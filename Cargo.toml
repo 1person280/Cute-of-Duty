@@ -1,0 +1,72 @@
+[package]
+name = "cute_of_duty"
+version = "0.2.3"
+edition = "2021"
+license = "GPL-3.0-with-linking-exception"
+authors = ["B站@3493264141322312", "Kimi AI Collaborator"]
+description = "Cute Of Duty 1: Simple - 战术撤离射击游戏（核心库 + 3D Demo，bevy 由 feature \"demo\" 门控）"
+
+[workspace]
+# 自 0.2.3 起 demo3d 独立 crate 已并回本包：3D Demo 代码位于
+# src/demo（玩法/渲染）与 src/model（干员模型/动作），
+# 由 feature "demo" 门控，默认 cargo build/test 不编译 bevy。
+
+[dependencies]
+# 序列化与配置解析
+serde = { version = "1.0", features = ["derive"] }
+serde_yaml = "0.9"
+
+# 无锁队列（HAL环形缓冲）
+crossbeam-queue = "0.3"
+
+# 数学与随机
+rand = { version = "0.8", features = ["std_rng"] }
+rand_pcg = "0.3"
+
+# 日志
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# 异步运行时（主循环实时节流调度）
+tokio = { version = "1.35", features = ["rt-multi-thread", "time", "macros"] }
+
+# 哈希（交易记录审计）
+blake3 = "1.5"
+
+# 3D 渲染引擎（可选：仅 feature "demo" 启用，cargo run --features demo）
+bevy = { version = "0.14", optional = true }
+
+[features]
+demo = ["dep:bevy"]
+
+# ===== 规划中（接入对应子系统时再启用，避免无谓的编译开销）=====
+# 网络（QUIC）:        quinn = "0.10"
+# 音频:                rodio = "0.17"
+# 零拷贝序列化:        rkyv = { version = "0.7", features = ["validation"] }
+# Arena分配器:         bumpalo = "3.14"
+# 时间处理:            chrono = "0.4"
+# 物理引擎:            rapier3d = "0.18"（启用 feature "physics"）
+# Vulkan绑定:          ash = "0.37"（启用 feature "vulkan"）
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bin]]
+name = "cod1"
+path = "src/main.rs"
+
+# profile 是 workspace 级设置
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.dev]
+opt-level = 1
+
+# Bevy官方推荐：dev模式下依赖（含wgpu渲染栈）全量O3，
+# 否则试玩帧率明显下降；游戏代码本身保持O1以加快增量编译
+[profile.dev.package."*"]
+opt-level = 3

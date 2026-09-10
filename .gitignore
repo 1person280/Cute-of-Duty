@@ -1,0 +1,18 @@
+# Rust 构建产物
+/target/
+
+# 本机 IDE / 编辑器
+.idea/
+.vscode/
+*.iml
+
+# 系统杂项
+Thumbs.db
+.DS_Store
+
+# 本地实验产物
+*.log
+/target/
+*.zip
+check_out.txt
+smoke_out.log

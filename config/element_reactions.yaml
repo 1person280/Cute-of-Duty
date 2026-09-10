@@ -1,0 +1,176 @@
+# Cute Of Duty 1: Simple - 元素反应配置表
+# 设计师可直接修改此文件，无需重新编译代码
+# 新增元素只需添加行，零代码改动
+
+reactions:
+  # ========== 基础元素反应 ==========
+  # 水/潮湿 + 火 = 蒸发
+  - target_state: Wet
+    incoming_element: Fire
+    result: Vaporize
+    damage_multiplier: 1.5
+    attach_effects: [Vaporize]
+    description: "水遇火蒸发，造成额外伤害"
+
+  # 冰冻 + 火 = 融化
+  - target_state: Frozen
+    incoming_element: Fire
+    result: Melt
+    damage_multiplier: 2.0
+    attach_effects: [Melt]
+    description: "冰遇火融化，造成巨额伤害"
+
+  # 草地/植被 + 火 = 燃烧
+  - target_state: Grass
+    incoming_element: Fire
+    result: Burning
+    damage_multiplier: 1.2
+    attach_effects: [Burning]
+    description: "点燃植被，持续燃烧"
+
+  # 水/潮湿 + 电 = 电解（无视护盾）
+  - target_state: Wet
+    incoming_element: Electric
+    result: Electrolysis
+    damage_multiplier: 1.8
+    attach_effects: [Electrolysis]
+    description: "电解潮湿目标，无视护盾直接伤害"
+
+  # 冰冻 + 电 = 超导
+  - target_state: Frozen
+    incoming_element: Electric
+    result: Superconduct
+    damage_multiplier: 1.0
+    attach_effects: [Superconduct]
+    description: "超导反应，降低目标物理抗性"
+
+  # 中毒/腐蚀 + 火 = 毒雾爆炸
+  - target_state: Poisoned
+    incoming_element: Fire
+    result: PoisonExplosion
+    damage_multiplier: 2.5
+    attach_effects: [PoisonCloud]
+    description: "毒雾爆炸，产生范围毒火混合云"
+
+  # 燃烧 + 冰 = 爆裂冻结（协同增益）
+  - target_state: Burning
+    incoming_element: Ice
+    result: ShatterFreeze
+    damage_multiplier: 2.0
+    attach_effects: [ShatterFreeze, PhysicalVulnerability]
+    description: "火后冰击，目标护甲碎裂，受到200%物理易伤"
+
+  # ========== 环境互动修正 ==========
+  # 雨天火系修正
+  - target_state: RainEnvironment
+    incoming_element: Fire
+    result: RainSuppressed
+    damage_multiplier: 0.7
+    attach_effects: []
+    description: "雨天火系输出降低30%"
+
+  # 雨天电系修正
+  - target_state: RainEnvironment
+    incoming_element: Electric
+    result: RainAmplified
+    damage_multiplier: 1.2
+    attach_effects: [ConductiveRisk]
+    description: "雨天电系输出增加20%，但有自伤风险"
+
+  # 高温区火系修正
+  - target_state: HighTemperature
+    incoming_element: Fire
+    result: Overheat
+    damage_multiplier: 1.4
+    attach_effects: [OverheatRisk]
+    description: "高温区火系输出增加40%，但有过热自伤风险"
+
+  # 雪地冰系修正
+  - target_state: SnowEnvironment
+    incoming_element: Ice
+    result: SnowAmplified
+    damage_multiplier: 1.3
+    attach_effects: []
+    description: "雪地冰系输出增加30%"
+
+  # 雪地电系修正
+  - target_state: SnowEnvironment
+    incoming_element: Electric
+    result: SnowSuppressed
+    damage_multiplier: 0.8
+    attach_effects: []
+    description: "雪地电系输出降低20%"
+
+# ========== 元素互斥规则 ==========
+mutual_exclusion:
+  # 自身互斥（装备搭配惩罚）
+  self_conflicts:
+    - elements: [IceArmor, FireWeapon]
+      effect: "fire_output_reduction"
+      value: 0.15
+      description: "冰甲+火枪：火枪输出降低15%（冰吸热）"
+
+    - elements: [FireArmor, IceGrenade]
+      effect: "ice_efficiency_reduction"
+      value: 0.15
+      description: "火甲+冰雷：冰雷冻结效率降低15%（火升温）"
+
+    - elements: [ElectricWeapon, WaterMine]
+      effect: "self_damage_risk"
+      value: 0.25
+      description: "电枪+水雷：潮湿环境下电枪自伤概率提升25%"
+
+  # 队友互斥（距离判定）
+  teammate_conflicts:
+    radius: 5.0  # 互斥半径5米
+    falloff: linear  # 线性衰减
+    combinations:
+      - elements: [IceArmor, FireWeapon]
+        effect: "fire_output_reduction"
+        max_value: 0.15
+        description: "冰甲队友降低火枪输出，贴脸15%，5米边缘0%"
+
+      - elements: [PoisonArmor, HealAbility]
+        effect: "heal_reduction"
+        max_value: 0.20
+        description: "毒甲队友降低生命恢复效率，贴脸20%，5米边缘0%"
+
+      - elements: [ElectricArmor, ElectronicDevice]
+        effect: "device_interference"
+        max_value: 0.10
+        description: "电甲队友干扰电子设备，贴脸10%，5米边缘0%"
+
+# ========== 协同增益（正向连携） ==========
+synergies:
+  - name: "烈焰共鸣"
+    condition: "three_fire_players_spaced"
+    trigger: "three_fire_players_distance_gt_5m"
+    effect:
+      fire_damage_bonus: 0.25
+      burn_stackable: true
+    description: "三名火系玩家间距>5米，各自火伤+25%，燃烧叠加"
+
+  - name: "电解"
+    condition: "electric_on_wet"
+    trigger: "electric_attack_on_wet_target"
+    effect:
+      ignore_shield: true
+      direct_hp_damage: true
+    description: "电系攻击潮湿目标，无视常规护盾直接伤害生命值"
+
+  - name: "毒雾爆炸"
+    condition: "poison_then_fire"
+    trigger: "poison_corrosion_followed_by_fire_ignite"
+    effect:
+      create_poison_fire_cloud: true
+      cloud_radius: 5.0
+      cloud_duration: 8.0
+    description: "毒系腐蚀后火系点燃，产生范围毒火混合云"
+
+  - name: "爆裂冻结"
+    condition: "fire_then_ice"
+    trigger: "fire_burning_followed_by_ice_freeze"
+    effect:
+      armor_shatter: true
+      physical_vulnerability: 2.0
+    description: "火系先手挂燃烧，冰系后手冻结，目标护甲碎裂，受到200%物理易伤"
