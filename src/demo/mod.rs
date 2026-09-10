@@ -834,6 +834,7 @@ fn setup_main_menu(
                 style: Style { height: Val::Px(10.0), ..default() },
                 ..default()
             });
+            spawn_credits_panel(overlay);
             close_btn = spawn_action_button(overlay, "返 回", 200.0, 48.0, 20.0);
         }).id();
     });
@@ -1409,6 +1410,7 @@ fn spawn_pause_ui(commands: &mut Commands, settings: &GameSettings) {
                 style: Style { height: Val::Px(12.0), ..default() },
                 ..default()
             });
+            spawn_credits_panel(panel);
             back_btn = spawn_menu_button(panel, "返 回", "回到暂停菜单", true);
         }).id();
     });
@@ -1420,6 +1422,72 @@ fn spawn_pause_ui(commands: &mut Commands, settings: &GameSettings) {
 
     commands.insert_resource(PauseMenuUi { root, main_panel, settings_panel });
     commands.insert_resource(PauseGrace(Timer::from_seconds(0.25, TimerMode::Once)));
+}
+
+/// 开源代码鸣谢面板：逐条列出本项目用到的核心开源库及其用途
+fn spawn_credits_panel(parent: &mut ChildBuilder) {
+    /// (库名 · 版本, 一句话说明"是什么、用在哪")
+    const CREDITS: &[(&str, &str)] = &[
+        ("Bevy 0.14", "3D 游戏引擎（MIT / Apache-2.0）—— 渲染、输入、UI、ECS 场景调度"),
+        ("Tokio 1.35", "异步运行时（MIT）—— 驱动固定 Tick 主循环的实时节流与定时"),
+        ("Serde / serde_yaml", "序列化框架（MIT / Apache-2.0）—— 解析 config/element_reactions.yaml 元素反应配置"),
+        ("Tracing", "结构化日志（MIT）—— 主循环、战局与档案系统的运行日志输出"),
+        ("Rand / rand_pcg", "随机数（MIT / Apache-2.0）—— 装备元素掉落与 AI 行为的确定性随机"),
+        ("Crossbeam-queue", "无锁队列（MIT / Apache-2.0）—— HAL 层环形缓冲的低延迟通信"),
+        ("BLAKE3 1.5", "密码学哈希（CC0 / Apache-2.0）—— 交易记录审计与确定性验证的状态哈希"),
+        ("Criterion 0.5", "基准测试框架（MIT / Apache-2.0，仅 dev 依赖）—— 性能回归基准"),
+    ];
+
+    parent.spawn(NodeBundle {
+        style: Style {
+            width: Val::Px(760.0),
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(4.0),
+            padding: UiRect::px(20.0, 10.0, 14.0, 12.0),
+            border: UiRect::all(Val::Px(2.0)),
+            ..default()
+        },
+        background_color: BackgroundColor(Color::srgba(0.06, 0.09, 0.13, 0.92)),
+        border_color: BorderColor(Color::srgb(0.22, 0.28, 0.36)),
+        border_radius: BorderRadius::all(Val::Px(4.0)),
+        ..default()
+    }).with_children(|panel| {
+        panel.spawn(TextBundle::from_section(
+            "开 源 代 码 鸣 谢",
+            TextStyle { font_size: 17.0, color: menu_accent(), ..default() },
+        ));
+        panel.spawn(TextBundle::from_section(
+            "本项目是开源软件（GPL-3.0 with linking exception），站在下列开源库的肩膀上",
+            TextStyle { font_size: 12.0, color: Color::srgb(0.55, 0.62, 0.72), ..default() },
+        ));
+        panel.spawn(NodeBundle {
+            style: Style { height: Val::Px(4.0), ..default() },
+            ..default()
+        });
+        for (name, desc) in CREDITS {
+            panel.spawn(NodeBundle {
+                style: Style {
+                    width: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Row,
+                    justify_content: JustifyContent::SpaceBetween,
+                    column_gap: Val::Px(16.0),
+                    ..default()
+                },
+                ..default()
+            }).with_children(|row| {
+                // 左列定宽，保证右侧说明文字纵向对齐
+                row.spawn(TextBundle::from_section(
+                    *name,
+                    TextStyle { font_size: 13.0, color: Color::srgb(0.85, 0.89, 0.95), ..default() },
+                ));
+                row.spawn(TextBundle::from_section(
+                    *desc,
+                    TextStyle { font_size: 13.0, color: Color::srgb(0.62, 0.70, 0.80), ..default() },
+                ));
+            });
+        }
+    });
 }
 
 /// 设置行：标签 + ◀ 值 ▶
