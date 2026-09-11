@@ -305,7 +305,7 @@ pub(crate) fn setup_main_menu(
         // 左上角角标
         root.spawn(TextBundle {
             text: Text::from_section(
-                "PRE-ALPHA v0.2.1",
+                "PRE-ALPHA v0.2.3",
                 TextStyle { font_size: 14.0, color: Color::srgb(0.42, 0.48, 0.56), ..default() },
             ),
             style: Style {
