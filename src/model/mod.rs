@@ -12,7 +12,7 @@
 use bevy::prelude::*;
 
 use crate::operator::roster;
-use crate::demo::{CamPivot, PitchPivot, ShoulderPivot, SpringArm, lerp};
+use crate::demo::camera::{CamPivot, PitchPivot, ShoulderPivot, SpringArm, lerp};
 
 
 // ===== 以下代码自 src/demo/mod.rs 原样迁入（干员模型/动作域） =====
