@@ -1,6 +1,6 @@
 # Cute Of Duty 1: Simple
 
-**版本 0.2.3 (Pre-Alpha)** · 战术撤离射击游戏
+**版本 0.3.0 (Pre-Alpha)** · 战术撤离射击游戏
 
 核心差异化设计：**元素互斥生态 + 反护航经济架构**。
 
@@ -27,7 +27,7 @@
 > 双击项目根目录下的 **`CuteOfDuty_Demo.exe`** 即可进入 3D 像素风 FPS Demo。
 >
 > 程序启动时会自动定位项目目录（从工作目录逐级向上搜索，找不到再从 exe 所在目录搜索），
-> 因此从任意位置启动都能加载 `assets/` 与 `config/`。
+> 因此从任意位置启动都能加载 `assets/` 与 `src/config/element_reactions.yaml`。
 
 ### 本地编译
 
@@ -95,31 +95,47 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
    默认 `cargo build`/`cargo test` 永远不编译 bevy；需要渲染的资源（Resource trait 等）
    由 Demo 侧 newtype 包装（如 `ElementalSystem`）。
 
-### 模块地图
+### 目录结构总览（表1 · Src 内部核心模块）
 
-| 模块 | 职责 |
-|------|------|
-| `src/element/` | 元素系统核心。设计要点：把元素反应从 O(n²) 笛卡尔积压缩为 O(n) 线性扩展；全部反应由 `config/element_reactions.yaml` 驱动，**新增元素只需加配置表** |
-| `src/config/` | 配置加载：项目根目录探测（CWD 向上 → exe 向上）+ 严格解析；解析失败大声报错，杜绝"改了配置不生效" |
-| `src/damage/` | 伤害结算流水线：元素修正 → 数值计算 → 副作用附着 → 生命扣除 → 事件广播 |
-| `src/engine/` | 游戏循环：60Hz 固定 Tick 主时钟，逻辑与渲染完全解耦，实体按 ID 排序处理保证确定性，双缓冲状态快照支持重放验证 |
-| `src/entity/` | 自研 ECS：实体是组件容器，组件是自治的前作用单元，系统按固定顺序处理实体 |
-| `src/equipment/` | 装备等级与元素规则（**反护航经济核心**）：1 级新手保护舱（无元素）；2-6 级获得时真随机元素、可付费指定（成本翻倍）；7-9 级真随机且不可指定（混沌区）；转售/给予时元素重新随机 |
-| `src/gamemode/` | 游戏模式：战术撤离（核心）、团队死斗（练习）、合约模式 |
-| `src/hal/` | 硬件抽象层：单调时钟、中断消解为带时间戳的环形缓冲数据、零分配 |
-| `src/map/` | **纯数据地图定义**（不依赖 bevy）：描述"地图里有什么、在哪"，渲染由 Demo 的通用渲染器统一处理。坐标约定：x 向右 / y 向上 / z 向前，玩家出生在原点面向 -Z |
-| `src/map/training.rs` | CQB 室内训练场（声明式数据定义）：出生准备室 / CQB 大厅（巷道+跪姿矮墙+指挥台）/ 射击馆（5/10/15m 靶道 + 移动靶）/ 二层回廊。**布局约束由单元测试保证，改坐标前先跑 `cargo test`** |
-| `src/operator/` | 干员与武器档案（纯数据）：Q/E 技能归属干员而非武器——焦狸（点燃 DoT）、霜吻（冰冻控制）、雷豹（位移+电麻）、毒蜨（持续毒区）；步枪数值同样集中于此 |
-| `src/player/` | 玩家档案：信誉系统、赛季进度、统计数据 |
-| `src/demo/` | 3D FPS Demo（feature `"demo"` 门控）：`mod.rs` 为纯组装层（插件/资源/系统注册），其余按功能拆为 `menu` / `pause` / `hud` / `inventory` / `combat` / `camera` / `controller` / `world` / `character` / `targets` / `minimap` / `stations` / `components` / `common` 子模块 |
-| `src/model/` | 干员模型与动作（feature `"demo"` 门控）：Yanhu 体素模型、动画系统、干员切换时的模型置换 |
+> 公开符号全部经各目录 `mod.rs` 薄壳重导出；**核心业务模块深度 ≤ 2 层**（`src/module/file.rs`）。
+> 扁平化/拆分规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+| 模块名 | 核心职责 | 关键文件 / 结构体说明 |
+|---|---|---|
+| `config` | 配置加载与单一事实来源 | `mod.rs`（目录探测 + `include_str!` 嵌入默认 + 运行时覆盖）；`element_reactions.yaml`（随源码提交的元素反应表） |
+| `element` | 元素反应系统 | `ElementType` / `EntityElementState` / `ReactionResult`（元素/状态模型）；`ElementConfig`（YAML 反序列化目标）；`ElementSystem`（反应查询、互斥惩罚、协同增益、环境修正） |
+| `damage` | 伤害结算流水线 | `packet.rs`（`DamagePacket`/`Vec3` 纯数据）；`resolver.rs`（`DamageResolver` 结算 Step1–9）；`effect.rs`（燃烧/冰冻/中毒等 9 个副作用组件） |
+| `engine` | 游戏循环 | `GameLoop`（60Hz 固定 Tick 主时钟）；`TickConfig`；确定性双缓冲快照 + 重放验证 |
+| `entity` | 自研 ECS | 实体=组件容器；组件自治前作用；系统按固定顺序处理 |
+| `equipment` | 装备等级与元素规则（反护航经济核心） | 1 级新手保护舱；2-6 级可指定元素（成本翻倍）；7-9 级真随机混沌区；转售/给予重置元素 |
+| `gamemode` | 游戏模式 | `MatchConfig` / `MatchManager`：战术撤离（核心）、团队死斗（练习）、合约 |
+| `hal` | 硬件抽象层 | 单调时钟；中断消解为带时间戳的环形缓冲（零分配，`crossbeam-queue`） |
+| `map` | **纯数据地图定义**（零 bevy） | `MapLayout`；`training/`：`layout()` 组装出生准备室/CQB 大厅/射击馆/二层回廊（`building_shell.rs`/`spawn_room.rs`/`cqb_hall.rs`/`shooting_range.rs`/`second_floor.rs`） |
+| `operator` | 干员与武器档案（纯数据） | Q/E 技能归属干员（焦狸/霜吻/雷豹/毒蜨）；步枪数值集中于此 |
+| `player` | 玩家档案 | 信誉系统、赛季进度、统计数据 |
+| `demo` *(feature `"demo"` 门控)* | 3D FPS Demo | `mod.rs` 纯组装层；面板已扁平化：`frontend`(引导)/`components`/`menu/`(主菜单+加载+设置)/`pause`/`world`/`character`/`controller`/`camera`/`combat/`(武器/技能/手雷/爆炸/区域/反馈)/`targets`/`minimap`/`hud/`(血条/弹药/击杀播报/伤害跳字/闪烁)/`inventory/`(背包/交互菜单/物品轮盘/持握手雷)/`stations` |
+| `model` *(feature `"demo"` 门控)* | 干员模型与动作 | `operator_models.rs`（四名干员体素模型）；`operator_swap.rs`（模型置换）；`yanhu_action.rs`（动作系统）；`rig.rs`/`palette.rs`/`components.rs` |
+
+### 目录结构总览（表2 · 外部资源与配置）
+
+| 目录名 | 用途 | 文件格式 / 注意事项 |
+|---|---|---|
+| `assets/` | 美术资源（游戏内加载） | 子目录：`characters/` `environment/` `fonts/` `ui/` `weapons/`；`.jpg`/`.png`/`.ttf`（中文字体 `simhei.ttf`）+ `model/*.json`（体素模型） |
+| `src/config/` | **配置表（含加载器，与核心代码物理相邻）** | `element_reactions.yaml`：无头模拟与 3D Demo 共用；**单一事实来源**——默认值由 `include_str!` 编译期嵌入，运行时同路径文件作为设计师热改覆盖；改表需同步重编译默认或改同文件 |
+| `tools/` | 开发辅助脚本 | PowerShell（图标生成、窗口截图、UI 自动测试等） |
+| `.github/workflows/` | CI | `rust.yml`：push/PR 到 `main` 自动跑 `cargo build` + `cargo test`（不带 demo） |
+| `.agents/skills/` | AI 协作工作流文档 | 美术创作 / 地图验收等技能的说明文档 |
+| `CuteOfDuty_Demo.exe` | 预编译 3D Demo | 双击即玩；启动自动定位项目根目录（向上搜索 `src/config/element_reactions.yaml`）|
 
 ### 配置表
 
-- `config/element_reactions.yaml`：元素反应表，无头模拟与 3D Demo **共用同一份**
+- `src/config/element_reactions.yaml`：元素反应表，无头模拟与 3D Demo **共用同一份**
   （核心库 `cute_of_duty::config` 模块统一加载，自动定位项目根目录）。
-  改平衡直接改表，不用动代码。加载语义：
-  - **文件缺失** → 回退到内置默认配置（与 YAML 内容保持一致），日志会提示；
+  改平衡直接改表，不用动代码。**单一事实来源**的加载语义：
+  - **权威默认** = 编译期 `include_str!` 嵌入的同目录 YAML，随二进制分发、无源码也能拿到一致默认值；
+    改表时同步改该文件即可（默认值由同一文件驱动，永不漂移）；
+  - **运行时覆盖** = 从项目根目录向上搜索同路径 YAML，供设计师不改代码热改表；
+  - **文件缺失** → 回退嵌入默认（与 YAML 恒一致），日志会提示；
   - **文件存在但解析失败** → 启动直接报错退出（两个入口均如此）——改错表应当场失败，
     而不是静默用默认值让改动"看起来生效了"。
 - 表内环境修正（`RainEnvironment`/`HighTemperature`/`SnowEnvironment` 各行）、
@@ -131,7 +147,7 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 
 ### 如何新增一张地图
 
-1. 新建 `src/map/<名称>.rs`，实现一个返回 `MapLayout` 的 `layout()` 函数（照抄 `training.rs` 的写法）；
+1. 新建 `src/map/<名称>/mod.rs`（或单文件 `<名称>.rs`），实现一个返回 `MapLayout` 的 `layout()` 函数（照抄 `training/mod.rs` 的写法）；
 2. 在 `src/map/mod.rs` 里 `pub mod <名称>;`
 3. Demo 侧无需改动渲染逻辑——通用渲染器 `spawn_map_layout` 会自动处理网格、材质、光照；
 4. 跑 `cargo test` 确认布局约束（边界、通道净空、遮挡不与掩体相交等）全部通过。
@@ -161,6 +177,7 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 0.3.0 | 2026-09-20 | **反屎山扁平化重构**：`config/` 并入 `src/config/`（YAML `include_str!` 嵌入 + 运行时覆盖，单一事实来源）；全部 >500 行上帝文件拆成语义化子模块（`damage`→packet/resolver/effect，`map/training`→分区分文件，`demo` 的 `inventory`/`menu`/`hud`/`combat`→面板目录，`model`→operator_models 等）；`common.rs`→`frontend.rs`；新增 [CONTRIBUTING.md（反屎山公约）](CONTRIBUTING.md) 与目录结构表格 |
 | 未发布（main） | 2026-09-11 | GitHub Actions CI 接入；`src/map/training.rs` 扁平化重构并修复 CI 构建错误；设置面板新增「开源代码鸣谢」；`src/demo` 由 7300 行单文件拆分为 15 个功能子模块 |
 | 0.2.3 | 2026-09-10 | 首个真开源版本：demo3d 独立 crate 并回本包（bevy 改由 feature `"demo"` 门控）；新增 `src/model` 干员模型（Yanhu）与动作系统；仓库以 GPL-3.0-with-linking-exception 开源 |
 | 0.2.1 | 2026-09-06 | 0.2 hotfix 1：主界面改版（右下角「切换模式/开始游戏」、右侧 60% 分类+模式选择面板、右上角齿轮设置浮层）；workspace 解耦（核心库零 bevy、配置表全量生效） |
@@ -175,18 +192,18 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 CuteOfDutyAlpha/
 ├── Cargo.toml / Cargo.lock     # 包清单（核心库 + cod1 bin；bevy 为 feature 门控的可选依赖）
 ├── CuteOfDuty_Demo.exe         # 预编译 3D Demo，双击即玩
+├── CONTRIBUTING.md             # ⚠️ 反屎山公约（贡献前必读）
 ├── .github/workflows/rust.yml  # CI：push/PR 到 main 跑 cargo build + cargo test
 ├── .agents/skills/             # AI 协作工作流文档（美术创作 / 地图验收）
-├── config/
-│   └── element_reactions.yaml  # 元素反应配置表（两个入口共用，自动定位）
 ├── assets/                     # 美术资源：characters / environment / fonts / ui / weapons
 ├── tools/                      # 开发辅助脚本（PowerShell：图标生成、窗口截图、UI 测试等）
 ├── src/
-│   ├── lib.rs                  # 核心库入口（11 个核心模块，见模块地图）
+│   ├── lib.rs                  # 核心库入口（11 个核心模块，见表1）
 │   ├── main.rs                 # cod1 入口：默认无头模拟；--features demo 时为 3D Demo
-│   ├── config/ damage/ element/ engine/ entity/
-│   ├── equipment/ gamemode/ hal/ map/ operator/ player/   # 核心库模块（零 bevy）
-│   ├── demo/                   # 3D Demo（feature "demo"）：组装层 mod.rs + 14 个功能子模块
+│   ├── config/                 # 配置加载器 + element_reactions.yaml（单一事实来源）
+│   ├── damage/ element/ engine/ entity/ equipment/ gamemode/ hal/ operator/ player/
+│   ├── map/                    # 纯数据地图定义（map/training/ 为训练场分区分文件）
+│   ├── demo/                   # 3D Demo（feature "demo"）：组装层 + 面板化子目录
 │   └── model/                  # 干员模型与动作（feature "demo"）
 └── target/                     # 构建产物
 ```

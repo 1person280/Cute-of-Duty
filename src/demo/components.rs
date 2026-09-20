@@ -1,4 +1,4 @@
-//! 游戏组件与标记：实体数据定义（无逻辑），全部 crate 内共享
+﻿//! 游戏组件与标记：实体数据定义（无逻辑），全部 crate 内共享
 
 use bevy::prelude::*;
 use crate::element::ElementType;
@@ -7,7 +7,7 @@ use crate::operator::{rifle_profile, roster};
 use crate::model::{
     ready_timer, OperatorAccent, OperatorState,
 };
-use super::common::*;
+use super::frontend::*;
 
 #[derive(Resource, Default)]
 pub(crate) struct InputState {

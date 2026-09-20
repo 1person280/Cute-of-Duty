@@ -1,4 +1,4 @@
-//! 功能站点：补给台/干员切换台面板、点击发放、UI 刷新
+﻿//! 功能站点：补给台/干员切换台面板、点击发放、UI 刷新
 
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, PrimaryWindow};
@@ -9,7 +9,7 @@ use crate::model::{
     OperatorAccent, Player, OperatorState,
 };
 use super::inventory::HeldGrenade;
-use super::common::*;
+use super::frontend::*;
 use super::components::*;
 
 /// 构建两张功能台的交互面板（隐藏，由 station_system 控制显隐）

@@ -1,4 +1,4 @@
-//! 暂停菜单与设置：GameSettings、设置行/鸣谢面板 UI、暂停交互、teardown_game
+﻿//! 暂停菜单与设置：GameSettings、设置行/鸣谢面板 UI、暂停交互、teardown_game
 
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
@@ -6,7 +6,7 @@ use crate::model::PlayerCamera;
 use super::menu::{spawn_menu_button, menu_accent, menu_button_palette, MenuButton};
 use super::inventory::HeldGrenade;
 use super::hud::EffectAssets;
-use super::common::*;
+use super::frontend::*;
 use super::components::*;
 
 #[derive(Resource)]

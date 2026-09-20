@@ -1,4 +1,4 @@
-//! Cute Of Duty 1: Simple - 3D Pixel FPS Demo（组装层）
+﻿//! Cute Of Duty 1: Simple - 3D Pixel FPS Demo（组装层）
 //!
 //! Tech: Bevy 0.14 + Voxel Rendering
 //! Style: Minecraft Steve model inspired
@@ -19,7 +19,7 @@
 //! - Esc: Close backpack / station panel, release mouse otherwise
 //!
 //! 模块划分（本文件只负责组装：插件/资源/系统注册，不含任何玩法逻辑）：
-//! - `common`     光标锁定、CJK 字体、元素系统胶水、AppState
+//! - `frontend`     光标锁定、CJK 字体、元素系统胶水、AppState
 //! - `components` 全部组件/标记定义（纯数据）
 //! - `menu`       主菜单与加载屏
 //! - `pause`      暂停菜单与设置
@@ -43,7 +43,7 @@ use bevy::window::WindowPlugin;
 pub mod camera; // model 直接依赖相机组件（避免 demo⇄model 整体互相 use）
 mod character;
 mod combat;
-mod common;
+mod frontend;
 mod components;
 mod controller;
 mod hud;
@@ -60,7 +60,7 @@ pub use camera::{CamPivot, PitchPivot, ShoulderPivot, SpringArm, lerp};
 use camera::*;
 
 use combat::*;
-use common::*;
+use frontend::*;
 use components::*;
 use controller::*;
 use hud::*;

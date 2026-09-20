@@ -108,7 +108,7 @@ pub enum ReactionResult {
 }
 
 /// 元素反应规则（配置表中的一行）
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ElementReaction {
     pub target_state: EntityElementState,
     pub incoming_element: ElementType,
@@ -121,7 +121,7 @@ pub struct ElementReaction {
 }
 
 /// 互斥规则
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SelfConflictRule {
     pub elements: Vec<String>,
     pub effect: String,
@@ -130,7 +130,7 @@ pub struct SelfConflictRule {
     pub description: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TeammateConflictCombination {
     pub elements: Vec<String>,
     pub effect: String,
@@ -139,14 +139,14 @@ pub struct TeammateConflictCombination {
     pub description: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TeammateConflictRules {
     pub radius: f32,
     pub falloff: String,
     pub combinations: Vec<TeammateConflictCombination>,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct MutualExclusionRules {
     #[serde(default)]
     pub self_conflicts: Vec<SelfConflictRule>,
@@ -155,7 +155,7 @@ pub struct MutualExclusionRules {
 }
 
 /// 协同增益规则
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SynergyRule {
     pub name: String,
     pub condition: String,
@@ -165,7 +165,7 @@ pub struct SynergyRule {
 }
 
 /// 元素系统配置（YAML反序列化目标）
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ElementConfig {
     #[serde(default)]
     pub reactions: Vec<ElementReaction>,
@@ -176,202 +176,17 @@ pub struct ElementConfig {
 }
 
 impl Default for ElementConfig {
-    /// 内置默认配置：与 config/element_reactions.yaml 保持一致
-    /// （找不到配置文件时的回退值，两份数据必须同步修改）
+    /// 内置默认配置：直接解析 `src/config/element_reactions.yaml`（编译期嵌入）。
+    ///
+    /// # 为何这样设计（Why）
+    /// 早期这里是一份手写的硬编码表格，与 YAML 分处两地，改表极易导致
+    /// "文件缺失时回退的默认值"与设计师新改的表不一致（静默漂移）。
+    /// 改为 `include_str!` 直读同一份 YAML 后：
+    /// 1. 默认值与配置表恒为同一事实来源，永不漂移；
+    /// 2. 删掉 ~200 行重复数据，element 模块不再依赖 config 模块（避免 config↔element 循环依赖）。
     fn default() -> Self {
-        let reaction = |target_state: EntityElementState,
-                        incoming_element: ElementType,
-                        result: ReactionResult,
-                        damage_multiplier: f32,
-                        attach_effects: Vec<ReactionResult>,
-                        description: &str| {
-            ElementReaction {
-                target_state,
-                incoming_element,
-                result,
-                damage_multiplier,
-                attach_effects,
-                description: description.to_string(),
-            }
-        };
-        Self {
-            reactions: vec![
-                // ========== 基础元素反应 ==========
-                reaction(
-                    EntityElementState::Wet,
-                    ElementType::Fire,
-                    ReactionResult::Vaporize,
-                    1.5,
-                    vec![ReactionResult::Vaporize],
-                    "水遇火蒸发，造成额外伤害",
-                ),
-                reaction(
-                    EntityElementState::Frozen,
-                    ElementType::Fire,
-                    ReactionResult::Melt,
-                    2.0,
-                    vec![ReactionResult::Melt],
-                    "冰遇火融化，造成巨额伤害",
-                ),
-                reaction(
-                    EntityElementState::Grass,
-                    ElementType::Fire,
-                    ReactionResult::Burning,
-                    1.2,
-                    vec![ReactionResult::Burning],
-                    "点燃植被，持续燃烧",
-                ),
-                reaction(
-                    EntityElementState::Wet,
-                    ElementType::Electric,
-                    ReactionResult::Electrolysis,
-                    1.8,
-                    vec![ReactionResult::Electrolysis],
-                    "电解潮湿目标，无视护盾直接伤害",
-                ),
-                reaction(
-                    EntityElementState::Frozen,
-                    ElementType::Electric,
-                    ReactionResult::Superconduct,
-                    1.0,
-                    vec![ReactionResult::Superconduct],
-                    "超导反应，降低目标物理抗性",
-                ),
-                reaction(
-                    EntityElementState::Poisoned,
-                    ElementType::Fire,
-                    ReactionResult::PoisonExplosion,
-                    2.5,
-                    vec![ReactionResult::PoisonCloud],
-                    "毒雾爆炸，产生范围毒火混合云",
-                ),
-                reaction(
-                    EntityElementState::Burning,
-                    ElementType::Ice,
-                    ReactionResult::ShatterFreeze,
-                    2.0,
-                    vec![ReactionResult::ShatterFreeze, ReactionResult::PhysicalVulnerability],
-                    "火后冰击，目标护甲碎裂，受到200%物理易伤",
-                ),
-                // ========== 环境互动修正 ==========
-                reaction(
-                    EntityElementState::RainEnvironment,
-                    ElementType::Fire,
-                    ReactionResult::RainSuppressed,
-                    0.7,
-                    vec![],
-                    "雨天火系输出降低30%",
-                ),
-                reaction(
-                    EntityElementState::RainEnvironment,
-                    ElementType::Electric,
-                    ReactionResult::RainAmplified,
-                    1.2,
-                    vec![ReactionResult::ConductiveRisk],
-                    "雨天电系输出增加20%，但有自伤风险",
-                ),
-                reaction(
-                    EntityElementState::HighTemperature,
-                    ElementType::Fire,
-                    ReactionResult::Overheat,
-                    1.4,
-                    vec![ReactionResult::OverheatRisk],
-                    "高温区火系输出增加40%，但有过热自伤风险",
-                ),
-                reaction(
-                    EntityElementState::SnowEnvironment,
-                    ElementType::Ice,
-                    ReactionResult::SnowAmplified,
-                    1.3,
-                    vec![],
-                    "雪地冰系输出增加30%",
-                ),
-                reaction(
-                    EntityElementState::SnowEnvironment,
-                    ElementType::Electric,
-                    ReactionResult::SnowSuppressed,
-                    0.8,
-                    vec![],
-                    "雪地电系输出降低20%",
-                ),
-            ],
-            mutual_exclusion: MutualExclusionRules {
-                self_conflicts: vec![
-                    SelfConflictRule {
-                        elements: vec!["IceArmor".to_string(), "FireWeapon".to_string()],
-                        effect: "fire_output_reduction".to_string(),
-                        value: 0.15,
-                        description: "冰甲+火枪：火枪输出降低15%（冰吸热）".to_string(),
-                    },
-                    SelfConflictRule {
-                        elements: vec!["FireArmor".to_string(), "IceGrenade".to_string()],
-                        effect: "ice_efficiency_reduction".to_string(),
-                        value: 0.15,
-                        description: "火甲+冰雷：冰雷冻结效率降低15%（火升温）".to_string(),
-                    },
-                    SelfConflictRule {
-                        elements: vec!["ElectricWeapon".to_string(), "WaterMine".to_string()],
-                        effect: "self_damage_risk".to_string(),
-                        value: 0.25,
-                        description: "电枪+水雷：潮湿环境下电枪自伤概率提升25%".to_string(),
-                    },
-                ],
-                teammate_conflicts: Some(TeammateConflictRules {
-                    radius: 5.0,
-                    falloff: "linear".to_string(),
-                    combinations: vec![
-                        TeammateConflictCombination {
-                            elements: vec!["IceArmor".to_string(), "FireWeapon".to_string()],
-                            effect: "fire_output_reduction".to_string(),
-                            max_value: 0.15,
-                            description: "冰甲队友降低火枪输出，贴脸15%，5米边缘0%".to_string(),
-                        },
-                        TeammateConflictCombination {
-                            elements: vec!["PoisonArmor".to_string(), "HealAbility".to_string()],
-                            effect: "heal_reduction".to_string(),
-                            max_value: 0.20,
-                            description: "毒甲队友降低生命恢复效率，贴脸20%，5米边缘0%".to_string(),
-                        },
-                        TeammateConflictCombination {
-                            elements: vec!["ElectricArmor".to_string(), "ElectronicDevice".to_string()],
-                            effect: "device_interference".to_string(),
-                            max_value: 0.10,
-                            description: "电甲队友干扰电子设备，贴脸10%，5米边缘0%".to_string(),
-                        },
-                    ],
-                }),
-            },
-            synergies: vec![
-                SynergyRule {
-                    name: "烈焰共鸣".to_string(),
-                    condition: "three_fire_players_spaced".to_string(),
-                    trigger: "three_fire_players_distance_gt_5m".to_string(),
-                    effect: serde_yaml::from_str("{fire_damage_bonus: 0.25, burn_stackable: true}").unwrap(),
-                    description: "三名火系玩家间距>5米，各自火伤+25%，燃烧叠加".to_string(),
-                },
-                SynergyRule {
-                    name: "电解".to_string(),
-                    condition: "electric_on_wet".to_string(),
-                    trigger: "electric_attack_on_wet_target".to_string(),
-                    effect: serde_yaml::from_str("{ignore_shield: true, direct_hp_damage: true}").unwrap(),
-                    description: "电系攻击潮湿目标，无视常规护盾直接伤害生命值".to_string(),
-                },
-                SynergyRule {
-                    name: "毒雾爆炸".to_string(),
-                    condition: "poison_then_fire".to_string(),
-                    trigger: "poison_corrosion_followed_by_fire_ignite".to_string(),
-                    effect: serde_yaml::from_str("{create_poison_fire_cloud: true, cloud_radius: 5.0, cloud_duration: 8.0}").unwrap(),
-                    description: "毒系腐蚀后火系点燃，产生范围毒火混合云".to_string(),
-                },
-                SynergyRule {
-                    name: "爆裂冻结".to_string(),
-                    condition: "fire_then_ice".to_string(),
-                    trigger: "fire_burning_followed_by_ice_freeze".to_string(),
-                    effect: serde_yaml::from_str("{armor_shatter: true, physical_vulnerability: 2.0}").unwrap(),
-                    description: "火系先手挂燃烧，冰系后手冻结，目标护甲碎裂，受到200%物理易伤".to_string(),
-                },
-            ],
-        }
+        serde_yaml::from_str(include_str!("../config/element_reactions.yaml"))
+            .expect("随包嵌入的 element_reactions.yaml 必须可解析")
     }
 }
 

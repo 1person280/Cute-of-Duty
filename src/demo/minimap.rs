@@ -1,4 +1,4 @@
-//! 小地图与罗盘：标记组件、坐标换算、构建与每帧更新系统
+﻿//! 小地图与罗盘：标记组件、坐标换算、构建与每帧更新系统
 
 use bevy::prelude::*;
 use crate::map::{MaterialKind, StationKind};
@@ -6,7 +6,7 @@ use crate::model::{
     Player, PlayerCamera,
 };
 use crate::map::training;
-use super::common::*;
+use super::frontend::*;
 use super::components::*;
 
 pub(crate) const MINIMAP_PX: f32 = 180.0;

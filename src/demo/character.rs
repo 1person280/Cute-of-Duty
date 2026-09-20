@@ -1,4 +1,4 @@
-//! 角色生成：玩家/敌人实体与体素模型构建
+﻿//! 角色生成：玩家/敌人实体与体素模型构建
 
 use bevy::prelude::*;
 use crate::element::ElementType;
@@ -8,7 +8,7 @@ use crate::model::{
     PlayerHeadPivot, PlayerModelRoot, PlayerMovement,
 };
 use super::minimap::Faction;
-use super::common::*;
+use super::frontend::*;
 use super::components::*;
 
 pub(crate) enum CharacterPreset { PlayerFire, EnemyIce, TeammateElectric }

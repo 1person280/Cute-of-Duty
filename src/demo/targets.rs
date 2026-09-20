@@ -1,4 +1,4 @@
-//! 靶标：静态靶倒地/复位、移动靶巡逻、准星命中反馈
+﻿//! 靶标：静态靶倒地/复位、移动靶巡逻、准星命中反馈
 
 use bevy::prelude::*;
 use crate::element::ElementType;
@@ -7,7 +7,7 @@ use crate::model::{
 };
 use super::hud::EffectAssets;
 use super::combat::{spawn_damage_popup, spawn_explosion};
-use super::common::*;
+use super::frontend::*;
 use super::components::*;
 
 pub(crate) fn target_dummy_logic(

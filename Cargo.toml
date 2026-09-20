@@ -1,6 +1,6 @@
 [package]
 name = "cute_of_duty"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2021"
 license = "GPL-3.0-with-linking-exception"
 authors = ["B站@3493264141322312", "Kimi AI Collaborator"]
@@ -51,6 +51,7 @@ demo = ["dep:bevy"]
 [dev-dependencies]
 criterion = "0.5"
 
+# 主游戏
 [[bin]]
 name = "cod1"
 path = "src/main.rs"

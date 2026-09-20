@@ -1,22 +1,32 @@
 //! 配置加载模块
 //!
-//! 核心库统一的配置表加载入口：项目根目录探测 + 严格解析。
-//! `cod1` 与 `cod1-demo` 共用此模块，解决两类历史问题：
+//! 核心库统一的配置表加载入口：`src/config/` 与业务代码物理相邻，`cod1` 与 `cod1-demo` 共用。
+//! 解决两类历史问题：
 //! 1. 按裸相对路径读 `config/element_reactions.yaml`，换目录启动就丢配置；
-//! 2. 解析失败静默回退内置默认值，设计师改错表毫无感知（配置"不生效"）。
+//! 2. 内置默认值与 YAML 分处两地，改表后默认值漂移、行为不一致。
 //!
-//! 语义约定：
-//! - 文件缺失 → 回退内置默认配置（README 承诺的行为），返回 `None` 路径供调用方提示；
+//! 语义约定（单一事实来源）：
+//! - 权威默认 = 编译期 `include_str!` 嵌入的同目录 `element_reactions.yaml`，
+//!   表与代码恒同步，永不漂移，且随二进制分发，无源码也能拿到一致的默认值；
+//! - 运行时覆盖 = 从项目根目录向上搜索 `src/config/element_reactions.yaml`（设计师改表热加载）；
+//! - 文件缺失 → 回退嵌入默认（README 承诺的行为），返回 `None` 路径供调用方提示；
 //! - 文件存在但解析失败 → 返回 `Err`，由调用方大声失败（改错表就该当场报错，而不是静默用默认值）。
 
 use crate::element::ElementConfig;
 use std::path::{Path, PathBuf};
 
-/// 元素配置在项目内的相对路径（同时作为项目根目录的探测标记）
-pub const ELEMENT_CONFIG_REL: &str = "config/element_reactions.yaml";
+/// 元素配置在项目内的相对路径（同时作为项目根目录的探测标记）。
+///
+/// 设计成"根目录/src/config/element_reactions.yaml"而非旧的全项目 `config/` 目录，
+/// 是为了让配置表与加载器同处一室，物理距离最近；也作为 `project_root()` 的定位锚点。
+pub const ELEMENT_CONFIG_REL: &str = "src/config/element_reactions.yaml";
+
+/// 编译期嵌入的权威默认配置：与仓库内的 YAML 恒为同一份内容，
+/// 保证"无源码环境/文件缺失"时的默认值与设计师改的表一致。
+pub const ELEMENT_CONFIG_EMBEDDED: &str = include_str!("element_reactions.yaml");
 
 /// 探测项目根目录：
-/// 先从当前工作目录逐级向上找 `config/element_reactions.yaml`，
+/// 先从当前工作目录逐级向上找 `src/config/element_reactions.yaml`，
 /// 找不到再从可执行文件所在目录逐级向上找。
 /// 兼容"双击 exe""从 target/debug 启动""从任意工作目录启动"等情形。
 pub fn project_root() -> Option<PathBuf> {
@@ -38,7 +48,10 @@ fn search_upward(start: &Path) -> Option<PathBuf> {
     None
 }
 
-/// 定位元素配置文件（自动解析项目根目录）
+/// 定位元素配置文件（自动解析项目根目录）。
+///
+/// 该文件是"运行时覆盖"：存在时以其为准（可热改表），不存在时由 `load_element_config`
+/// 回退至编译期嵌入的默认配置。
 pub fn element_config_path() -> Option<PathBuf> {
     project_root().map(|root| root.join(ELEMENT_CONFIG_REL))
 }
@@ -54,12 +67,14 @@ pub fn load_element_config_from(path: &Path) -> Result<ElementConfig, String> {
 /// 便捷入口：自动定位配置文件并加载。
 ///
 /// - 找到且解析成功 → `Ok((配置, Some(路径)))`
-/// - 文件缺失       → `Ok((内置默认配置, None))`
+/// - 文件缺失       → `Ok((嵌入默认配置, None))`（编译期 `include_str!`，与 YAML 恒一致）
 /// - 解析失败       → `Err(带路径与原因的完整错误信息)`
 pub fn load_element_config() -> Result<(ElementConfig, Option<PathBuf>), String> {
     match element_config_path() {
         Some(path) => load_element_config_from(&path).map(|c| (c, Some(path))),
-        None => Ok((ElementConfig::default(), None)),
+        None => serde_yaml::from_str(ELEMENT_CONFIG_EMBEDDED)
+            .map(|c: ElementConfig| (c, None))
+            .map_err(|e| format!("嵌入默认元素配置解析失败: {e}")),
     }
 }
 
@@ -68,7 +83,7 @@ mod tests {
     use super::*;
     use crate::element::{ElementSystem, EntityElementState, ElementType};
 
-    /// 测试环境 CWD = 包根目录，config/ 就在这里
+    /// 测试环境 CWD = 包根目录，src/config/element_reactions.yaml 就在这里
     #[test]
     fn test_project_root_found() {
         let root = project_root().expect("应能定位到项目根目录");
@@ -85,6 +100,17 @@ mod tests {
         let teammate = config.mutual_exclusion.teammate_conflicts.as_ref().unwrap();
         assert_eq!(teammate.combinations.len(), 3);
         assert_eq!(config.synergies.len(), 4);
+    }
+
+    /// 嵌入默认必须与仓库中的 YAML 一致：改表必须同步改动才算生效，
+    /// 否则无源码 / 文件缺失环境下回退到的默认值会与设计师预期不一致。
+    #[test]
+    fn test_embedded_default_parses_and_matches_yaml() {
+        let embedded: ElementConfig = serde_yaml::from_str(ELEMENT_CONFIG_EMBEDDED)
+            .expect("嵌入默认应可解析");
+        let file = element_config_path().expect("随包YAML应存在");
+        let from_file = load_element_config_from(&file).expect("随包YAML应可解析");
+        assert_eq!(embedded, from_file, "嵌入默认与 src/config/element_reactions.yaml 不一致");
     }
 
     #[test]

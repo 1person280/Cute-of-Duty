@@ -1,4 +1,4 @@
-//! 世界生成：地图布局落地、材质缓存、资产池、靶/拾取物/站点生成
+﻿//! 世界生成：地图布局落地、材质缓存、资产池、靶/拾取物/站点生成
 
 use std::collections::HashMap;
 use bevy::prelude::*;
@@ -11,7 +11,7 @@ use super::character::{spawn_player, spawn_enemy, CharacterPreset};
 use super::camera::{CamPivot, ShoulderPivot, PitchPivot, SpringArm, SpringArmState, PIVOT_HEIGHT, ARM_SHOULDER_X_NORMAL, ARM_EYE_Y_NORMAL, ARM_LEN_NORMAL};
 use super::hud::EffectAssets;
 use crate::map::training;
-use super::common::*;
+use super::frontend::*;
 use super::components::*;
 
 pub(crate) fn setup_world(
