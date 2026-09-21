@@ -1,4 +1,4 @@
-﻿//! 干员技能：Q/E 手感调度、冷却节拍与技能形态施放
+//! 干员技能：Q/E 手感调度、冷却节拍与技能形态施放
 
 use bevy::prelude::*;
 use crate::element::{ElementSystem, ElementType};
@@ -104,7 +104,7 @@ pub(crate) fn cast_skill(
             player_transform.translation = start + fwd * moved;
             // 冲刺残影：起点与终点各撒一把元素火花
             for pos in [start + Vec3::Y, start + fwd * moved + Vec3::Y] {
-                for _ in 0..6 {
+                for _ in 0..3 {
                     let dir = Vec3::new(
                         (rand::random::<f32>() - 0.5) * 2.0,
                         rand::random::<f32>(),

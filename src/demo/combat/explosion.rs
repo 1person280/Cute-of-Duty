@@ -1,4 +1,4 @@
-﻿//! 爆炸：范围伤害结算（含点燃/冰冻机制）、爆炸视觉扩展与消散
+//! 爆炸：范围伤害结算（含点燃/冰冻机制）、爆炸视觉扩展与消散
 
 use bevy::prelude::*;
 use bevy::pbr::NotShadowCaster;
@@ -107,9 +107,9 @@ pub(crate) fn spawn_explosion(
             transform: Transform::from_translation(pos).with_scale(Vec3::splat(0.1)),
             ..default()
         },
-        ExplosionEffect { timer: Timer::from_seconds(0.6, TimerMode::Once), max_scale },
+        ExplosionEffect { timer: Timer::from_seconds(0.45, TimerMode::Once), max_scale },
     ));
-    for _ in 0..10 {
+    for _ in 0..4 {
         let dir = Vec3::new(
             (rand::random::<f32>() - 0.5) * 2.0,
             rand::random::<f32>() * 0.8 + 0.2,

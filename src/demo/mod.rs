@@ -1,4 +1,4 @@
-﻿//! Cute Of Duty 1: Simple - 3D Pixel FPS Demo（组装层）
+//! Cute Of Duty 1: Simple - 3D Pixel FPS Demo（组装层）
 //!
 //! Tech: Bevy 0.14 + Voxel Rendering
 //! Style: Minecraft Steve model inspired
@@ -43,9 +43,11 @@ use bevy::window::WindowPlugin;
 pub mod camera; // model 直接依赖相机组件（避免 demo⇄model 整体互相 use）
 mod character;
 mod combat;
+mod controller;
+mod debug_tracer;
+mod effect_guard;
 mod frontend;
 mod components;
-mod controller;
 mod hud;
 mod inventory;
 mod menu;
@@ -60,6 +62,8 @@ pub use camera::{CamPivot, PitchPivot, ShoulderPivot, SpringArm, lerp};
 use camera::*;
 
 use combat::*;
+use debug_tracer::*;
+use effect_guard::*;
 use frontend::*;
 use components::*;
 use controller::*;
@@ -112,6 +116,7 @@ pub fn run() {
         .init_resource::<SelectedCategory>()
         .init_resource::<PauseMenu>()
         .init_resource::<HeldGrenade>()
+        .init_resource::<TracerTimer>()
         .add_event::<KillEvent>()
         .insert_resource(ClearColor(Color::srgb(0.12, 0.14, 0.18)))
         .insert_resource(AmbientLight {
@@ -202,6 +207,8 @@ pub fn run() {
             operator_ui_update_system,
             hud_operator_name_system,
         ).run_if(in_state(AppState::InGame)).run_if(not(pause_open)))
+        .add_systems(Update, memory_tracer.run_if(in_state(AppState::InGame)))
+        .add_systems(Update, effect_guard.run_if(in_state(AppState::InGame)))
         .run();
 }
 

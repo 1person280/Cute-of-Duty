@@ -1,22 +1,35 @@
+<div align="center">
+
 # Cute Of Duty 1: Simple
 
-**版本 0.3.0 (Pre-Alpha)** · 战术撤离射击游戏
+**战术撤离射击游戏** · 核心差异化 **元素互斥生态 + 反护航经济架构**
 
-核心差异化设计：**元素互斥生态 + 反护航经济架构**。
+基于 Rust + Bevy 0.14 的 3D 像素风 FPS · 无头确定性模拟与 3D Demo 双入口
+配置文件表驱动的全部玩法规则 · 单一事实来源
 
-作者：B站@3493264141322312
-## 📜 License / 授权协议
+[![License](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/Version-0.3.0%20Pre--Alpha-red.svg)](#四版本历史)
+[![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
+[![Headless](https://img.shields.io/badge/%E6%97%A0%E5%A4%B4%E6%A8%A1%E6%8B%9F-passing-2ea44f.svg)](#一快速开始)
+[![Demo](https://img.shields.io/badge/3D%20Demo-Bevy%200.14-2ea44f.svg)](#一快速开始)
 
-本项目采用 **GPL-3.0-with-linking-exception** 协议开源。
+**外部依赖 · 站在开源社区的肩膀上** · [![by Bevy](https://img.shields.io/badge/by-Bevy-E90000)](https://bevyengine.org)
+[![by Tokio](https://img.shields.io/badge/by-Tokio-blue)](https://tokio.rs)
+[![by Serde](https://img.shields.io/badge/by-Serde-white)](https://serde.rs)
+[![by Tracing](https://img.shields.io/badge/by-Tracing-black)](https://github.com/tokio-rs/tracing)
+[![by Rand](https://img.shields.io/badge/by-Rand-4B8BBE)](https://crates.io/crates/rand)
+[![by Crossbeam](https://img.shields.io/badge/by-Crossbeam-8E44AD)](https://crates.io/crates/crossbeam)
+[![by BLAKE3](https://img.shields.io/badge/by-BLAKE3-2EA44F)](https://crates.io/crates/blake3)
 
-这意味着：
-- ✅ **你可以自由使用**：你可以将本项目的代码库链接到你的独立模块（包括商业闭源软件）中，而无需将你的整个项目开源。
-- ✅ **修改需保留声明**：如果你直接修改了本项目的源代码，修改后的部分仍需保持 GPL-3.0 开源协议。
-- ⚖️ **详细说明**：请查看仓库根目录下的 [LICENSE](./LICENSE) 文件以获取完整的法律文本和例外条款。
+> 完整依赖清单与各库许可证见游戏内「设置 → 开源代码鸣谢」面板。
 
+</div>
 
-> 本项目站在开源社区的肩膀上：Bevy / Tokio / Serde / Tracing / Rand / Crossbeam / BLAKE3 等
-> （完整清单与许可证见游戏内「设置 → 开源代码鸣谢」面板）。
+---
+
+> **一句话定位**：Cute Of Duty 1 站在"生态可互斥、经济反护航"的路线上——每种元素既是
+> 收益也可能是反噬，装备等级越高越失控，玩家要做的是**在收益与风险之间权衡**，
+> 而不是照搬传统 FPS 的"枪械数值堆叠"。
 
 ---
 
@@ -71,7 +84,20 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 
 ---
 
-## 二、架构总览（接手前必读）
+## 二、核心差异化卖点
+
+| 卖点 | 说明 |
+|---|---|
+| **元素互斥生态** | 火 / 冰 / 电 / 毒等元素并非"越堆越强"。护甲与武器的元素互斥、同源元素协同增益、环境修正全部由配置表驱动——选型本身就是博弈 |
+| **反护航经济架构** | 装备等级不是保障线而是风险线：1 级新手保护舱 → 2–6 级可指定元素（成本翻倍）→ 7–9 级真随机混沌区；转售 / 给予会重置元素。高等级=高收益+高不确定性 |
+| **配置表驱动的全部规则** | 数值、元素反应、干员档案、地图布局一律沉淀为 YAML / 纯数据结构，核心库**不硬编码任何玩法**，改平衡不用动代码 |
+| **零 bevy 的核心库** | 游戏逻辑与渲染彻底分离：`cargo test` 秒级完成，Bezy 由 feature 门控，带来的直接好处是核心迭代几乎无编译负担 |
+
+> 三条铁律（改动前请先理解，这是项目约定）详见 [架构说明](#三架构总览)。
+
+---
+
+## 三、架构总览（接手前必读）
 
 ```
                 ┌──────────────────────────────────┐
@@ -154,25 +180,6 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 
 ---
 
-## 三、开发环境说明与已知坑
-
-1. 首次 `cargo run --features demo` 需要 20+ 分钟（Bevy/wgpu 全量编译），请耐心等待；
-   不带 feature 的命令不编译 bevy，秒级完成。建议保持 `Cargo.lock` 以获得与开发一致的依赖版本。
-2. dev profile 已按 Bevy 官方建议把依赖设为 O3（否则试玩帧率明显下降），游戏代码本身保持 O1
-   以加快增量编译——不要改 `[profile.dev.package."*"]`。
-3. **CI**：`.github/workflows/rust.yml` 在 push / PR 到 `main` 时自动跑 `cargo build` + `cargo test`
-   （不带 demo feature，验证核心库；提交前本地跑一遍同样命令可提前发现问题）。
-
-### 已知问题（试玩实测）
-
-- ~~手雷爆炸内存飙升 / OOM~~：2026-09-05 已修复（爆炸/枪口特效网格与材质入池共享，不再逐发新建资产）。
-- ~~术能锁定后相机冻结~~：实为玩家初始 yaw 朝向问题（背对靶场），已修复（默认面向靶场出生）。
-- **渲染内存缓慢增长（未修）**：长时间游玩（数分钟级）GPU 内存仍会缓慢累积，最终可能 OOM；
-  自动化/长时间试玩建议分段进行。
-- 自动化试玩提示：若用外部自动化驱动本 Demo，winit 可能拦截合成鼠标事件，可用系统级 `mouse_event` 绕过。
-
----
-
 ## 四、版本历史
 
 | 版本 | 日期 | 说明 |
@@ -186,13 +193,51 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 
 ---
 
-## 五、目录结构
+## 五、文档
+
+* **项目规范**
+  * [贡献指南（反屎山公约：600 行上限 / 无循环依赖 / 语义化命名）](CONTRIBUTING.md)
+  * [开源许可证 GPL-3.0-with-linking-exception（原文）](LICENSE)
+* **AI 协作工作流（`.agents/skills/`）**
+  * [游戏美术创作指南](.agents/skills/)
+  * [地图建模验收流程](.agents/skills/)
+
+---
+
+## 六、开发环境说明与已知坑
+
+1. 首次 `cargo run --features demo` 需要 20+ 分钟（Bevy/wgpu 全量编译），请耐心等待；
+   不带 feature 的命令不编译 bevy，秒级完成。建议保持 `Cargo.lock` 以获得与开发一致的依赖版本。
+2. dev profile 已按 Bevy 官方建议把依赖设为 O3（否则试玩帧率明显下降），游戏代码本身保持 O1
+   以加快增量编译——不要改 `[profile.dev.package."*"]`。
+3. **CI**：`.github/workflows/rust.yml` 在 push / PR 到 `main` 时自动跑 `cargo build` + `cargo test`
+   （不带 demo feature，验证核心库；提交前本地跑一遍同样命令可提前发现问题）。
+
+### 已知问题（试玩实测）
+
+- ~~手雷爆炸内存飙升 / OOM~~：2026-09-05 已修复（爆炸/枪口特效网格与材质入池共享，不再逐发新建资产）。
+- ~~术能锁定后相机冻结~~：实为玩家初始 yaw 朝向问题（背对靶场），已修复（默认面向靶场出生）。
+- **渲染内存缓慢增长（已定向缓解，仍待长时间确认）**：长时间游玩（数分钟级）GPU 内存仍会缓慢累积，
+  最终可能 OOM。2026-09-21 起做了定向修复（仍在观察是否彻底根治，见下）：
+  - 修复「弹字清理依赖相机，相机暂不可用时弹字永久存活」的确定性回收失效点（`damage_popup_system`）；
+  - 为曳光/弹字/粒子/反应文字/爆炸等高频特效增加**硬性存活上限兜底清道夫**（`effect_guard.rs`），
+    杜绝任何回收路径失效导致的无限堆积；
+  - 收敛高频特效的生成密度与寿命（命中粒子 5→3、爆炸碎块 10→4、曳光/枪口/爆闪寿命收短等），
+    减少 Bevy 每帧反复 spawn/despawn 造成的渲染 batch 抖动。
+  - 定位其余增长点时，可用内置诊断采样（`cargo run --features demo` 游玩后看日志，`debug_tracer.rs`
+    每 5s 打印各类特效实体存活数与 `Mesh`/`Material` 资产表容量）。
+- 自动化试玩提示：若用外部自动化驱动本 Demo，winit 可能拦截合成鼠标事件，可用系统级 `mouse_event` 绕过。
+
+---
+
+## 七、目录结构
 
 ```
 CuteOfDutyAlpha/
 ├── Cargo.toml / Cargo.lock     # 包清单（核心库 + cod1 bin；bevy 为 feature 门控的可选依赖）
 ├── CuteOfDuty_Demo.exe         # 预编译 3D Demo，双击即玩
 ├── CONTRIBUTING.md             # ⚠️ 反屎山公约（贡献前必读）
+├── README.md                   # 本档案（交接文档）
 ├── .github/workflows/rust.yml  # CI：push/PR 到 main 跑 cargo build + cargo test
 ├── .agents/skills/             # AI 协作工作流文档（美术创作 / 地图验收）
 ├── assets/                     # 美术资源：characters / environment / fonts / ui / weapons
@@ -205,5 +250,8 @@ CuteOfDutyAlpha/
 │   ├── map/                    # 纯数据地图定义（map/training/ 为训练场分区分文件）
 │   ├── demo/                   # 3D Demo（feature "demo"）：组装层 + 面板化子目录
 │   └── model/                  # 干员模型与动作（feature "demo"）
-└── target/                     # 构建产物
+└── target/                     # 构建产物（git 忽略）
 ```
+
+> 一位开发者接手前，只需要读三份：**本 README（概览）** → **架构表 1/2** → **CONTRIBUTING.md（公约）**。
+> 核心业务模块保持 ≤ 2 层深度、每个 `.rs` ≤ 600 行、禁止 `utils.rs` 之类的语义化空壳——这些是硬约束，不是建议。

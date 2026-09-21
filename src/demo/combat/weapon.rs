@@ -1,4 +1,4 @@
-﻿//! 武器：换弹计时与主武器射击（命中判定/元素反应/曳光/枪口火光/命中反馈）
+//! 武器：换弹计时与主武器射击（命中判定/元素反应/曳光/枪口火光/命中反馈）
 
 use bevy::prelude::*;
 use crate::element::ElementType;
@@ -146,7 +146,7 @@ pub(crate) fn shooting_system(
                 .with_scale(Vec3::new(1.0, 1.0, len)),
             ..default()
         },
-        BulletHit { timer: Timer::from_seconds(0.06, TimerMode::Once) },
+        BulletHit { timer: Timer::from_seconds(0.04, TimerMode::Once) },
     ));
 
     // Muzzle flash
@@ -157,7 +157,7 @@ pub(crate) fn shooting_system(
             transform: Transform::from_translation(muzzle),
             ..default()
         },
-        BulletHit { timer: Timer::from_seconds(0.04, TimerMode::Once) },
+        BulletHit { timer: Timer::from_seconds(0.03, TimerMode::Once) },
     ));
 
     // Hit processing
@@ -203,7 +203,7 @@ pub(crate) fn shooting_system(
             spawn_damage_popup(&mut commands, hit_point + Vec3::Y * 0.5, popup_text, popup_color);
 
             // Damage particles
-            for _ in 0..5 {
+            for _ in 0..3 {
                 let dir = Vec3::new(
                     (rand::random::<f32>() - 0.5) * 2.0,
                     rand::random::<f32>(),
@@ -231,7 +231,7 @@ pub(crate) fn shooting_system(
                     transform: Transform::from_translation(hit_point).with_scale(Vec3::splat(2.5)),
                     ..default()
                 },
-                BulletHit { timer: Timer::from_seconds(0.15, TimerMode::Once) },
+                BulletHit { timer: Timer::from_seconds(0.12, TimerMode::Once) },
             ));
 
             // Reaction text

@@ -52,20 +52,23 @@ pub(crate) fn damage_popup_system(
     windows: Query<&Window, With<PrimaryWindow>>,
     time: Res<Time>,
 ) {
-    let Ok((camera, camera_transform)) = camera_query.get_single() else { return };
+    let camera_opt = camera_query.get_single().ok();
     let window_height = windows.get_single().map(|w| w.height()).unwrap_or(1080.0);
 
     for (entity, mut style, mut text, mut bg, mut popup) in popup_query.iter_mut() {
         popup.timer.tick(time.delta());
         let t = popup.timer.elapsed_secs() / popup.timer.duration().as_secs_f32();
 
-        // Move upward in world space
+        // 世界空间上移（与相机无关）
         popup.world_pos.y += 2.5 * time.delta_seconds();
 
-        // Convert world position to screen position
-        if let Some(viewport_pos) = camera.world_to_viewport(camera_transform, popup.world_pos) {
-            style.left = Val::Px(viewport_pos.x);
-            style.top = Val::Px(window_height - viewport_pos.y);
+        // 屏幕坐标换算才依赖相机：view 缺失（多相机/相机暂不可用）只是本帧不刷新位置，
+        // 绝不因此跳过下方的 tick→finished→despawn——否则弹字会永久存活、缓慢堆积。
+        if let Some((camera, camera_transform)) = &camera_opt {
+            if let Some(viewport_pos) = camera.world_to_viewport(camera_transform, popup.world_pos) {
+                style.left = Val::Px(viewport_pos.x);
+                style.top = Val::Px(window_height - viewport_pos.y);
+            }
         }
 
         // Fade out near end
@@ -77,6 +80,7 @@ pub(crate) fn damage_popup_system(
 
         if popup.timer.finished() {
             commands.entity(entity).despawn();
+            continue;
         }
     }
 }
