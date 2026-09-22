@@ -255,6 +255,7 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 0.4.0 | 2026-09-22 | **底层更新路线图**：新增 [ROADMAP.md](ROADMAP.md)，规划全底层依赖升级（核心 Bevy 0.14→0.19，跨 5 大版本；含 tokio / serde_yaml / rand / blake3 等按优先级分批），完成即发布 0.5.0 |
 | 0.3.2 | 2026-09-22 | **搜打撤**：物资箱重塑为体素栅格木箱（四角立柱 + 四面通板 + 平顶盖）并接入统一交互菜单（站点优先于拾取，F 必开箱不误拾，弃用自建触发）；对局仓库/背包拖拽选装落地并打通 Tab 背包；README：友商对比扩到 CS2/Valorant/OW2/APEX/PUBG/Fortnite/CoD/R6S/Destiny/Battlefield/Halo/塔科夫并拆成「技术对比」+「商业化对比」两张表（商业化定位为无影响月卡制，付费对玩法零影响）；目录结构说明列改为「首行结构 + 其后逐文件一行」并为 `map` 新增嵌套子表；Demo 操作方式改为「按键组 × 触发环境」矩阵排版（A/B 环境列为玩法环境预留，当前标 `—`） |
 | 0.3.1 | 2026-09-21 | **渲染内存泄漏定向修复 + README 翻新**：修复 `damage_popup_system` 相机缺失时弹字永久存活的确定性泄漏；新增 `effect_guard.rs`（五类高频特效硬性存活上限兜底）；收敛特效密度/寿命（命中粒子 5→3、爆炸碎块 10→4 等）；新增 `debug_tracer.rs`（每 5s 实体/资产采样，供定位残余增长） |
 | 0.3.0 | 2026-09-20 | **反屎山扁平化重构**：`config/` 并入 `src/config/`（YAML `include_str!` 嵌入 + 运行时覆盖，单一事实来源）；全部 >500 行上帝文件拆成语义化子模块（`damage`→packet/resolver/effect，`map/training`→分区分文件，`demo` 的 `inventory`/`menu`/`hud`/`combat`→面板目录，`model`→operator_models 等）；`common.rs`→`frontend.rs`；新增 [CONTRIBUTING.md（反屎山公约）](CONTRIBUTING.md) 与目录结构表格 |
@@ -269,6 +270,7 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 ## 五、文档
 
 * **项目规范**
+  * [底层更新路线图（0.4 专项：全底层依赖 + Bevy 0.14→0.19）](ROADMAP.md)
   * [贡献指南（反屎山公约：600 行上限 / 无循环依赖 / 语义化命名）](CONTRIBUTING.md)
   * [开源许可证 GPL-3.0-with-linking-exception（原文）](LICENSE)
 * **AI 协作工作流（`.agents/skills/`）**
