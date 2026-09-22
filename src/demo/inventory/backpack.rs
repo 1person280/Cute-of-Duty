@@ -1,4 +1,4 @@
-﻿//! 背包 UI：Tab 背包面板（固定双主武器架、弹药池、物资槽）、开关逻辑、刷新与悬停快速使用。
+//! 背包 UI：Tab 背包面板（固定双主武器架、弹药池、物资槽）、开关逻辑、刷新与悬停快速使用。
 
 use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, PrimaryWindow};
@@ -386,11 +386,14 @@ pub(crate) fn inventory_toggle(
     mut window_query: Query<&mut Window, With<PrimaryWindow>>,
     wheel: Res<WheelState>,
     open_station: Res<OpenStation>,
+    crate_win: Res<super::super::supply_crate::CrateWindow>,
 ) {
     // 轮盘打开/按住期间不响应 Tab/Esc，避免两层 UI 叠加
     if wheel.open || wheel.pending_key.is_some() { return; }
     // 站点面板打开时不响应（站点面板自带开关）
     if *open_station != OpenStation::None { return; }
+    // 物资箱窗口打开时不响应（关闭走 station_system）
+    if crate_win.crate_entity.is_some() { return; }
     let tab = keyboard.just_pressed(KeyCode::Tab);
     let esc = keyboard.just_pressed(KeyCode::Escape);
     if !tab && !esc { return; }
@@ -440,21 +443,45 @@ pub(crate) fn inventory_item_use_system(
     use_item_at(slot_index, &mut inventory.items, &mut health, &mut armor, &mut held);
 }
 
+/// 物资槽/武器架的样式查询别名：槽位标记 + 交互 + 边框/底色。
+/// 用类型别名收窄长 Query 元组，规避 clippy::type_complexity。
+type InventorySlotStyle<'w, 's> = Query<
+    'w, 's,
+    (&'static InventorySlotUI, &'static Interaction, &'static mut BorderColor, &'static mut BackgroundColor),
+    Without<BackpackWeaponSlot>,
+>;
+type BackpackWeaponStyle<'w, 's> = Query<
+    'w, 's,
+    (&'static BackpackWeaponSlot, &'static Interaction, &'static mut BorderColor, &'static mut BackgroundColor),
+    Without<InventorySlotUI>,
+>;
+
+/// 背包文本/弹药池文本的可变查询别名：以互斥 With/Without 标记隔离，
+/// 收窄长 Query 元组，规避 clippy::type_complexity。
+type SlotTextQuery<'w, 's> = Query<
+    'w, 's,
+    (&'static InventorySlotText, &'static mut Text),
+    (Without<BackpackWeaponText>, Without<HudBackpackAmmo>),
+>;
+type WeaponTextQuery<'w, 's> = Query<
+    'w, 's,
+    (&'static BackpackWeaponText, &'static mut Text),
+    (Without<InventorySlotText>, Without<HudBackpackAmmo>),
+>;
+type BackpackAmmoTextQuery<'w, 's> = Query<
+    'w, 's,
+    &'static mut Text,
+    (With<HudBackpackAmmo>, Without<InventorySlotText>, Without<BackpackWeaponText>),
+>;
+
 /// 背包 UI 刷新：物资槽文本、武器架文本（槽位标记/弹匣数）、弹药池、悬停高亮
-#[allow(clippy::type_complexity)]
 pub(crate) fn inventory_ui_update(
     player_query: Query<&Inventory, With<Player>>,
-    mut slot_texts: Query<(&InventorySlotText, &mut Text), (Without<BackpackWeaponText>, Without<HudBackpackAmmo>)>,
-    mut weapon_texts: Query<(&BackpackWeaponText, &mut Text), (Without<InventorySlotText>, Without<HudBackpackAmmo>)>,
-    mut ammo_text: Query<&mut Text, (With<HudBackpackAmmo>, Without<InventorySlotText>, Without<BackpackWeaponText>)>,
-    #[allow(clippy::type_complexity)] mut slot_bgs: Query<
-        (&InventorySlotUI, &Interaction, &mut BorderColor, &mut BackgroundColor),
-        Without<BackpackWeaponSlot>,
-    >,
-    #[allow(clippy::type_complexity)] mut weapon_bgs: Query<
-        (&BackpackWeaponSlot, &Interaction, &mut BorderColor, &mut BackgroundColor),
-        Without<InventorySlotUI>,
-    >,
+    mut slot_texts: SlotTextQuery,
+    mut weapon_texts: WeaponTextQuery,
+    mut ammo_text: BackpackAmmoTextQuery,
+    mut slot_bgs: InventorySlotStyle,
+    mut weapon_bgs: BackpackWeaponStyle,
 ) {
     let Ok(inventory) = player_query.get_single() else { return };
 

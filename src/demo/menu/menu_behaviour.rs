@@ -1,12 +1,60 @@
-﻿//! 主菜单行为层：输入分发、按钮动作、模式/分类选择与样式刷新。
+//! 主菜单行为层：输入分发、按钮动作、模式/分类选择与样式刷新。
 //! 依赖 main_menu / mode_panel / settings_panel 提供的 UI 句柄、资源与标记。
 
 use bevy::prelude::*;
 use super::*;
 use crate::demo::frontend::*;
 use crate::demo::pause::*;
+use crate::demo::loadout::{LoadoutButton, LoadoutCloseButton};
 
-#[allow(clippy::type_complexity)]
+/// 主菜单按钮动作查询：五种按钮标记各为 Optional，借助类型别名收窄长元组，
+/// 规避 clippy::type_complexity。
+type MenuButtons<'w, 's> = Query<
+    'w, 's,
+    (
+        &'static Interaction,
+        Option<&'static SwitchModeButton>,
+        Option<&'static StartGameButton>,
+        Option<&'static GearButton>,
+        Option<&'static SettingsCloseButton>,
+        Option<&'static QuitButton>,
+    ),
+    Changed<Interaction>,
+>;
+
+/// 主菜单样式层的长可变查询别名：以互斥 With/Without 标记隔离，
+/// 收窄长 Query 元组，规避 clippy::type_complexity。
+type MenuHoverButtonQuery<'w, 's> = Query<
+    'w, 's,
+    (
+        &'static Interaction,
+        &'static mut BackgroundColor,
+        &'static mut BorderColor,
+    ),
+    (Changed<Interaction>, With<MenuButton>),
+>;
+type MenuModeRowQuery<'w, 's> = Query<
+    'w, 's,
+    (
+        &'static ModeRow,
+        &'static Interaction,
+        &'static mut BackgroundColor,
+        &'static mut BorderColor,
+        &'static mut Visibility,
+    ),
+    (Without<MenuButton>, Without<CategoryButton>, Without<ModePanelRoot>),
+>;
+type MenuCategoryQuery<'w, 's> = Query<
+    'w, 's,
+    (
+        &'static CategoryButton,
+        &'static Interaction,
+        &'static mut BackgroundColor,
+        &'static mut BorderColor,
+    ),
+    (Without<MenuButton>, Without<ModeRow>),
+>;
+
 pub(crate) fn main_menu_interaction(
     mut next_state: ResMut<NextState<AppState>>,
     mut app_exit: EventWriter<AppExit>,
@@ -20,17 +68,7 @@ pub(crate) fn main_menu_interaction(
     mut visibility: Query<&mut Visibility>,
     mut value_texts: Query<(&SettingValueText, &mut Text), Without<StatusText>>,
     mut status_texts: Query<&mut Text, (With<StatusText>, Without<SettingValueText>)>,
-    buttons: Query<
-        (
-            &Interaction,
-            Option<&SwitchModeButton>,
-            Option<&StartGameButton>,
-            Option<&GearButton>,
-            Option<&SettingsCloseButton>,
-            Option<&QuitButton>,
-        ),
-        Changed<Interaction>,
-    >,
+    buttons: MenuButtons,
     adjust_buttons: Query<(&SettingAdjust, &Interaction), Changed<Interaction>>,
     category_buttons: Query<(&CategoryButton, &Interaction), Changed<Interaction>>,
     mode_rows: Query<(&ModeRow, &Interaction), Changed<Interaction>>,
@@ -40,7 +78,7 @@ pub(crate) fn main_menu_interaction(
         return;
     }
 
-    // Esc 关闭设置浮层（连同压暗层）
+    // Esc 关闭设置浮层（连同压暗层）；仓库浮层由 main_menu_loadout 负责
     if keys.just_pressed(KeyCode::Escape) {
         if let Ok(mut vis) = visibility.get_mut(ui.settings_overlay) {
             if matches!(*vis, Visibility::Visible) {
@@ -54,10 +92,18 @@ pub(crate) fn main_menu_interaction(
     let settings_open = visibility
         .get(ui.settings_overlay)
         .map_or(false, |vis| matches!(*vis, Visibility::Visible));
+    let loadout_open = visibility
+        .get(ui.loadout_panel)
+        .map_or(false, |vis| matches!(*vis, Visibility::Visible));
+    // 任一浮层打开即视为"占用"，主按钮区全部让位
+    let any_overlay = settings_open || loadout_open;
 
-    // 按钮动作分发（设置浮层打开时，除"返回"外全部拦截）
+    // 按钮动作分发（任一浮层打开时，除各自"返回"外全部拦截）
     for (interaction, switch, start, gear, close, quit) in &buttons {
         if *interaction != Interaction::Pressed {
+            continue;
+        }
+        if loadout_open {
             continue;
         }
         if settings_open && close.is_none() {
@@ -97,8 +143,8 @@ pub(crate) fn main_menu_interaction(
         }
     }
 
-    // 分类 / 模式选择（面板内部互斥：设置浮层打开时不响应）
-    if !settings_open {
+    // 分类 / 模式选择（浮层打开时不响应）
+    if !any_overlay {
         for (cat, interaction) in &category_buttons {
             if *interaction == Interaction::Pressed {
                 category.0 = cat.0;
@@ -126,6 +172,53 @@ pub(crate) fn main_menu_interaction(
     }
 }
 
+/// 仓库（携带物资）面板行为：Esc / 按钮开关浮层。
+/// 浮层内的"拖拽 / Shift+左键快移"由 `loadout::loadout_drag_system` 处理，
+/// 文本刷新也在该系统中逐帧进行，故这里只负责显隐，不触碰携带数据。
+pub(crate) fn main_menu_loadout(
+    ui: Res<MainMenuUi>,
+    keys: Res<ButtonInput<KeyCode>>,
+    mut visibility: Query<&mut Visibility>,
+    loadout_open_btn: Query<&Interaction, (With<LoadoutButton>, Changed<Interaction>)>,
+    loadout_close_btn: Query<&Interaction, (With<LoadoutCloseButton>, Changed<Interaction>)>,
+) {
+    let open = |visibility: &Query<&mut Visibility>, panel: Entity| {
+        visibility.get(panel).map_or(false, |vis| matches!(*vis, Visibility::Visible))
+    };
+    let was_open = open(&visibility, ui.loadout_panel);
+
+    // Esc 关闭仓库浮层（连同压暗层）
+    if keys.just_pressed(KeyCode::Escape) && was_open {
+        hide_loadout(ui.loadout_panel, ui.loadout_backdrop, &mut visibility);
+        return;
+    }
+    // "仓库"按钮：开关浮层
+    for interaction in &loadout_open_btn {
+        if *interaction == Interaction::Pressed {
+            set_loadout_visible(ui.loadout_panel, ui.loadout_backdrop, !was_open, &mut visibility);
+        }
+    }
+    // 面板"返回"按钮：关闭浮层
+    for interaction in &loadout_close_btn {
+        if *interaction == Interaction::Pressed {
+            hide_loadout(ui.loadout_panel, ui.loadout_backdrop, &mut visibility);
+        }
+    }
+}
+
+/// 隐藏仓库浮层（面板 + 压暗层）
+fn hide_loadout(panel: Entity, backdrop: Entity, visibility: &mut Query<&mut Visibility>) {
+    if let Ok(mut vis) = visibility.get_mut(panel) { *vis = Visibility::Hidden; }
+    if let Ok(mut vis) = visibility.get_mut(backdrop) { *vis = Visibility::Hidden; }
+}
+
+/// 显/隐仓库浮层（面板 + 压暗层）
+fn set_loadout_visible(panel: Entity, backdrop: Entity, show: bool, visibility: &mut Query<&mut Visibility>) {
+    let target = if show { Visibility::Visible } else { Visibility::Hidden };
+    if let Ok(mut vis) = visibility.get_mut(panel) { *vis = target; }
+    if let Ok(mut vis) = visibility.get_mut(backdrop) { *vis = target; }
+}
+
 /// 主菜单样式层：普通按钮悬停高亮、齿轮图标变色、模式行选中/置灰/分类过滤、状态行同步。
 /// 只在有输入或选中态变化时重刷，避免每帧覆写样式导致变更检测空转。
 pub(crate) fn main_menu_style(
@@ -135,20 +228,11 @@ pub(crate) fn main_menu_style(
     panel_vis: Query<&Visibility, (With<ModePanelRoot>, Without<ModeRow>)>,
     gear_hover: Query<&Interaction, (With<GearButton>, Changed<Interaction>)>,
     mut gear_icon: Query<&mut UiImage, With<GearIcon>>,
-    mut hover_buttons: Query<
-        (&Interaction, &mut BackgroundColor, &mut BorderColor),
-        (Changed<Interaction>, With<MenuButton>),
-    >,
+    mut hover_buttons: MenuHoverButtonQuery,
     row_changed: Query<&Interaction, (With<ModeRow>, Changed<Interaction>)>,
     category_changed: Query<&Interaction, (With<CategoryButton>, Changed<Interaction>)>,
-    mut mode_rows: Query<
-        (&ModeRow, &Interaction, &mut BackgroundColor, &mut BorderColor, &mut Visibility),
-        (Without<MenuButton>, Without<CategoryButton>, Without<ModePanelRoot>),
-    >,
-    mut categories: Query<
-        (&CategoryButton, &Interaction, &mut BackgroundColor, &mut BorderColor),
-        (Without<MenuButton>, Without<ModeRow>),
-    >,
+    mut mode_rows: MenuModeRowQuery,
+    mut categories: MenuCategoryQuery,
     mut status_texts: Query<&mut Text, (With<StatusText>, Without<SettingValueText>)>,
 ) {
     let touched = ui.is_changed()

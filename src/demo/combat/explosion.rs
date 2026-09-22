@@ -10,58 +10,62 @@ use crate::demo::components::*;
 use crate::demo::hud::{EffectAssets, EffectMatKind};
 use super::*;
 
+/// 一次爆炸结算的规格：落点、元素、基础伤害、作用半径与机制
+pub(crate) struct ExplosionSpec {
+    pub(crate) pos: Vec3,
+    pub(crate) element: ElementType,
+    pub(crate) base_damage: f32,
+    pub(crate) radius: f32,
+    pub(crate) effect: SkillEffect,
+}
+
 /// 对爆炸点周围的目标结算范围伤害 + 干员机制（点燃/冰冻）；
 /// 毒雾区域由调用方在作用点另行生成（spawn_skill_zone）。
 /// 线性距离衰减（边缘保底30%）+ 元素反应，规则查核心配置表。
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_explosion_damage(
     commands: &mut Commands,
     effects: &EffectAssets,
     element_system: &ElementSystem,
     targets: &mut Query<(Entity, &mut TargetDummy, &Transform, &Children), (Without<GrenadeProjectile>, Without<Player>)>,
-    pos: Vec3,
-    element: ElementType,
-    base_damage: f32,
-    radius: f32,
-    effect: SkillEffect,
+    spec: ExplosionSpec,
 ) {
     for (entity, mut dummy, transform, _) in targets.iter_mut() {
         if dummy.down_timer.is_some() { continue; } // 已倒地的靶子不再受击
-        let dist = transform.translation.distance(pos);
-        if dist > radius { continue; }
-        let falloff = (1.0 - dist / radius).max(0.3);
+        let dist = transform.translation.distance(spec.pos);
+        if dist > spec.radius { continue; }
+        let falloff = (1.0 - dist / spec.radius).max(0.3);
         let (dmg, reaction_name) = element_reaction(
             element_system,
             dummy.element_state,
-            element,
-            base_damage * falloff,
+            spec.element,
+            spec.base_damage * falloff,
         );
 
         dummy.current_health -= dmg;
         dummy.hit_flash = Some(Timer::from_seconds(0.2, TimerMode::Once));
         // 若这一击致命，靶子被冲击波掀翻：沿爆炸中心指向靶子的方向倒下
-        let blast_dir = (transform.translation - pos).with_y(0.0);
+        let blast_dir = (transform.translation - spec.pos).with_y(0.0);
         if blast_dir.length_squared() > 1e-6 {
             dummy.fall_dir = blast_dir.normalize();
         }
-        if element != ElementType::Physical {
-            dummy.element_state = Some(element);
+        if spec.element != ElementType::Physical {
+            dummy.element_state = Some(spec.element);
             dummy.state_timer = Some(Timer::from_seconds(3.5, TimerMode::Once));
         }
 
         // 机制：点燃（DoT 挂到目标身上）
-        if effect.burn_secs > 0.0 && effect.burn_dps > 0.0 {
+        if spec.effect.burn_secs > 0.0 && spec.effect.burn_dps > 0.0 {
             dummy.dots.push(DamageOverTime {
-                element,
-                dps: effect.burn_dps,
+                element: spec.element,
+                dps: spec.effect.burn_dps,
                 tick: Timer::from_seconds(DOT_TICK, TimerMode::Repeating),
-                remaining: Timer::from_seconds(effect.burn_secs, TimerMode::Once),
+                remaining: Timer::from_seconds(spec.effect.burn_secs, TimerMode::Once),
             });
         }
         // 机制：冰冻/电麻（目标停止行动 + 冰块视觉；已冻结则只刷新时长）
-        if effect.freeze_secs > 0.0 {
+        if spec.effect.freeze_secs > 0.0 {
             if dummy.frozen.is_none() {
-                dummy.frozen = Some(Timer::from_seconds(effect.freeze_secs, TimerMode::Once));
+                dummy.frozen = Some(Timer::from_seconds(spec.effect.freeze_secs, TimerMode::Once));
                 let ice = commands.spawn((
                     PbrBundle {
                         mesh: effects.frost_cube.clone(),
@@ -86,7 +90,7 @@ pub(crate) fn apply_explosion_damage(
         let popup_color = if reaction_name.is_some() {
             Color::srgb(1.0, 0.85, 0.2)
         } else {
-            element.color()
+            spec.element.color()
         };
         spawn_damage_popup(commands, transform.translation + Vec3::Y * 0.8, popup_text, popup_color);
     }

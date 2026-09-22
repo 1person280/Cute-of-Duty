@@ -56,7 +56,8 @@ pub(crate) fn fps_controller(
         if keyboard.pressed(KeyCode::KeyD) { input.x += 1.0; }
 
         // 移动输入始终相对相机方向（W = 相机前方）；瞄准时移速降至 55%
-        let mut speed = if keyboard.pressed(KeyCode::ShiftLeft) { 7.0 } else { 4.0 };
+        // 奔跑：Ctrl 冲刺（冲刺到搜打撤全程），瞄准时无效
+        let mut speed = if keyboard.pressed(KeyCode::ControlLeft) { 7.0 } else { 4.0 };
         if cam.aiming { speed *= AIM_MOVE_FACTOR; }
         // 动作系统读这个值决定步频/摆幅（撞墙时仍保持走姿，输入在即视为移动）
         movement.planar_speed = if input != Vec3::ZERO { speed } else { 0.0 };

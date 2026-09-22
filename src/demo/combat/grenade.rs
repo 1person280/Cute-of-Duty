@@ -1,4 +1,4 @@
-﻿//! 手雷/投掷物：飞行物理、落地引爆（范围伤害 + 机制 + 视觉）
+//! 手雷/投掷物：飞行物理、落地引爆（范围伤害 + 机制 + 视觉）
 
 use bevy::prelude::*;
 use crate::model::Player;
@@ -25,8 +25,13 @@ pub(crate) fn grenade_physics(
         if transform.translation.y <= 0.15 {
             transform.translation.y = 0.15;
             let impact = transform.translation;
-            apply_explosion_damage(&mut commands, &effects, &element_system.0, &mut target_query,
-                impact, grenade.element, grenade.damage, grenade.radius, grenade.effect);
+            apply_explosion_damage(&mut commands, &effects, &element_system.0, &mut target_query, ExplosionSpec {
+                pos: impact,
+                element: grenade.element,
+                base_damage: grenade.damage,
+                radius: grenade.radius,
+                effect: grenade.effect,
+            });
             spawn_skill_zone(&mut commands, &mut effects, &mut materials, impact, grenade.effect);
             spawn_explosion(&mut commands, &mut effects, &mut materials, impact, grenade.element, grenade.radius + 1.5);
             commands.entity(entity).despawn();
@@ -34,8 +39,13 @@ pub(crate) fn grenade_physics(
         }
         if grenade.timer.finished() {
             let impact = transform.translation;
-            apply_explosion_damage(&mut commands, &effects, &element_system.0, &mut target_query,
-                impact, grenade.element, grenade.damage, grenade.radius, grenade.effect);
+            apply_explosion_damage(&mut commands, &effects, &element_system.0, &mut target_query, ExplosionSpec {
+                pos: impact,
+                element: grenade.element,
+                base_damage: grenade.damage,
+                radius: grenade.radius,
+                effect: grenade.effect,
+            });
             spawn_skill_zone(&mut commands, &mut effects, &mut materials, impact, grenade.effect);
             spawn_explosion(&mut commands, &mut effects, &mut materials, impact, grenade.element, grenade.radius + 1.5);
             commands.entity(entity).despawn();

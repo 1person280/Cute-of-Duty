@@ -44,16 +44,22 @@ pub mod camera; // model 直接依赖相机组件（避免 demo⇄model 整体�
 mod character;
 mod combat;
 mod controller;
+mod bigmap;
 mod debug_tracer;
 mod effect_guard;
+mod extraction;
 mod frontend;
 mod components;
 mod hud;
 mod inventory;
+mod loadout;
 mod menu;
 mod minimap;
 mod pause;
 mod stations;
+mod supply_crate;
+#[cfg(test)]
+mod supply_crate_tests;
 mod targets;
 mod world;
 
@@ -62,10 +68,13 @@ pub use camera::{CamPivot, PitchPivot, ShoulderPivot, SpringArm, lerp};
 use camera::*;
 
 use combat::*;
+use bigmap::*;
 use debug_tracer::*;
 use effect_guard::*;
+use extraction::*;
 use frontend::*;
 use components::*;
+use loadout::*;
 use controller::*;
 use hud::*;
 use inventory::*;
@@ -73,6 +82,7 @@ use menu::*;
 use minimap::*;
 use pause::*;
 use stations::*;
+use supply_crate::*;
 use targets::*;
 use world::*;
 
@@ -112,11 +122,16 @@ pub fn run() {
         .init_resource::<KillStats>()
         .init_resource::<OpenStation>()
         .init_resource::<GameSettings>()
+        .init_resource::<Loadout>()
+        .init_resource::<LoadoutDrag>()
+        .init_resource::<CrateWindow>()
+        .init_resource::<CrateDrag>()
         .init_resource::<SelectedMode>()
         .init_resource::<SelectedCategory>()
         .init_resource::<PauseMenu>()
         .init_resource::<HeldGrenade>()
         .init_resource::<TracerTimer>()
+        .init_resource::<BigMapOpen>()
         .add_event::<KillEvent>()
         .insert_resource(ClearColor(Color::srgb(0.12, 0.14, 0.18)))
         .insert_resource(AmbientLight {
@@ -130,7 +145,7 @@ pub fn run() {
         .add_systems(Update, loading_tick.run_if(in_state(AppState::Loading)))
         .add_systems(OnExit(AppState::Loading), despawn_loading_screen)
         .add_systems(OnEnter(AppState::MainMenu), (setup_menu_camera, setup_main_menu, release_cursor))
-        .add_systems(Update, (main_menu_interaction, main_menu_style).chain().run_if(in_state(AppState::MainMenu)))
+        .add_systems(Update, (main_menu_loadout, loadout_drag_system, main_menu_interaction, main_menu_style).chain().run_if(in_state(AppState::MainMenu)))
         .add_systems(OnExit(AppState::MainMenu), despawn_main_menu)
         .add_systems(OnEnter(AppState::InGame), (
             despawn_menu_camera,
@@ -140,6 +155,9 @@ pub fn run() {
             setup_inventory_hud,
             setup_station_ui,
             setup_item_wheel,
+            setup_bigmap,
+            reset_crate_state,
+            setup_crate_ui,
             grab_cursor,
         ))
         // 返回主界面：清空全部游戏实体与游戏态资源，下次进入时全量重建
@@ -178,11 +196,18 @@ pub fn run() {
             minimap_update_system,
         ).run_if(in_state(AppState::InGame)).run_if(not(pause_open)))
         .add_systems(Update, (
+            hud_health_bar_system,
+            hud_ammo_main_system,
+            hud_weapon_slots_system,
+            hud_reload_system,
+            hud_skill_cd_system,
+            hud_skill_text_system,
+            hud_vitals_text_system,
+        ).run_if(in_state(AppState::InGame)).run_if(not(pause_open)))
+        .add_systems(Update, (
             target_dummy_logic,
             moving_target_logic,
             crosshair_hit_feedback,
-            hud_update_system,
-            hud_vitals_text_system,
             low_ammo_blink,
             screen_edge_glow,
             floating_reaction_text,
@@ -199,8 +224,11 @@ pub fn run() {
             kill_feed_system,
         ).run_if(in_state(AppState::InGame)).run_if(not(pause_open)))
         .add_systems(Update, (
-            // 站点面板读取交互菜单的选中条目：必须在拾取执行（消费 F）之后
+            // 站点面板读取交互菜单的选中条目：必须在拾取执行（消费 F）之后；
+            // 物资箱登记为站点，此处一并打开/关闭其 3×4 面板
             station_system.after(cursor_grab_toggle).after(interact_execute_system),
+            crate_ui_system,
+            crate_drag_system,
             supply_station_click_system,
             operator_station_click_system,
             supply_ui_update_system,
@@ -209,6 +237,12 @@ pub fn run() {
         ).run_if(in_state(AppState::InGame)).run_if(not(pause_open)))
         .add_systems(Update, memory_tracer.run_if(in_state(AppState::InGame)))
         .add_systems(Update, effect_guard.run_if(in_state(AppState::InGame)))
+        // M 战术全景图：先于全局光标切换运行（关闭时消费 Esc，避免与光标切换冲突）
+        .add_systems(Update, (
+            bigmap_toggle.before(cursor_grab_toggle),
+            bigmap_update_system,
+            extraction_zone_system,
+        ).run_if(in_state(AppState::InGame)).run_if(not(pause_open)))
         .run();
 }
 

@@ -1,4 +1,4 @@
-﻿//! 游戏组件与标记：实体数据定义（无逻辑），全部 crate 内共享
+//! 游戏组件与标记：实体数据定义（无逻辑），全部 crate 内共享
 
 use bevy::prelude::*;
 use crate::element::ElementType;
@@ -24,11 +24,12 @@ pub(crate) struct NearbyInteract {
     pub(crate) scroll_start: usize,
 }
 
-/// 交互菜单条目：F 执行选中项 —— 拾取物直接拾取，站点打开面板
+/// 交互菜单条目：F 执行选中项 —— 拾取物直接拾取，站点打开面板。
+/// 站点条目携带实体（物资箱复用站点通路，需据此绑定打开面板的具体箱子）。
 #[derive(Clone, Copy)]
 pub(crate) enum InteractEntry {
     Pickup(Entity),
-    Station { kind: StationKind, label: &'static str },
+    Station { kind: StationKind, label: &'static str, entity: Entity },
 }
 
 
@@ -398,6 +399,8 @@ pub(crate) enum OpenStation {
     None,
     Supply,
     Operator,
+    /// 物资箱（共享 station_system 的开关/光标通路）
+    Crate,
 }
 
 #[derive(Component)]

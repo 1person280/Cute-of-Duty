@@ -1,6 +1,7 @@
-﻿//! 功能站点：补给台/干员切换台面板、点击发放、UI 刷新
+//! 功能站点：补给台/干员切换台面板、点击发放、UI 刷新
 
 use bevy::prelude::*;
+use bevy::ecs::system::SystemParam;
 use bevy::window::{CursorGrabMode, PrimaryWindow};
 use crate::element::ElementType;
 use crate::map::StationKind;
@@ -11,6 +12,7 @@ use crate::model::{
 use super::inventory::HeldGrenade;
 use super::frontend::*;
 use super::components::*;
+use super::supply_crate::{CrateUIRoot, CrateWindow};
 
 /// 构建两张功能台的交互面板（隐藏，由 station_system 控制显隐）
 pub(crate) fn setup_station_ui(mut commands: Commands) {
@@ -199,68 +201,87 @@ pub(crate) fn setup_station_ui(mut commands: Commands) {
     // 旧的"站点提示条"已并入底部统一交互菜单（interact_menu_update），不再单独生成
 }
 
+/// 站点面板系统的状态资源：输入、光标、站点打开态、轮盘/持雷/附近占用
+#[derive(SystemParam)]
+pub(crate) struct StationState<'w> {
+    keyboard: Res<'w, ButtonInput<KeyCode>>,
+    input_state: ResMut<'w, InputState>,
+    open: ResMut<'w, OpenStation>,
+    wheel: Res<'w, WheelState>,
+    held: Res<'w, HeldGrenade>,
+    nearby: Res<'w, NearbyInteract>,
+}
+
 /// 站点面板开关：F 打开统一交互菜单（NearbyInteract）中选中的站点条目，
 /// F / Esc 关闭已开面板并锁回光标。Esc 不再直接开站点（开面板统一走 F + 交互菜单），
-/// 避免背包关闭同帧 Esc 被本系统抢走而误开面板。
+/// 避免背包关闭同帧 Esc 被本系统抢走而误开面板。物资箱复用此通路：登记为
+/// `StationKind::SupplyCrate`，开箱即把 [`CrateWindow`] 绑到具体箱子实体并显示箱子面板。
 /// 运行顺序在 cursor_grab_toggle 之后；靠近检测由 interact_detection_system 负责。
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn station_system(
-    keyboard: Res<ButtonInput<KeyCode>>,
+    // 纯资源统一走 SystemParam，查询参数直连（避开派生 SystemParam 与 &mut 查询项的 lifetime 限制）
+    mut st: StationState,
+    mut crate_win: ResMut<CrateWindow>,
     mut window_query: Query<&mut Window, With<PrimaryWindow>>,
-    mut input_state: ResMut<InputState>,
-    mut open: ResMut<OpenStation>,
-    wheel: Res<WheelState>,
-    held: Res<HeldGrenade>,
-    nearby: Res<NearbyInteract>,
     mut supply_vis: Query<&mut Visibility, (With<SupplyUIRoot>, Without<OperatorUIRoot>)>,
     mut operator_vis: Query<&mut Visibility, (With<OperatorUIRoot>, Without<SupplyUIRoot>)>,
+    mut crate_vis: Query<&mut Visibility, (With<CrateUIRoot>, Without<SupplyUIRoot>, Without<OperatorUIRoot>)>,
 ) {
     // 轮盘打开/按住期间、手雷持握时不处理：开会在轮盘/瞄准上叠面板；关会把光标锁回
-    let wheel_busy = wheel.open || wheel.pending_key.is_some();
-    if wheel_busy || held.item.is_some() { return; }
+    let wheel_busy = st.wheel.open || st.wheel.pending_key.is_some();
+    if wheel_busy || st.held.item.is_some() { return; }
 
-    if keyboard.just_pressed(KeyCode::KeyF) {
-        if *open == OpenStation::None {
+    if st.keyboard.just_pressed(KeyCode::KeyF) {
+        if *st.open == OpenStation::None {
             // 无 UI 占用（光标锁定）且选中条目是站点时才开面板；拾取物条目交给 interact_execute_system
-            if input_state.cursor_locked {
-                if let Some(InteractEntry::Station { kind, .. }) = nearby.entries.get(nearby.selected) {
-                    *open = match kind {
+            if st.input_state.cursor_locked {
+                if let Some(InteractEntry::Station { kind, entity, .. }) = st.nearby.entries.get(st.nearby.selected) {
+                    *st.open = match kind {
                         StationKind::SupplyTable => OpenStation::Supply,
                         StationKind::OperatorDesk => OpenStation::Operator,
+                        // 物资箱：绑定具体箱子实体，打开其 3×4 战利品面板
+                        StationKind::SupplyCrate => {
+                            crate_win.crate_entity = Some(*entity);
+                            OpenStation::Crate
+                        }
                     };
                     if let Ok(mut window) = window_query.get_single_mut() {
                         window.cursor.visible = true;
                         window.cursor.grab_mode = CursorGrabMode::None;
                     }
-                    input_state.cursor_locked = false;
+                    st.input_state.cursor_locked = false;
                 }
             }
         } else {
-            close_station_panel(&mut window_query, &mut input_state, &mut open);
+            close_station_panel(&mut window_query, &mut st.input_state, &mut st.open, &mut crate_win);
         }
-    } else if keyboard.just_pressed(KeyCode::Escape) {
+    } else if st.keyboard.just_pressed(KeyCode::Escape) {
         // Esc 只负责关闭已打开的面板
-        if *open != OpenStation::None {
-            close_station_panel(&mut window_query, &mut input_state, &mut open);
+        if *st.open != OpenStation::None {
+            close_station_panel(&mut window_query, &mut st.input_state, &mut st.open, &mut crate_win);
         }
     }
 
     // 面板显隐兜底：每帧按状态刷新，任何提前 return 都不会把面板留在屏幕上
     if let Ok(mut vis) = supply_vis.get_single_mut() {
-        *vis = if *open == OpenStation::Supply { Visibility::Visible } else { Visibility::Hidden };
+        *vis = if *st.open == OpenStation::Supply { Visibility::Visible } else { Visibility::Hidden };
     }
     if let Ok(mut vis) = operator_vis.get_single_mut() {
-        *vis = if *open == OpenStation::Operator { Visibility::Visible } else { Visibility::Hidden };
+        *vis = if *st.open == OpenStation::Operator { Visibility::Visible } else { Visibility::Hidden };
+    }
+    if let Ok(mut vis) = crate_vis.get_single_mut() {
+        *vis = if *st.open == OpenStation::Crate { Visibility::Visible } else { Visibility::Hidden };
     }
 }
 
-/// 关闭站点面板：锁回光标并清空打开态
+/// 关闭站点面板：锁回光标并清空打开态（含复位物资箱窗口）
 pub(crate) fn close_station_panel(
     window_query: &mut Query<&mut Window, With<PrimaryWindow>>,
     input_state: &mut InputState,
     open: &mut OpenStation,
+    crate_win: &mut CrateWindow,
 ) {
     *open = OpenStation::None;
+    crate_win.crate_entity = None;
     if let Ok(mut window) = window_query.get_single_mut() {
         window.cursor.visible = false;
         window.cursor.grab_mode = CursorGrabMode::Locked;
@@ -336,10 +357,17 @@ pub(crate) fn operator_station_click_system(
     }
 }
 
+/// 补给台行样式查询：行序号 + 交互 + 边框/底色（与干员卡互斥）。
+/// 用类型别名收窄长的 Query 元组，规避 clippy::type_complexity。
+type SupplyRowHover<'w, 's> = Query<
+    'w, 's,
+    (&'static SupplyRow, &'static Interaction, &'static mut BorderColor, &'static mut BackgroundColor),
+    Without<OperatorCard>,
+>;
+
 /// 补给台面板：悬停行高亮
-#[allow(clippy::type_complexity)]
 pub(crate) fn supply_ui_update_system(
-    mut rows: Query<(&SupplyRow, &Interaction, &mut BorderColor, &mut BackgroundColor), Without<OperatorCard>>,
+    mut rows: SupplyRowHover,
 ) {
     for (_row, interaction, mut border, mut bg) in rows.iter_mut() {
         if *interaction == Interaction::Hovered {
@@ -352,10 +380,17 @@ pub(crate) fn supply_ui_update_system(
     }
 }
 
+/// 干员卡样式查询：卡序号 + 交互 + 边框/底色（与补给台行互斥）。
+/// 类型别名规避 clippy::type_complexity。
+type OperatorCardHover<'w, 's> = Query<
+    'w, 's,
+    (&'static OperatorCard, &'static Interaction, &'static mut BorderColor, &'static mut BackgroundColor),
+    Without<SupplyRow>,
+>;
+
 /// 干员切换台面板：卡片高亮（当前干员金色 + 元素底色，悬停白框）与文本刷新
-#[allow(clippy::type_complexity)]
 pub(crate) fn operator_ui_update_system(
-    mut cards: Query<(&OperatorCard, &Interaction, &mut BorderColor, &mut BackgroundColor), Without<SupplyRow>>,
+    mut cards: OperatorCardHover,
     mut texts: Query<(&OperatorCardText, &mut Text)>,
     player_query: Query<&OperatorState, With<Player>>,
 ) {

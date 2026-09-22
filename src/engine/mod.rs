@@ -15,6 +15,11 @@ use crate::entity::{World, RenderSnapshot, Entity, EntityType, EntityId};
 use crate::damage::Vec3;
 use crate::damage::DamageResolver;
 
+mod double_buffer;
+pub use double_buffer::DoubleBuffer;
+mod pre_explosion_cache;
+pub use pre_explosion_cache::PreExplosionCache;
+
 /// Tick配置
 #[derive(Debug, Clone, Copy)]
 pub struct TickConfig {
@@ -44,44 +49,6 @@ pub enum GameLoopState {
     Paused,
     ShuttingDown,
     Stopped,
-}
-
-/// 双缓冲渲染快照
-pub struct DoubleBuffer {
-    /// 逻辑层写入的缓冲区
-    logic_buffer: RenderSnapshot,
-    /// 渲染层读取的缓冲区
-    render_buffer: RenderSnapshot,
-}
-
-impl DoubleBuffer {
-    pub fn new() -> Self {
-        Self {
-            logic_buffer: RenderSnapshot::new(0),
-            render_buffer: RenderSnapshot::new(0),
-        }
-    }
-
-    /// 获取逻辑写入缓冲区
-    pub fn get_logic_buffer(&mut self) -> &mut RenderSnapshot {
-        &mut self.logic_buffer
-    }
-
-    /// 获取渲染读取缓冲区（只读）
-    pub fn get_render_buffer(&self) -> &RenderSnapshot {
-        &self.render_buffer
-    }
-
-    /// 交换缓冲区
-    pub fn swap(&mut self) {
-        std::mem::swap(&mut self.logic_buffer, &mut self.render_buffer);
-    }
-}
-
-impl Default for DoubleBuffer {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 /// 游戏循环
@@ -473,94 +440,6 @@ impl GameLoop {
     }
 }
 
-/// 预爆炸缓存系统
-/// 
-/// 手雷/爆炸物飞行期间增量维护"影响范围内实体订阅列表"，
-/// 爆炸时直接遍历订阅列表，无需实时空间查询。
-pub struct PreExplosionCache {
-    /// 订阅列表：在爆炸范围内的实体
-    subscribers: Vec<EntityId>,
-    /// 爆炸半径
-    radius: f32,
-    /// 最后更新时间
-    last_update_tick: u64,
-}
-
-impl PreExplosionCache {
-    pub fn new(radius: f32) -> Self {
-        Self {
-            subscribers: Vec::new(),
-            radius,
-            last_update_tick: 0,
-        }
-    }
-
-    /// 添加订阅者
-    pub fn add_subscriber(&mut self, entity_id: EntityId) {
-        if !self.subscribers.contains(&entity_id) {
-            self.subscribers.push(entity_id);
-        }
-    }
-
-    /// 移除订阅者
-    pub fn remove_subscriber(&mut self, entity_id: EntityId) {
-        self.subscribers.retain(|&id| id != entity_id);
-    }
-
-    /// 更新订阅列表（实体进入/离开范围时调用）
-    pub fn update(&mut self, grenade_pos: Vec3, world: &World, current_tick: u64) {
-        self.last_update_tick = current_tick;
-        
-        // 获取当前在范围内的所有实体
-        let in_range: Vec<_> = world.query_in_radius(grenade_pos, self.radius);
-        
-        // 更新订阅列表
-        self.subscribers.clear();
-        self.subscribers.extend(in_range);
-    }
-
-    /// 获取订阅者列表
-    pub fn get_subscribers(&self) -> &[EntityId] {
-        &self.subscribers
-    }
-
-    /// 验证并推送爆炸指令（带一致性校验）
-    pub fn validate_and_push(
-        &self,
-        explosion_center: Vec3,
-        world: &mut World,
-        cmd: &crate::damage::ExplosionCmd,
-        resolver: &crate::damage::DamageResolver,
-    ) {
-        for &subscriber_id in &self.subscribers {
-            if let Some(entity) = world.get_entity(subscriber_id) {
-                // 1. 存活校验
-                if !entity.is_alive {
-                    continue;
-                }
-                
-                // 2. 位置偏差校验（10%容差）
-                let actual_dist = entity.position.distance(&explosion_center);
-                if actual_dist > self.radius * 1.1 {
-                    continue;
-                }
-            }
-            
-            // 3. 阻挡重新校验 + 推送
-            if let Some(entity) = world.get_entity_mut(subscriber_id) {
-                let damage = crate::damage::DamagePacket::new(
-                    cmd.element,
-                    cmd.base_damage,
-                    cmd.source_id,
-                ).with_source_pos(explosion_center);
-                
-                let env = crate::element::EntityElementState::Normal;
-                resolver.resolve(entity, &damage, &env);
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -594,30 +473,6 @@ mod tests {
         buffer.swap();
         
         assert_eq!(buffer.get_render_buffer().tick, 100);
-    }
-
-    #[test]
-    fn test_pre_explosion_cache() {
-        let mut world = World::new();
-        
-        // 创建实体
-        let e1 = Entity::new_player(0, Vec3::new(0.0, 0.0, 0.0));
-        let e2 = Entity::new_player(0, Vec3::new(3.0, 0.0, 0.0));
-        let e3 = Entity::new_player(0, Vec3::new(10.0, 0.0, 0.0));
-        
-        let id1 = world.spawn(e1);
-        let id2 = world.spawn(e2);
-        let _id3 = world.spawn(e3);
-        
-        // 创建缓存（半径5米）
-        let mut cache = PreExplosionCache::new(5.0);
-        cache.update(Vec3::new(0.0, 0.0, 0.0), &world, 1);
-        
-        // e1(0,0,0)和e2(3,0,0)在范围内，e3(10,0,0)不在
-        let subscribers = cache.get_subscribers();
-        assert!(subscribers.contains(&id1));
-        assert!(subscribers.contains(&id2));
-        assert!(!subscribers.contains(&EntityId::new(3))); // e3不在范围内
     }
 
     #[test]

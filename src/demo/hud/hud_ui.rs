@@ -1,9 +1,10 @@
-﻿//! HUD 构建：准星、干员名/血条/护甲条/技能栏、底部物品栏、弹药槽、击杀播报根、边缘光晕
+//! HUD 构建：准星、干员名/血条/护甲条/技能栏、底部物品栏、弹药槽、击杀播报根、边缘光晕
 
 use bevy::prelude::*;
 use crate::element::ElementType;
 use crate::model::palette;
 use crate::demo::inventory::{HeldHintRoot, HELD_HINT_TEXT};
+use crate::demo::extraction::{ExtractionHintRoot, ExtractionHintText};
 use crate::demo::frontend::*;
 use crate::demo::components::*;
 
@@ -71,6 +72,34 @@ pub(crate) fn setup_hud(mut commands: Commands) {
             ),
             ..default()
         });
+    });
+
+    // 撤离区提示：接近北端红色信标时显示，extraction_zone_system 控制显隐与回车确认
+    commands.spawn((
+        NodeBundle {
+            style: Style {
+                position_type: PositionType::Absolute,
+                width: Val::Percent(100.0),
+                top: Val::Percent(32.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                ..default()
+            },
+            visibility: Visibility::Hidden,
+            ..default()
+        },
+        ExtractionHintRoot,
+    )).with_children(|hint| {
+        hint.spawn((
+            TextBundle {
+                text: Text::from_section(
+                    "已抵达撤离区 · 按 Enter 确认撤离",
+                    TextStyle { font_size: 18.0, color: Color::srgb(0.9, 0.2, 0.2), ..default() },
+                ),
+                ..default()
+            },
+            ExtractionHintText,
+        ));
     });
 
     // Bottom HUD bar

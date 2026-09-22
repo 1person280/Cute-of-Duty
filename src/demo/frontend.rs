@@ -141,6 +141,7 @@ pub(crate) fn cursor_grab_toggle(
     held: Res<HeldGrenade>,
     open_station: Res<OpenStation>,
     backpack_ui: Query<&Visibility, With<InventoryUI>>,
+    crate_win: Res<super::supply_crate::CrateWindow>,
 ) {
     // 轮盘打开时 Esc 由轮盘负责（取消并收起），这里跳过避免抢占光标状态
     if wheel.open || wheel.pending_key.is_some() { return; }
@@ -148,6 +149,8 @@ pub(crate) fn cursor_grab_toggle(
     if held.item.is_some() { return; }
     // 站点面板打开时 Esc 由 station_system 负责（本系统在它之前运行，看到打开态直接跳过）
     if *open_station != OpenStation::None { return; }
+    // 物资箱窗口打开时 Esc 由 station_system 负责关闭，这里跳过避免抢占光标
+    if crate_win.crate_entity.is_some() { return; }
     // 背包打开时 Esc 由 inventory_toggle 负责关闭背包；
     // 若在这里把光标锁回，随后 station_system 会看到"光标已锁 + Esc"而误开补给台
     if backpack_ui.get_single().map_or(false, |vis| *vis == Visibility::Visible) { return; }

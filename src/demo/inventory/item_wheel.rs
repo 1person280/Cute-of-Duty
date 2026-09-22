@@ -2,6 +2,7 @@
 //! 光标停在中心或点击中心"取消"键则撤销使用（不消耗道具）。
 
 use bevy::prelude::*;
+use bevy::ecs::system::SystemParam;
 use bevy::window::{CursorGrabMode, PrimaryWindow};
 use crate::model::Player;
 use crate::demo::components::*;
@@ -134,110 +135,116 @@ pub(crate) fn setup_item_wheel(mut commands: Commands) {
 /// 短按 → 快速使用背包中第一个对应类别道具；
 /// 长按 WHEEL_OPEN_DELAY 秒 → 呼出轮盘（解锁光标），光标指向选卡，松开按键确认使用；
 /// 光标停在中心或点击中心"取消"键 → 撤销使用（不消耗道具）。
-#[allow(clippy::too_many_arguments)]
+/// 轮盘系统的输入上下文：输入事件、时间、光标/轮盘/持雷状态与中心"取消"键交互。
+/// 纯资源 + 只读查询走 SystemParam，可变查询在系统参数中直连。
+#[derive(SystemParam)]
+pub(crate) struct WheelContext<'w, 's> {
+    keyboard: Res<'w, ButtonInput<KeyCode>>,
+    mouse: Res<'w, ButtonInput<MouseButton>>,
+    time: Res<'w, Time>,
+    input_state: ResMut<'w, InputState>,
+    wheel: ResMut<'w, WheelState>,
+    held: ResMut<'w, HeldGrenade>,
+    cancel_btn: Query<'w, 's, &'static Interaction, With<WheelCancelButton>>,
+}
+
 pub(crate) fn item_wheel_system(
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mouse: Res<ButtonInput<MouseButton>>,
-    time: Res<Time>,
+    mut r: WheelContext,
     mut window_query: Query<&mut Window, With<PrimaryWindow>>,
-    mut input_state: ResMut<InputState>,
-    mut wheel: ResMut<WheelState>,
     mut player_query: Query<(&mut Inventory, &mut Health, &mut Armor), With<Player>>,
-    mut held: ResMut<HeldGrenade>,
     mut root_vis: Query<&mut Visibility, (With<WheelRoot>, Without<WheelCard>)>,
     mut hub_text: Query<&mut Text, (With<WheelHubText>, Without<WheelCardText>)>,
-    cancel_btn: Query<&Interaction, With<WheelCancelButton>>,
     mut cards: Query<(&WheelCard, &mut Style, &mut BorderColor, &mut Visibility, &mut BackgroundColor), Without<WheelRoot>>,
     mut card_texts: Query<(&WheelCardText, &mut Text), Without<WheelHubText>>,
 ) {
     // 0) 收起判定最先执行：松开 3/4 / Esc / 失焦 / 超时 → 本帧立刻收起并使用选中道具。
     //    必须放在显隐刷新与卡片布局之前——低端机上单帧渲染可达数秒，若先布局后判定，
     //    松手那一帧会带着整圈卡片多渲染数秒，看起来就是“松手后轮盘滞留”。
-    if wheel.open {
-        wheel.open_secs += time.delta_seconds();
-        let wheel_key = if wheel.category == ItemCategory::Consumable { KeyCode::Digit3 } else { KeyCode::Digit4 };
+    if r.wheel.open {
+        r.wheel.open_secs += r.time.delta_seconds();
+        let wheel_key = if r.wheel.category == ItemCategory::Consumable { KeyCode::Digit3 } else { KeyCode::Digit4 };
         let window_focused = window_query.get_single().map(|w| w.focused).unwrap_or(true);
-        let force_cancel = keyboard.just_pressed(KeyCode::Escape)
+        let force_cancel = r.keyboard.just_pressed(KeyCode::Escape)
             || !window_focused
-            || wheel.open_secs >= WHEEL_MAX_OPEN_SECS;
-        if force_cancel || !keyboard.pressed(wheel_key) {
-            let confirmed = !force_cancel && keyboard.just_released(wheel_key);
+            || r.wheel.open_secs >= WHEEL_MAX_OPEN_SECS;
+        if force_cancel || !r.keyboard.pressed(wheel_key) {
+            let confirmed = !force_cancel && r.keyboard.just_released(wheel_key);
             if confirmed {
                 // 中心撤销：无选中（光标停在中心/取消键上）→ 不消耗道具直接收起
-                if let Some(sel) = wheel.selected {
-                    if let Some(&inv_idx) = wheel.filtered.get(sel) {
+                if let Some(sel) = r.wheel.selected {
+                    if let Some(&inv_idx) = r.wheel.filtered.get(sel) {
                         if let Ok((mut inventory, mut health, mut armor)) = player_query.get_single_mut() {
-                            use_item_at(inv_idx, &mut inventory.items, &mut health, &mut armor, &mut held);
+                            use_item_at(inv_idx, &mut inventory.items, &mut health, &mut armor, &mut r.held);
                         }
                     }
                 }
             }
-            wheel.open = false;
-            wheel.selected = None;
+            r.wheel.open = false;
+            r.wheel.selected = None;
             if let Ok(mut window) = window_query.get_single_mut() {
                 window.cursor.visible = false;
                 window.cursor.grab_mode = CursorGrabMode::Locked;
             }
-            input_state.cursor_locked = true;
+            r.input_state.cursor_locked = true;
         }
     }
 
     // 1) 根节点与卡片显隐兜底：按【收起判定之后】的状态刷新，任何提前 return
     //    （快速使用/判定中）都不会把轮盘留在屏幕上；卡片显式隐藏，不依赖父继承
     let Ok(mut root_vis) = root_vis.get_single_mut() else { return };
-    *root_vis = if wheel.open { Visibility::Visible } else { Visibility::Hidden };
-    if !wheel.open {
+    *root_vis = if r.wheel.open { Visibility::Visible } else { Visibility::Hidden };
+    if !r.wheel.open {
         for (_, _, _, mut visibility, _) in cards.iter_mut() {
             *visibility = Visibility::Hidden;
         }
     }
 
     // 1) 开始按住 3/4（仅游戏进行中、无 UI 占用时）
-    if !wheel.open && wheel.pending_key.is_none() && input_state.cursor_locked {
-        if keyboard.just_pressed(KeyCode::Digit3) {
-            wheel.pending_key = Some(KeyCode::Digit3);
-            wheel.pending_hold = 0.0;
-        } else if keyboard.just_pressed(KeyCode::Digit4) {
-            wheel.pending_key = Some(KeyCode::Digit4);
-            wheel.pending_hold = 0.0;
+    if !r.wheel.open && r.wheel.pending_key.is_none() && r.input_state.cursor_locked {
+        if r.keyboard.just_pressed(KeyCode::Digit3) {
+            r.wheel.pending_key = Some(KeyCode::Digit3);
+            r.wheel.pending_hold = 0.0;
+        } else if r.keyboard.just_pressed(KeyCode::Digit4) {
+            r.wheel.pending_key = Some(KeyCode::Digit4);
+            r.wheel.pending_hold = 0.0;
         }
     }
 
     // 2) 待判定：短按快速使用 / 长按呼出轮盘
-    if let Some(key) = wheel.pending_key {
+    if let Some(key) = r.wheel.pending_key {
         // 按住期间其他 UI（站点/背包）抢走了光标 → 放弃本次判定：
         // 既不快速使用也不呼出轮盘，避免轮盘叠在面板上、松键后滞留
-        if !input_state.cursor_locked {
-            wheel.pending_key = None;
+        if !r.input_state.cursor_locked {
+            r.wheel.pending_key = None;
             return;
         }
-        wheel.pending_hold += time.delta_seconds();
-        if keyboard.just_released(key) {
-            wheel.pending_key = None;
+        r.wheel.pending_hold += r.time.delta_seconds();
+        if r.keyboard.just_released(key) {
+            r.wheel.pending_key = None;
             let category = if key == KeyCode::Digit3 { ItemCategory::Consumable } else { ItemCategory::Tactical };
             if let Ok((mut inventory, mut health, mut armor)) = player_query.get_single_mut() {
                 if let Some(idx) = inventory.items.iter().position(|it| it.item_type.category() == category) {
-                    use_item_at(idx, &mut inventory.items, &mut health, &mut armor, &mut held);
+                    use_item_at(idx, &mut inventory.items, &mut health, &mut armor, &mut r.held);
                 }
             }
             return;
-        } else if wheel.pending_hold >= WHEEL_OPEN_DELAY {
-            wheel.pending_key = None;
+        } else if r.wheel.pending_hold >= WHEEL_OPEN_DELAY {
+            r.wheel.pending_key = None;
             let category = if key == KeyCode::Digit3 { ItemCategory::Consumable } else { ItemCategory::Tactical };
             // 该类别没有道具时不呼出轮盘（快速轻点同样是无操作）
             let has_items = player_query.get_single()
                 .map(|(inv, _, _)| inv.items.iter().any(|it| it.item_type.category() == category))
                 .unwrap_or(false);
             if has_items {
-                wheel.open = true;
-                wheel.category = category;
-                wheel.selected = None;
-                wheel.open_secs = 0.0;
+                r.wheel.open = true;
+                r.wheel.category = category;
+                r.wheel.selected = None;
+                r.wheel.open_secs = 0.0;
                 if let Ok(mut window) = window_query.get_single_mut() {
                     window.cursor.visible = true;
                     window.cursor.grab_mode = CursorGrabMode::None;
                 }
-                input_state.cursor_locked = false;
+                r.input_state.cursor_locked = false;
             }
         } else {
             return; // 仍在判定中，本轮不动轮盘 UI
@@ -247,17 +254,17 @@ pub(crate) fn item_wheel_system(
     // 轮盘未打开时到此为止（显隐已在顶部按状态刷新）。
     // 必须有此守卫：否则下方“打开态”逻辑会在正常游戏时每帧执行，
     // 把轮盘点亮又立刻取消，表现为“没长按 3/4 也常驻屏幕”。
-    if !wheel.open { return; }
+    if !r.wheel.open { return; }
 
     // 3) 轮盘打开：收集同类道具、光标选卡（收起判定已前移到系统开头）
     let Ok((inventory, ..)) = player_query.get_single_mut() else { return };
     let filtered: Vec<usize> = inventory.items.iter().enumerate()
-        .filter(|(_, it)| it.item_type.category() == wheel.category)
+        .filter(|(_, it)| it.item_type.category() == r.wheel.category)
         .map(|(i, _)| i)
         .collect();
-    wheel.filtered = filtered;
-    if wheel.filtered.is_empty() {
-        wheel.open = false;
+    r.wheel.filtered = filtered;
+    if r.wheel.filtered.is_empty() {
+        r.wheel.open = false;
         *root_vis = Visibility::Hidden;
         for (_, _, _, mut visibility, _) in cards.iter_mut() {
             *visibility = Visibility::Hidden;
@@ -266,7 +273,7 @@ pub(crate) fn item_wheel_system(
             window.cursor.visible = false;
             window.cursor.grab_mode = CursorGrabMode::Locked;
         }
-        input_state.cursor_locked = true;
+        r.input_state.cursor_locked = true;
         return;
     }
     *root_vis = Visibility::Visible;
@@ -275,13 +282,13 @@ pub(crate) fn item_wheel_system(
     let center = Vec2::new(window.width() * 0.5, window.height() * 0.5);
 
     // 点击轮盘中心"取消"键：撤销使用（不消耗道具），收起轮盘并锁定光标
-    let hover_cancel = cancel_btn.iter().any(|i| *i != Interaction::None);
-    if hover_cancel && mouse.just_pressed(MouseButton::Left) {
-        wheel.open = false;
-        wheel.selected = None;
+    let hover_cancel = r.cancel_btn.iter().any(|i| *i != Interaction::None);
+    if hover_cancel && r.mouse.just_pressed(MouseButton::Left) {
+        r.wheel.open = false;
+        r.wheel.selected = None;
         window.cursor.visible = false;
         window.cursor.grab_mode = CursorGrabMode::Locked;
-        input_state.cursor_locked = true;
+        r.input_state.cursor_locked = true;
         return;
     }
 
@@ -290,7 +297,7 @@ pub(crate) fn item_wheel_system(
         let offset = cursor - center;
         if offset.length() > 40.0 && !hover_cancel {
             let angle = offset.y.atan2(offset.x);
-            let n = wheel.filtered.len();
+            let n = r.wheel.filtered.len();
             let sector = std::f32::consts::TAU / n as f32;
             let mut best = 0usize;
             let mut best_dist = f32::MAX;
@@ -300,15 +307,15 @@ pub(crate) fn item_wheel_system(
                 if d > std::f32::consts::PI { d = std::f32::consts::TAU - d; }
                 if d < best_dist { best_dist = d; best = i; }
             }
-            wheel.selected = Some(best);
+            r.wheel.selected = Some(best);
         } else {
             // 中心区 = 撤销位：不选中任何卡片
-            wheel.selected = None;
+            r.wheel.selected = None;
         }
     }
 
     // 卡片环形布局 + 选中高亮 + 显隐 + 文本；超出道具数量的卡片隐藏
-    let n = wheel.filtered.len();
+    let n = r.wheel.filtered.len();
     let sector = std::f32::consts::TAU / n as f32;
     for (card, mut style, mut border, mut visibility, mut bg) in cards.iter_mut() {
         let i = card.0;
@@ -323,7 +330,7 @@ pub(crate) fn item_wheel_system(
         style.position_type = PositionType::Absolute;
         style.left = Val::Px(cx);
         style.top = Val::Px(cy);
-        let selected = Some(i) == wheel.selected;
+        let selected = Some(i) == r.wheel.selected;
         border.0 = if selected {
             Color::srgba(1.0, 0.8, 0.25, 0.95)
         } else {
@@ -336,7 +343,7 @@ pub(crate) fn item_wheel_system(
         };
     }
     for (card_text, mut text) in card_texts.iter_mut() {
-        if let Some(&inv_idx) = wheel.filtered.get(card_text.0) {
+        if let Some(&inv_idx) = r.wheel.filtered.get(card_text.0) {
             if let Some(item) = inventory.items.get(inv_idx) {
                 text.sections[0].value = item.name.clone();
                 continue;
@@ -345,12 +352,12 @@ pub(crate) fn item_wheel_system(
         text.sections[0].value = "".to_string();
     }
     if let Ok(mut hub) = hub_text.get_single_mut() {
-        let sel_name = wheel.selected
-            .and_then(|s| wheel.filtered.get(s))
+        let sel_name = r.wheel.selected
+            .and_then(|s| r.wheel.filtered.get(s))
             .and_then(|&idx| inventory.items.get(idx))
             .map(|item| item.name.as_str())
             .unwrap_or("移出中心选择道具");
-        let cat_label = match wheel.category {
+        let cat_label = match r.wheel.category {
             ItemCategory::Consumable => "恢复",
             ItemCategory::Tactical => "战术",
         };

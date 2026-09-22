@@ -10,6 +10,7 @@
 //! 坐标约定（与 demo 一致）：x 向右 / y 向上 / z 向前，
 //! 玩家出生在原点、面向 -Z；单位为米。
 
+pub mod lawn;
 pub mod training;
 
 /// 位置（米）：[x, y, z]
@@ -160,6 +161,8 @@ pub enum StationKind {
     SupplyTable,
     /// 干员切换台
     OperatorDesk,
+    /// 场景物资箱（3×4 随机战利品）
+    SupplyCrate,
 }
 
 /// 场景功能站点（交互台本体几何由 props 提供，这里只登记位置与语义）

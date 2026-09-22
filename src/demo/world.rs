@@ -1,4 +1,4 @@
-﻿//! 世界生成：地图布局落地、材质缓存、资产池、靶/拾取物/站点生成
+//! 世界生成：地图布局落地、材质缓存、资产池、靶/拾取物/站点生成
 
 use std::collections::HashMap;
 use bevy::prelude::*;
@@ -10,14 +10,17 @@ use crate::model::{
 use super::character::{spawn_player, spawn_enemy, CharacterPreset};
 use super::camera::{CamPivot, ShoulderPivot, PitchPivot, SpringArm, SpringArmState, PIVOT_HEIGHT, ARM_SHOULDER_X_NORMAL, ARM_EYE_Y_NORMAL, ARM_LEN_NORMAL};
 use super::hud::EffectAssets;
-use crate::map::training;
+use crate::map::lawn;
 use super::frontend::*;
 use super::components::*;
+use super::loadout::Loadout;
+use super::supply_crate::spawn_crates;
 
 pub(crate) fn setup_world(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    loadout: Res<Loadout>,
 ) {
     // Main directional light
     commands.spawn(DirectionalLightBundle {
@@ -47,13 +50,14 @@ pub(crate) fn setup_world(
         ..default()
     });
 
-    // Corner lights
-    for pos in [(15.0, 2.5, 15.0), (-15.0, 2.5, 15.0), (15.0, 2.5, -15.0), (-15.0, 2.5, -15.0)] {
+    // Corner lights：随活动地图（1×1km 草坪场）的四角布置
+    let corner = crate::map::lawn::HALF;
+    for pos in [(corner, 2.5, corner), (-corner, 2.5, corner), (corner, 2.5, -corner), (-corner, 2.5, -corner)] {
         commands.spawn(PointLightBundle {
             point_light: PointLight {
-                intensity: 40000.0,
+                intensity: 80000.0,
                 color: Color::srgb(0.9, 0.85, 0.75),
-                range: 22.0,
+                range: 60.0,
                 shadows_enabled: false,
                 ..default()
             },
@@ -62,9 +66,9 @@ pub(crate) fn setup_world(
         });
     }
 
-    // Player
-    let player_pos = Vec3::new(0.0, 0.0, 0.0);
-    spawn_player(&mut commands, &mut meshes, &mut materials, player_pos);
+    // Player：出生点取自当前活动地图（数据驱动，搜打撤大场出生在南端出生区）
+    let player_pos = Vec3::from(lawn::layout().player_spawn);
+    spawn_player(&mut commands, &mut meshes, &mut materials, player_pos, &loadout);
 
     // 越肩相机装配（SpringArm 架构）：
     // CamPivot(脚底, TopLevel 不随模型旋转) → ShoulderPivot(Yaw) → PitchPivot(Pitch)
@@ -94,31 +98,35 @@ pub(crate) fn setup_world(
         });
     });
 
-    // AI enemies
-    spawn_enemy(&mut commands, &mut meshes, &mut materials, Vec3::new(8.0, 0.0, -8.0), CharacterPreset::EnemyIce);
-    spawn_enemy(&mut commands, &mut meshes, &mut materials, Vec3::new(-8.0, 0.0, -6.0), CharacterPreset::TeammateElectric);
+    // AI enemies：分布到搜打撤场地的搜索区/射击区，让"打"阶段有敌对目标
+    spawn_enemy(&mut commands, &mut meshes, &mut materials, Vec3::new(0.0, 0.0, 300.0), CharacterPreset::EnemyIce);
+    spawn_enemy(&mut commands, &mut meshes, &mut materials, Vec3::new(-200.0, 0.0, 100.0), CharacterPreset::EnemyIce);
+    spawn_enemy(&mut commands, &mut meshes, &mut materials, Vec3::new(200.0, 0.0, -50.0), CharacterPreset::TeammateElectric);
 
     // Training ground
     spawn_training_ground(&mut commands, &mut meshes, &mut materials);
 
     // 共享特效资产：所有运行时特效（曳光/火花/粒子/爆炸/投掷物）复用
     commands.insert_resource(EffectAssets::new(&mut meshes, &mut materials));
+
+    // 物资箱：与玩家同一命令批次生成，出生区北侧可见，杜绝调度遗漏
+    spawn_crates(&mut commands, &mut meshes, &mut materials);
 }
 
 // =============================================================================
 // Training Ground —— 数据驱动渲染
 // =============================================================================
 
-// 地图几何数据由 `crate::map::training` 提供（纯数据，无 bevy 依赖）。
+// 地图几何数据由 `crate::map::lawn` 提供（纯数据，无 bevy 依赖）。
 // 本文件只负责把数据渲染成实体，不在这里摆放任何掩体/靶位；
-// 调整训练场布局请改 src/map/training/mod.rs。
+// 调整搜打撤草坪场布局请改 src/map/lawn/mod.rs。
 
 pub(crate) fn spawn_training_ground(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
-    spawn_map_layout(&training::layout(), commands, meshes, materials);
+    spawn_map_layout(&lawn::layout(), commands, meshes, materials);
 }
 
 /// 通用地图渲染器：渲染任意 [`MapLayout`] 为场景实体
@@ -345,7 +353,11 @@ pub(crate) fn spawn_map_target(
     let white = pool.voxel_mat(materials, palette::TARGET_WHITE);
     match spec.motion {
         None => {
-            spawn_dummy(commands, meshes, materials, pool, pos, red, white, spec.label);
+            spawn_dummy(commands, meshes, materials, pool, DummySpawn {
+                position: pos,
+                label: spec.label,
+                scheme: DummyScheme { red, white },
+            });
         }
         Some(m) => {
             let board = pool.box_mesh(meshes, 0.8, 0.8, 0.2);
@@ -377,7 +389,12 @@ pub(crate) fn spawn_map_pickup(
         PickupKind::Grenade { element } => (PickupType::Grenade { element }, element.color()),
         PickupKind::Weapon { element } => (PickupType::Weapon { element }, element.color()),
     };
-    spawn_pickup_item(commands, meshes, materials, pool, Vec3::from(spec.pos), item_type, spec.label, color);
+    spawn_pickup_item(commands, meshes, materials, pool, PickupSpawn {
+        position: Vec3::from(spec.pos),
+        item_type,
+        name: spec.label.to_string(),
+        color,
+    });
 }
 
 /// 生成场景功能站点（补给台/干员切换台的交互登记点，桌面几何由 props 提供）
@@ -419,17 +436,27 @@ pub(crate) fn spawn_glow(
     }).insert(NotShadowCaster);
 }
 
-#[allow(clippy::too_many_arguments)]
+/// 靶子渲染方案：以红芯白环的两段式配色标识可命中目标
+pub(crate) struct DummyScheme {
+    pub red: Handle<StandardMaterial>,
+    pub white: Handle<StandardMaterial>,
+}
+
+/// 靶子的生成描述：位置 + 命中标签 + 双色渲染方案
+pub(crate) struct DummySpawn {
+    pub position: Vec3,
+    pub label: &'static str,
+    pub scheme: DummyScheme,
+}
+
 pub(crate) fn spawn_dummy(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     pool: &mut AssetPool,
-    position: Vec3,
-    red: Handle<StandardMaterial>,
-    white: Handle<StandardMaterial>,
-    label: &'static str,
+    spec: DummySpawn,
 ) {
+    let position = spec.position;
     // 支柱底端贴地：高台等架空靶位自动获得更长支撑
     let pole_y = 0.75 - position.y;
     let board = pool.box_mesh(meshes, 1.2, 1.2, 0.3);
@@ -444,16 +471,16 @@ pub(crate) fn spawn_dummy(
             transform: Transform::from_translation(position),
             ..default()
         },
-        TargetDummy { label, ..default() },
+        TargetDummy { label: spec.label, ..default() },
     )).with_children(|p| {
         p.spawn(PbrBundle {
             mesh: board,
-            material: red,
+            material: spec.scheme.red,
             ..default()
         });
         p.spawn(PbrBundle {
             mesh: inner,
-            material: white,
+            material: spec.scheme.white,
             ..default()
         });
         p.spawn(PbrBundle {
@@ -470,17 +497,22 @@ pub(crate) fn spawn_dummy(
     });
 }
 
+/// 单个拾取物的生成描述：落点、道具类型、显示名与配色
+pub(crate) struct PickupSpawn {
+    pub(crate) position: Vec3,
+    pub(crate) item_type: PickupType,
+    pub(crate) name: String,
+    pub(crate) color: Color,
+}
+
 pub(crate) fn spawn_pickup_item(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     pool: &mut AssetPool,
-    position: Vec3,
-    item_type: PickupType,
-    name: &str,
-    color: Color,
+    spec: PickupSpawn,
 ) {
-    let (mesh_size, glow_color) = match &item_type {
+    let (mesh_size, glow_color) = match &spec.item_type {
         PickupType::Ammo { .. } => (Vec3::new(0.5, 0.35, 0.35), Color::srgb(1.0, 0.85, 0.3)),
         PickupType::Health { .. } => (Vec3::new(0.4, 0.25, 0.4), Color::srgb(1.0, 0.3, 0.3)),
         PickupType::Armor { .. } => (Vec3::new(0.4, 0.3, 0.5), Color::srgb(0.3, 0.6, 1.0)),
@@ -488,17 +520,17 @@ pub(crate) fn spawn_pickup_item(
         PickupType::Weapon { element } => (Vec3::new(0.18, 0.18, 0.9), element.color()),
     };
     let body = pool.box_mesh(meshes, mesh_size.x, mesh_size.y, mesh_size.z);
-    let body_mat = pool.emissive_mat(materials, color, 2.0);
+    let body_mat = pool.emissive_mat(materials, spec.color, 2.0);
     let orb = pool.sphere_mesh(meshes, 0.08);
     let orb_mat = pool.emissive_mat(materials, glow_color, 4.0);
     commands.spawn((
         PbrBundle {
             mesh: body,
             material: body_mat,
-            transform: Transform::from_translation(position),
+            transform: Transform::from_translation(spec.position),
             ..default()
         },
-        PickupItem { name: name.to_string(), item_type: item_type.clone() },
+        PickupItem { name: spec.name, item_type: spec.item_type.clone() },
         Collider { half_size: Vec3::new(mesh_size.x * 0.5, mesh_size.y * 0.5, mesh_size.z * 0.5) },
     )).with_children(|p| {
         // Floating indicator

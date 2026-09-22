@@ -5,6 +5,8 @@
 .idea/
 .vscode/
 *.iml
+/.zcode/
+/.trae/
 
 # 系统杂项
 Thumbs.db

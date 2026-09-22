@@ -1,11 +1,12 @@
-﻿//! 小地图与罗盘：标记组件、坐标换算、构建与每帧更新系统
+//! 小地图与罗盘：标记组件、坐标换算、构建与每帧更新系统
 
 use bevy::prelude::*;
+use bevy::ecs::system::SystemParam;
 use crate::map::{MaterialKind, StationKind};
 use crate::model::{
     Player, PlayerCamera,
 };
-use crate::map::training;
+use crate::map::lawn;
 use super::frontend::*;
 use super::components::*;
 
@@ -73,7 +74,7 @@ pub(crate) fn heading_rad(yaw: f32) -> f32 {
 }
 
 pub(crate) fn setup_minimap(mut commands: Commands) {
-    let layout = training::layout();
+    let layout = lawn::layout();
     let half = layout.half_extent;
 
     // 根节点：左上角，纵向排列 罗盘条 + 方形地图（边距与右上角击杀播报一致）
@@ -235,6 +236,7 @@ pub(crate) fn setup_minimap(mut commands: Commands) {
                 let color = match station.kind {
                     StationKind::SupplyTable => Color::srgb(1.0, 0.65, 0.15),
                     StationKind::OperatorDesk => Color::srgb(0.2, 0.9, 0.95),
+                    StationKind::SupplyCrate => Color::srgb(1.0, 0.55, 0.12),
                 };
                 map.spawn(NodeBundle {
                     style: Style {
@@ -346,43 +348,104 @@ pub(crate) fn dot_size(kind: DotKind) -> f32 {
     }
 }
 
+/// 罗盘/落图的可变样式查询别名：各标记互斥的 With 过滤。
+/// 用类型别名收窄长 Query 元组，规避 clippy::type_complexity。
+type MinimapDotStyleQuery<'w, 's> = Query<
+    'w, 's,
+    (&'static MinimapDot, &'static mut Style, &'static mut BackgroundColor),
+    (
+        Without<MinimapPlayerDot>,
+        Without<MinimapPlayerArrow>,
+        Without<CompassTick>,
+        Without<CompassLabel>,
+    ),
+>;
+type MinimapTickStyleQuery<'w, 's> = Query<
+    'w, 's,
+    (&'static CompassTick, &'static mut Style),
+    (
+        Without<MinimapDot>,
+        Without<MinimapPlayerDot>,
+        Without<MinimapPlayerArrow>,
+        Without<CompassLabel>,
+    ),
+>;
+type MinimapLabelStyleQuery<'w, 's> = Query<
+    'w, 's,
+    (&'static CompassLabel, &'static mut Style),
+    (
+        Without<MinimapDot>,
+        Without<MinimapPlayerDot>,
+        Without<MinimapPlayerArrow>,
+        Without<CompassTick>,
+    ),
+>;
+type MinimapPlayerDotQuery<'w, 's> = Query<
+    'w, 's,
+    &'static mut Style,
+    (
+        With<MinimapPlayerDot>,
+        Without<MinimapPlayerArrow>,
+        Without<MinimapDot>,
+        Without<CompassTick>,
+        Without<CompassLabel>,
+    ),
+>;
+type MinimapPlayerArrowQuery<'w, 's> = Query<
+    'w, 's,
+    (&'static mut Style, &'static mut Transform),
+    (
+        With<MinimapPlayerArrow>,
+        Without<MinimapPlayerDot>,
+        Without<MinimapDot>,
+        Without<CompassTick>,
+        Without<CompassLabel>,
+        Without<Player>,
+        Without<Faction>,
+        Without<TargetDummy>,
+        Without<PickupItem>,
+    ),
+>;
+
+/// 每帧更新的只读"世界"上下文：相机、玩家、地图边界与动态实体查询。
+/// 用 SystemParam 收拢只读查询与资源，规避 too_many_arguments。
+#[derive(SystemParam)]
+pub(crate) struct MinimapWorld<'w, 's> {
+    cam_query: Query<'w, 's, &'static PlayerCamera>,
+    player_query: Query<'w, 's, &'static Transform, With<Player>>,
+    map: Res<'w, MinimapMap>,
+    characters: Query<'w, 's, (&'static Transform, &'static Faction), Without<Player>>,
+    targets: MinimapTargetsQuery<'w, 's>,
+    pickups: MinimapPickupsQuery<'w, 's>,
+}
+
+/// 动态实体落图的只读查询别名：互斥 With/Without 标记隔离敌我/掩体，
+/// 收窄长 Query 元组，规避 clippy::type_complexity。
+type MinimapTargetsQuery<'w, 's> = Query<
+    'w, 's,
+    &'static Transform,
+    (With<TargetDummy>, Without<Player>, Without<Faction>),
+>;
+type MinimapPickupsQuery<'w, 's> = Query<
+    'w, 's,
+    (&'static Transform, &'static PickupItem),
+    (Without<Player>, Without<Faction>, Without<TargetDummy>),
+>;
+
 /// 每帧更新：罗盘滚动 + 方位读数 + 玩家/动态实体落图。
 /// 各 Style 可变查询用互斥的 With 标记隔离，避免 B0001 运行时冲突。
-#[allow(clippy::type_complexity)]
 pub(crate) fn minimap_update_system(
-    cam_query: Query<&PlayerCamera>,
-    player_query: Query<&Transform, With<Player>>,
-    map: Res<MinimapMap>,
-    characters: Query<(&Transform, &Faction), Without<Player>>,
-    targets: Query<&Transform, (With<TargetDummy>, Without<Player>, Without<Faction>)>,
-    pickups: Query<(&Transform, &PickupItem), (Without<Player>, Without<Faction>, Without<TargetDummy>)>,
-    mut dots: Query<
-        (&MinimapDot, &mut Style, &mut BackgroundColor),
-        (Without<MinimapPlayerDot>, Without<MinimapPlayerArrow>, Without<CompassTick>, Without<CompassLabel>),
-    >,
-    mut ticks: Query<
-        (&CompassTick, &mut Style),
-        (Without<MinimapDot>, Without<MinimapPlayerDot>, Without<MinimapPlayerArrow>, Without<CompassLabel>),
-    >,
-    mut labels: Query<
-        (&CompassLabel, &mut Style),
-        (Without<MinimapDot>, Without<MinimapPlayerDot>, Without<MinimapPlayerArrow>, Without<CompassTick>),
-    >,
-    mut player_dot: Query<
-        &mut Style,
-        (With<MinimapPlayerDot>, Without<MinimapPlayerArrow>, Without<MinimapDot>, Without<CompassTick>, Without<CompassLabel>),
-    >,
-    mut player_arrow: Query<
-        (&mut Style, &mut Transform),
-        // &mut Transform 须与上方四处 &Transform 读访问逐一对立，否则 B0001
-        (With<MinimapPlayerArrow>, Without<MinimapPlayerDot>, Without<MinimapDot>, Without<CompassTick>, Without<CompassLabel>,
-         Without<Player>, Without<Faction>, Without<TargetDummy>, Without<PickupItem>),
-    >,
+    world: MinimapWorld,
+    mut dots: MinimapDotStyleQuery,
+    mut ticks: MinimapTickStyleQuery,
+    mut labels: MinimapLabelStyleQuery,
+    mut player_dot: MinimapPlayerDotQuery,
+    mut player_arrow: MinimapPlayerArrowQuery,
     mut heading_text: Query<&mut Text, With<CompassHeadingText>>,
 ) {
-    let Ok(cam) = cam_query.get_single() else { return };
-    let Ok(player) = player_query.get_single() else { return };
-    let half = map.half_extent;
+    let Ok(cam) = world.cam_query.get_single() else { return };
+    let Ok(player) = world.player_query.get_single() else { return };
+    let half = world.map.half_extent;
 
     // ---- 罗盘：刻度/方位字按 1px=1° 滚动，超出可视范围隐藏 ----
     let heading = heading_rad(cam.yaw);
@@ -421,14 +484,14 @@ pub(crate) fn minimap_update_system(
 
     // ---- 动态实体 → 地图像素 ----
     let to_px = |t: &Transform| [world_to_map(t.translation.x, half), world_to_map(t.translation.z, half)];
-    let target_px: Vec<[f32; 2]> = targets.iter().map(to_px).collect();
-    let pickup_px: Vec<([f32; 2], Color)> = pickups
+    let target_px: Vec<[f32; 2]> = world.targets.iter().map(to_px).collect();
+    let pickup_px: Vec<([f32; 2], Color)> = world.pickups
         .iter()
         .map(|(t, item)| (to_px(t), minimap_pickup_color(&item.item_type)))
         .collect();
     let mut enemy_px: Vec<[f32; 2]> = Vec::new();
     let mut teammate_px: Vec<[f32; 2]> = Vec::new();
-    for (t, faction) in characters.iter() {
+    for (t, faction) in world.characters.iter() {
         match faction {
             Faction::Enemy => enemy_px.push(to_px(t)),
             Faction::Teammate => teammate_px.push(to_px(t)),

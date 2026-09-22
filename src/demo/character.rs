@@ -1,4 +1,4 @@
-﻿//! 角色生成：玩家/敌人实体与体素模型构建
+//! 角色生成：玩家/敌人实体与体素模型构建
 
 use bevy::prelude::*;
 use crate::element::ElementType;
@@ -10,6 +10,7 @@ use crate::model::{
 use super::minimap::Faction;
 use super::frontend::*;
 use super::components::*;
+use super::loadout::{Loadout, apply_loadout};
 
 pub(crate) enum CharacterPreset { PlayerFire, EnemyIce, TeammateElectric }
 
@@ -18,29 +19,27 @@ pub(crate) fn spawn_player(
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     pos: Vec3,
+    loadout: &Loadout,
 ) {
     // 发光饰条 = 当前干员的元素色（切换干员时由 switch_operator 重新着色）
     let accent = mat_emissive(materials, roster()[0].element.color());
     let eye = mat_emissive(materials, palette::EYE_BLUE);
+
+    // 起步背包按"仓库"选装落地（双主武器固定；物资/护甲/弹药池随勾选）
+    let mut inventory = Inventory::default();
+    let mut armor = Armor::default();
+    apply_loadout(&mut inventory, &mut armor, loadout);
 
     let mut root = commands.spawn((
         SpatialBundle { transform: Transform::from_translation(pos), ..default() },
         Player,
         PlayerMovement::default(),
         Health::default(),
-        Armor::default(),
+        armor,
         WeaponSlot::default(),
         OperatorState::default(),
         OperatorAccent(accent.clone()),
-        // 背包默认自带两把起步步枪与弹药池；武器架可在场上拾取扩充
-        Inventory {
-            items: vec![
-                PickupItem { name: "医疗包".to_string(), item_type: PickupType::Health { amount: 30.0 } },
-                PickupItem { name: "烈焰手雷".to_string(), item_type: PickupType::Grenade { element: ElementType::Fire } },
-                PickupItem { name: "冰霜手雷".to_string(), item_type: PickupType::Grenade { element: ElementType::Ice } },
-            ],
-            ..Inventory::default()
-        },
+        inventory,
     ));
     root.with_children(|p| {
         // 玩家模型包进带标记的根：切干员时由 operator_model_swap_system 整体换模型

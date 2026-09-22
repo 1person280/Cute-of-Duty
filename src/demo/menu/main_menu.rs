@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use super::mode_panel::*;
 use super::settings_panel::*;
 use crate::demo::pause::{spawn_credits_panel, spawn_setting_row, GameSettings, SettingKind};
+use crate::demo::loadout::{LoadoutButton, spawn_loadout_panel};
 
 #[derive(Resource)]
 pub(crate) struct MenuCamera(pub(crate) Entity);
@@ -19,6 +20,10 @@ pub(crate) struct MainMenuUi {
     pub(crate) settings_overlay: Entity,
     /// 设置浮层的全屏压暗层（与浮层同步显隐）
     pub(crate) settings_backdrop: Entity,
+    /// 仓库（携带物资）选装浮层
+    pub(crate) loadout_panel: Entity,
+    /// 仓库浮层的全屏压暗层
+    pub(crate) loadout_backdrop: Entity,
     /// 右下角"当前模式"状态行
     pub(crate) status_text: Entity,
 }
@@ -78,10 +83,13 @@ pub(crate) fn setup_main_menu(
     let mut switch_btn = Entity::PLACEHOLDER;
     let mut start_btn = Entity::PLACEHOLDER;
     let mut close_btn = Entity::PLACEHOLDER;
+    let mut loadout_btn = Entity::PLACEHOLDER;
     let mut status_text = Entity::PLACEHOLDER;
     let mut mode_panel = Entity::PLACEHOLDER;
     let mut settings_overlay = Entity::PLACEHOLDER;
     let mut settings_backdrop = Entity::PLACEHOLDER;
+    let mut loadout_panel = Entity::PLACEHOLDER;
+    let mut loadout_backdrop = Entity::PLACEHOLDER;
 
     let gear_texture: Handle<Image> = assets.load("ui/gear_icon.png");
     let (base_bg, base_border) = menu_button_palette(false);
@@ -215,6 +223,8 @@ pub(crate) fn setup_main_menu(
                 switch_btn = spawn_action_button(row, "切 换 模 式", 176.0, 54.0, 20.0);
                 start_btn = spawn_action_button(row, "开 始 游 戏", 216.0, 54.0, 20.0);
             });
+            // 仓库按钮：选装携带物资，与右下角主操作区同列
+            loadout_btn = spawn_action_button(col, "仓 库 · 携带物资", 404.0, 46.0, 18.0);
         });
 
         // 右上角齿轮：打开设置浮层（ZIndex 压在模式面板之上）
@@ -452,17 +462,23 @@ pub(crate) fn setup_main_menu(
             spawn_credits_panel(overlay);
             close_btn = spawn_action_button(overlay, "返 回", 200.0, 48.0, 20.0);
         }).id();
+
+        // 仓库（携带物资）选装浮层（覆盖层 + 压暗层，ZIndex 同设置浮层）
+        (loadout_panel, loadout_backdrop) = spawn_loadout_panel(root);
     });
 
     commands.entity(close_btn).insert(SettingsCloseButton);
     commands.entity(quit_btn).insert(QuitButton);
     commands.entity(switch_btn).insert(SwitchModeButton);
     commands.entity(start_btn).insert(StartGameButton);
+    commands.entity(loadout_btn).insert(LoadoutButton);
     commands.insert_resource(MainMenuUi {
         root,
         mode_panel,
         settings_overlay,
         settings_backdrop,
+        loadout_panel,
+        loadout_backdrop,
         status_text,
     });
     commands.insert_resource(MenuGrace(Timer::from_seconds(0.4, TimerMode::Once)));

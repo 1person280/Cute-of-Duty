@@ -1680,7 +1680,7 @@ checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
 name = "cute_of_duty"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bevy",
  "blake3",
