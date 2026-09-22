@@ -8,7 +8,7 @@
 配置文件表驱动的全部玩法规则 · 单一事实来源
 
 [![License](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.3.1--hotfix-red.svg)](#四版本历史)
+[![Version](https://img.shields.io/badge/Version-0.3.2--%E6%90%9C%E6%89%93%E6%92%A4-red.svg)](#四版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
 [![Headless](https://img.shields.io/badge/%E6%97%A0%E5%A4%B4%E6%A8%A1%E6%8B%9F-passing-2ea44f.svg)](#一快速开始)
 [![Demo](https://img.shields.io/badge/3D%20Demo-Bevy%200.14-2ea44f.svg)](#一快速开始)
