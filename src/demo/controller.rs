@@ -12,7 +12,7 @@ use super::components::*;
 pub(crate) fn fps_controller(
     mut player_query: Query<(&mut Transform, &mut PlayerMovement), With<Player>>,
     mut cam_query: Query<&mut PlayerCamera>,
-    mut mouse_events: EventReader<MouseMotion>,
+    mut mouse_events: MessageReader<MouseMotion>,
     keyboard: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     input_state: Res<InputState>,
@@ -25,11 +25,11 @@ pub(crate) fn fps_controller(
         return;
     }
 
-    let dt = time.delta_seconds();
+    let dt = time.delta_secs();
     let mut delta = Vec2::ZERO;
     for ev in mouse_events.read() { delta += ev.delta; }
 
-    let Ok(mut cam) = cam_query.get_single_mut() else { return };
+    let Ok(mut cam) = cam_query.single_mut() else { return };
     if delta != Vec2::ZERO {
         // 鼠标 X → 肩轴 Yaw，Y → 俯仰 Pitch；两轴灵敏度独立
         cam.yaw -= delta.x * MOUSE_SENS_X * settings.mouse_sensitivity;
@@ -143,7 +143,7 @@ pub(crate) fn collides(
 // —— 相机装配 ——
 
 pub(crate) fn weapon_switch(keyboard: Res<ButtonInput<KeyCode>>, mut query: Query<&mut WeaponSlot, With<Player>>) {
-    let Ok(mut slot) = query.get_single_mut() else { return };
+    let Ok(mut slot) = query.single_mut() else { return };
     if keyboard.just_pressed(KeyCode::Digit1) && slot.current != 0 { slot.current = 0; }
     if keyboard.just_pressed(KeyCode::Digit2) && slot.current != 1 { slot.current = 1; }
 }

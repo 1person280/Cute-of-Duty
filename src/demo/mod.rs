@@ -38,7 +38,7 @@ use bevy::prelude::*;
 use bevy::asset::AssetPlugin;
 use crate::element::ElementSystem;
 use crate::model::{operator_model_swap_system, yanhu_action_system};
-use bevy::window::WindowPlugin;
+use bevy::window::{WindowPlugin, WindowResolution};
 
 pub mod camera; // model 直接依赖相机组件（避免 demo⇄model 整体互相 use）
 mod character;
@@ -98,7 +98,7 @@ pub fn run() {
     let mut plugins = DefaultPlugins.set(WindowPlugin {
         primary_window: Some(Window {
             title: "Cute Of Duty 1 - 3D Pixel FPS".to_string(),
-            resolution: (1280.0_f32, 720.0_f32).into(),
+            resolution: WindowResolution::new(1280, 720),
             position: WindowPosition::Centered(MonitorSelection::Primary),
             resizable: false,
             ..default()
@@ -132,12 +132,8 @@ pub fn run() {
         .init_resource::<HeldGrenade>()
         .init_resource::<TracerTimer>()
         .init_resource::<BigMapOpen>()
-        .add_event::<KillEvent>()
+        .add_message::<KillEvent>()
         .insert_resource(ClearColor(Color::srgb(0.12, 0.14, 0.18)))
-        .insert_resource(AmbientLight {
-            color: Color::srgb(0.9, 0.92, 1.0),
-            brightness: 0.55,
-        })
         // 前端流程：加载页 → 主菜单 → 选择训练场进入游戏。
         // 世界与 HUD 的构建全部延迟到 OnEnter(InGame)，
         // 字体必须在 Startup 最先加载（前端界面文本同样依赖 CJK 字形）。

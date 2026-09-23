@@ -16,14 +16,14 @@ pub(crate) fn reload_system(
     time: Res<Time>,
     input_state: Res<InputState>,
 ) {
-    let Ok((mut movement, weapon_slot, mut inventory)) = player_query.get_single_mut() else { return };
+    let Ok((mut movement, weapon_slot, mut inventory)) = player_query.single_mut() else { return };
 
     let current_idx = weapon_slot.current;
 
     // Tick reload timer if active
     if let Some(ref mut timer) = movement.reload_timer {
         timer.tick(time.delta());
-        if timer.finished() {
+        if timer.is_finished() {
             // 换弹从背包弹药池取弹
             let widx = current_idx;
             let needed = inventory.weapons[widx].max_ammo - inventory.weapons[widx].ammo;
@@ -64,7 +64,7 @@ pub(crate) fn shooting_system(
     input_state: Res<InputState>,
     held: Res<HeldGrenade>,
 ) {
-    let Ok((player_transform, mut movement, weapon_slot, mut inventory)) = player_query.get_single_mut() else { return };
+    let Ok((player_transform, mut movement, weapon_slot, mut inventory)) = player_query.single_mut() else { return };
     movement.shoot_cooldown.tick(time.delta());
 
     // 背包/轮盘/站点等 UI 打开（光标解锁）时不射击
@@ -77,7 +77,7 @@ pub(crate) fn shooting_system(
     if movement.reload_timer.is_some() { return; }
 
     let shooting = mouse.pressed(MouseButton::Left);
-    if !shooting || !movement.shoot_cooldown.finished() { return; }
+    if !shooting || !movement.shoot_cooldown.is_finished() { return; }
 
     let idx = weapon_slot.current;
     let empty = inventory.weapons[idx].ammo <= 0;
@@ -95,11 +95,11 @@ pub(crate) fn shooting_system(
     let fire_interval = inventory.weapons[idx].fire_interval;
     movement.shoot_cooldown = Timer::from_seconds(fire_interval, TimerMode::Once);
 
-    let Ok(cam) = cam_query.get_single() else { return };
+    let Ok(cam) = cam_query.single() else { return };
 
     // 命中判定以准星为准：射线从相机出发、沿视线方向（与屏幕中心一致）。
     // 角色与相机之间的物体不参与检测（SpringArm 已做相机避障，射线只查靶子）。
-    let cam_gtf = cam_gtransform.get_single().copied()
+    let cam_gtf = cam_gtransform.single().copied()
         .map(|tf| tf.compute_transform())
         .unwrap_or_default();
     let origin = cam_gtf.translation;
@@ -138,25 +138,19 @@ pub(crate) fn shooting_system(
     // Laser trail（共享网格按弹道长度缩放 Z）
     let color = element.color();
     commands.spawn((
-        PbrBundle {
-            mesh: effects.tracer.clone(),
-            material: effects.material(&mut materials, element, EffectMatKind::Plain),
-            transform: Transform::from_translation(mid)
-                .looking_at(end, Vec3::Y)
-                .with_scale(Vec3::new(1.0, 1.0, len)),
-            ..default()
-        },
+        Mesh3d(effects.tracer.clone()),
+        MeshMaterial3d(effects.material(&mut materials, element, EffectMatKind::Plain)),
+        Transform::from_translation(mid)
+            .looking_at(end, Vec3::Y)
+            .with_scale(Vec3::new(1.0, 1.0, len)),
         BulletHit { timer: Timer::from_seconds(0.04, TimerMode::Once) },
     ));
 
     // Muzzle flash
     commands.spawn((
-        PbrBundle {
-            mesh: effects.spark.clone(),
-            material: effects.muzzle_material.clone(),
-            transform: Transform::from_translation(muzzle),
-            ..default()
-        },
+        Mesh3d(effects.spark.clone()),
+        MeshMaterial3d(effects.muzzle_material.clone()),
+        Transform::from_translation(muzzle),
         BulletHit { timer: Timer::from_seconds(0.03, TimerMode::Once) },
     ));
 
@@ -210,12 +204,9 @@ pub(crate) fn shooting_system(
                     (rand::random::<f32>() - 0.5) * 2.0,
                 ).normalize();
                 commands.spawn((
-                    PbrBundle {
-                        mesh: effects.particle.clone(),
-                        material: effects.material(&mut materials, element, EffectMatKind::Particle),
-                        transform: Transform::from_translation(hit_point),
-                        ..default()
-                    },
+                    Mesh3d(effects.particle.clone()),
+                    MeshMaterial3d(effects.material(&mut materials, element, EffectMatKind::Particle)),
+                    Transform::from_translation(hit_point),
                     DamageParticle {
                         velocity: dir * 3.0,
                         timer: Timer::from_seconds(0.5, TimerMode::Once),
@@ -225,12 +216,9 @@ pub(crate) fn shooting_system(
 
             // Hit explosion
             commands.spawn((
-                PbrBundle {
-                    mesh: effects.spark.clone(),
-                    material: effects.material(&mut materials, element, EffectMatKind::HitFlash),
-                    transform: Transform::from_translation(hit_point).with_scale(Vec3::splat(2.5)),
-                    ..default()
-                },
+                Mesh3d(effects.spark.clone()),
+                MeshMaterial3d(effects.material(&mut materials, element, EffectMatKind::HitFlash)),
+                Transform::from_translation(hit_point).with_scale(Vec3::splat(2.5)),
                 BulletHit { timer: Timer::from_seconds(0.12, TimerMode::Once) },
             ));
 

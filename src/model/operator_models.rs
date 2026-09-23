@@ -25,19 +25,18 @@ fn yanhu_point(x: f32, y: f32, z: f32) -> Vec3 {
 }
 
 fn voxel_box(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     mat: &Handle<StandardMaterial>,
     origin: Vec3,
     size: Vec3,
     rot: Quat,
 ) {
-    parent.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(size.x, size.y, size.z)),
-        material: mat.clone(),
-        transform: Transform::from_translation(origin).with_rotation(rot),
-        ..default()
-    });
+    parent.spawn((
+        Mesh3d(meshes.add(Cuboid::new(size.x, size.y, size.z))),
+        MeshMaterial3d(mat.clone()),
+        Transform::from_translation(origin).with_rotation(rot),
+    ));
 }
 
 /// 焰狐干员模型（[YSM] 是，史蒂夫模型 mod 美学，35 盒）：
@@ -45,7 +44,7 @@ fn voxel_box(
 /// 规格与 assets/characters/model/yanhu.geometry.json、yanhu_model_preview.png 一致。
 /// 元素件（刘海挑染/胸徽/臂章/照门）共享 accent 发光材质——切干员时随 switch_operator 重着色。
 pub fn build_yanhu(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     accent: &Handle<StandardMaterial>,
@@ -71,26 +70,26 @@ pub fn build_yanhu(
     let (c, s) = yanhu_px(3.0, 22.0, -3.0, 3.0, 2.0, 3.0);     voxel_box(parent, meshes, &armor, c, s, q);   // shdR
     // 四肢包进枢轴（关节点在肩/髋），由 yanhu_action_system 驱动行走/跳跃/瞄准动作
     let arm_l_pivot = yanhu_point(-6.0, 24.0, -0.5);
-    let mut arm_l = parent.spawn((SpatialBundle { transform: Transform::from_translation(arm_l_pivot), ..default() }, YanhuLimb::new(LimbKind::ArmL)));
+    let mut arm_l = parent.spawn((Transform::from_translation(arm_l_pivot), YanhuLimb::new(LimbKind::ArmL)));
     arm_l.with_children(|p| {
         let (c, s) = yanhu_px(-8.0, 19.0, -2.0, 4.0, 5.0, 4.0);    voxel_box(p, meshes, &green, c - arm_l_pivot, s, q);   // armLup
         let (c, s) = yanhu_px(-8.0, 12.0, -2.0, 4.0, 7.0, 4.0);    voxel_box(p, meshes, &skin, c - arm_l_pivot, s, q);    // armLlo
     });
     let arm_r_pivot = yanhu_point(6.0, 24.0, -0.5);
-    let mut arm_r = parent.spawn((SpatialBundle { transform: Transform::from_translation(arm_r_pivot), ..default() }, YanhuLimb::new(LimbKind::ArmR)));
+    let mut arm_r = parent.spawn((Transform::from_translation(arm_r_pivot), YanhuLimb::new(LimbKind::ArmR)));
     arm_r.with_children(|p| {
         let (c, s) = yanhu_px(4.0, 19.0, -2.0, 4.0, 5.0, 4.0);     voxel_box(p, meshes, &green, c - arm_r_pivot, s, q);   // armRup
         let (c, s) = yanhu_px(3.9, 20.0, -2.1, 4.2, 2.0, 4.2);     voxel_box(p, meshes, accent, c - arm_r_pivot, s, q);   // armband
         let (c, s) = yanhu_px(4.0, 12.0, -2.0, 4.0, 7.0, 4.0);     voxel_box(p, meshes, &skin, c - arm_r_pivot, s, q);    // armRlo
     });
     let leg_l_pivot = yanhu_point(-2.0, 12.0, 0.0);
-    let mut leg_l = parent.spawn((SpatialBundle { transform: Transform::from_translation(leg_l_pivot), ..default() }, YanhuLimb::new(LimbKind::LegL)));
+    let mut leg_l = parent.spawn((Transform::from_translation(leg_l_pivot), YanhuLimb::new(LimbKind::LegL)));
     leg_l.with_children(|p| {
         let (c, s) = yanhu_px(-4.0, 3.0, -2.0, 4.0, 9.0, 4.0);     voxel_box(p, meshes, &green, c - leg_l_pivot, s, q);   // legL
         let (c, s) = yanhu_px(-4.0, 0.0, -3.0, 4.0, 3.0, 5.0);     voxel_box(p, meshes, &boot, c - leg_l_pivot, s, q);    // bootL
     });
     let leg_r_pivot = yanhu_point(2.0, 12.0, 0.0);
-    let mut leg_r = parent.spawn((SpatialBundle { transform: Transform::from_translation(leg_r_pivot), ..default() }, YanhuLimb::new(LimbKind::LegR)));
+    let mut leg_r = parent.spawn((Transform::from_translation(leg_r_pivot), YanhuLimb::new(LimbKind::LegR)));
     leg_r.with_children(|p| {
         let (c, s) = yanhu_px(0.0, 3.0, -2.0, 4.0, 9.0, 4.0);      voxel_box(p, meshes, &green, c - leg_r_pivot, s, q);   // legR
         let (c, s) = yanhu_px(0.0, 0.0, -3.0, 4.0, 3.0, 5.0);      voxel_box(p, meshes, &boot, c - leg_r_pivot, s, q);    // bootR
@@ -99,13 +98,13 @@ pub fn build_yanhu(
     let tail_a_pivot = yanhu_point(0.0, 14.5, 2.0);
     let tail_b_pivot = yanhu_point(0.0, 16.0, 8.0);
     let tail_c_pivot = yanhu_point(0.0, 17.0, 13.0);
-    let mut tail_a = parent.spawn((SpatialBundle { transform: Transform::from_translation(tail_a_pivot), ..default() }, YanhuLimb::new(LimbKind::TailA)));
+    let mut tail_a = parent.spawn((Transform::from_translation(tail_a_pivot), YanhuLimb::new(LimbKind::TailA)));
     tail_a.with_children(|ta| {
         let (c, s) = yanhu_px(-1.5, 13.0, 2.0, 3.0, 3.0, 7.0);     voxel_box(ta, meshes, &hair, c - tail_a_pivot, s, q);   // tailA
-        let mut tail_b = ta.spawn((SpatialBundle { transform: Transform::from_translation(tail_b_pivot - tail_a_pivot), ..default() }, YanhuLimb::new(LimbKind::TailB)));
+        let mut tail_b = ta.spawn((Transform::from_translation(tail_b_pivot - tail_a_pivot), YanhuLimb::new(LimbKind::TailB)));
         tail_b.with_children(|tb| {
             let (c, s) = yanhu_px(-1.0, 15.0, 8.0, 2.0, 2.0, 6.0);     voxel_box(tb, meshes, &hair, c - tail_b_pivot, s, q);   // tailB
-            let mut tail_c = tb.spawn((SpatialBundle { transform: Transform::from_translation(tail_c_pivot - tail_b_pivot), ..default() }, YanhuLimb::new(LimbKind::TailC)));
+            let mut tail_c = tb.spawn((Transform::from_translation(tail_c_pivot - tail_b_pivot), YanhuLimb::new(LimbKind::TailC)));
             tail_c.with_children(|tc| {
                 let (c, s) = yanhu_px(-1.0, 16.0, 13.0, 2.0, 2.0, 4.0);    voxel_box(tc, meshes, &cream, c - tail_c_pivot, s, q);  // tailC
             });
@@ -114,10 +113,7 @@ pub fn build_yanhu(
 
     // ---- 头（枢轴随瞄准俯仰；发/耳随头动，耳微外倾） ----
     let head_base = Vec3::new(0.0, 24.0 * YANHU_S, 0.0);
-    let mut head_pivot = parent.spawn(SpatialBundle {
-        transform: Transform::from_translation(head_base),
-        ..default()
-    });
+    let mut head_pivot = parent.spawn(Transform::from_translation(head_base));
     head_pivot.insert(PlayerHeadPivot);
     head_pivot.with_children(|hd| {
         let tilt_l = Quat::from_rotation_z(0.15);
@@ -139,10 +135,7 @@ pub fn build_yanhu(
 
     // ---- 枪（枢轴瞄准时从腰际举到肩上，同 build_steve 程序化持枪） ----
     let (gun_center, _) = yanhu_px(4.2, 16.0, -6.0, 1.0, 1.0, 7.0);
-    let mut gun_pivot = parent.spawn(SpatialBundle {
-        transform: Transform::from_translation(Vec3::new(0.517, 1.55, 0.32)),
-        ..default()
-    });
+    let mut gun_pivot = parent.spawn(Transform::from_translation(Vec3::new(0.517, 1.55, 0.32)));
     gun_pivot.insert(PlayerAimGun {
         base: Vec3::new(0.517, 1.55, 0.32),
         raised: Vec3::new(0.517, 2.5, 0.38),
@@ -160,7 +153,7 @@ pub fn build_yanhu(
 /// 枢轴约定与焰狐一致（YanhuLimb 四肢 + TailA/B/C 长马尾链），
 /// 动作由 yanhu_action_system 统一驱动；冰晶件共享 accent 发光材质（切干员随元素重着色）。
 pub(crate) fn build_shuangren(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     accent: &Handle<StandardMaterial>,
@@ -194,26 +187,26 @@ pub(crate) fn build_shuangren(
 
     // ---- 四肢枢轴（与焰狐同一关节点，动作系统直接复用） ----
     let arm_l_pivot = yanhu_point(-6.0, 24.0, -0.5);
-    let mut arm_l = parent.spawn((SpatialBundle { transform: Transform::from_translation(arm_l_pivot), ..default() }, YanhuLimb::new(LimbKind::ArmL)));
+    let mut arm_l = parent.spawn((Transform::from_translation(arm_l_pivot), YanhuLimb::new(LimbKind::ArmL)));
     arm_l.with_children(|p| {
         let (c, s) = yanhu_px(-8.0, 19.0, -2.0, 4.0, 5.0, 4.0);    voxel_box(p, meshes, &frost, c - arm_l_pivot, s, q);   // armLup
         let (c, s) = yanhu_px(-8.0, 12.0, -2.0, 4.0, 7.0, 4.0);    voxel_box(p, meshes, &skin, c - arm_l_pivot, s, q);    // armLlo
         let (c, s) = yanhu_px(-8.1, 17.0, -2.1, 4.2, 1.6, 4.2);    voxel_box(p, meshes, accent, c - arm_l_pivot, s, q);   // armband
     });
     let arm_r_pivot = yanhu_point(6.0, 24.0, -0.5);
-    let mut arm_r = parent.spawn((SpatialBundle { transform: Transform::from_translation(arm_r_pivot), ..default() }, YanhuLimb::new(LimbKind::ArmR)));
+    let mut arm_r = parent.spawn((Transform::from_translation(arm_r_pivot), YanhuLimb::new(LimbKind::ArmR)));
     arm_r.with_children(|p| {
         let (c, s) = yanhu_px(4.0, 19.0, -2.0, 4.0, 5.0, 4.0);     voxel_box(p, meshes, &frost, c - arm_r_pivot, s, q);   // armRup
         let (c, s) = yanhu_px(4.0, 12.0, -2.0, 4.0, 7.0, 4.0);     voxel_box(p, meshes, &skin, c - arm_r_pivot, s, q);    // armRlo
     });
     let leg_l_pivot = yanhu_point(-2.0, 12.0, 0.0);
-    let mut leg_l = parent.spawn((SpatialBundle { transform: Transform::from_translation(leg_l_pivot), ..default() }, YanhuLimb::new(LimbKind::LegL)));
+    let mut leg_l = parent.spawn((Transform::from_translation(leg_l_pivot), YanhuLimb::new(LimbKind::LegL)));
     leg_l.with_children(|p| {
         let (c, s) = yanhu_px(-4.0, 3.0, -2.0, 4.0, 9.0, 4.0);     voxel_box(p, meshes, &frost, c - leg_l_pivot, s, q);   // legL
         let (c, s) = yanhu_px(-4.0, 0.0, -3.0, 4.0, 3.0, 5.0);     voxel_box(p, meshes, &boot, c - leg_l_pivot, s, q);    // bootL
     });
     let leg_r_pivot = yanhu_point(2.0, 12.0, 0.0);
-    let mut leg_r = parent.spawn((SpatialBundle { transform: Transform::from_translation(leg_r_pivot), ..default() }, YanhuLimb::new(LimbKind::LegR)));
+    let mut leg_r = parent.spawn((Transform::from_translation(leg_r_pivot), YanhuLimb::new(LimbKind::LegR)));
     leg_r.with_children(|p| {
         let (c, s) = yanhu_px(0.0, 3.0, -2.0, 4.0, 9.0, 4.0);      voxel_box(p, meshes, &frost, c - leg_r_pivot, s, q);   // legR
         let (c, s) = yanhu_px(0.0, 0.0, -3.0, 4.0, 3.0, 5.0);      voxel_box(p, meshes, &boot, c - leg_r_pivot, s, q);    // bootR
@@ -223,14 +216,14 @@ pub(crate) fn build_shuangren(
     let tail_a_pivot = yanhu_point(0.0, 24.0, 3.0);
     let tail_b_pivot = yanhu_point(0.0, 18.0, 3.0);
     let tail_c_pivot = yanhu_point(0.0, 10.0, 3.0);
-    let mut tail_a = parent.spawn((SpatialBundle { transform: Transform::from_translation(tail_a_pivot), ..default() }, YanhuLimb::new(LimbKind::TailA)));
+    let mut tail_a = parent.spawn((Transform::from_translation(tail_a_pivot), YanhuLimb::new(LimbKind::TailA)));
     tail_a.with_children(|ta| {
         let (c, s) = yanhu_px(-1.5, 22.5, 2.4, 3.0, 1.5, 4.0);     voxel_box(ta, meshes, accent, c - tail_a_pivot, s, q); // 发带
         let (c, s) = yanhu_px(-1.5, 18.0, 2.5, 3.0, 8.0, 4.0);     voxel_box(ta, meshes, &hair, c - tail_a_pivot, s, q);  // ponyA
-        let mut tail_b = ta.spawn((SpatialBundle { transform: Transform::from_translation(tail_b_pivot - tail_a_pivot), ..default() }, YanhuLimb::new(LimbKind::TailB)));
+        let mut tail_b = ta.spawn((Transform::from_translation(tail_b_pivot - tail_a_pivot), YanhuLimb::new(LimbKind::TailB)));
         tail_b.with_children(|tb| {
             let (c, s) = yanhu_px(-1.25, 10.0, 2.8, 2.5, 8.0, 3.4);    voxel_box(tb, meshes, &hair_dark, c - tail_b_pivot, s, q); // ponyB
-            let mut tail_c = tb.spawn((SpatialBundle { transform: Transform::from_translation(tail_c_pivot - tail_b_pivot), ..default() }, YanhuLimb::new(LimbKind::TailC)));
+            let mut tail_c = tb.spawn((Transform::from_translation(tail_c_pivot - tail_b_pivot), YanhuLimb::new(LimbKind::TailC)));
             tail_c.with_children(|tc| {
                 let (c, s) = yanhu_px(-1.0, 4.0, 3.0, 2.0, 6.0, 3.0);      voxel_box(tc, meshes, &hair, c - tail_c_pivot, s, q);  // ponyC
             });
@@ -239,10 +232,7 @@ pub(crate) fn build_shuangren(
 
     // ---- 头（枢轴随瞄准俯仰；冰晶头冠 + 双冰角） ----
     let head_base = Vec3::new(0.0, 24.0 * YANHU_S, 0.0);
-    let mut head_pivot = parent.spawn(SpatialBundle {
-        transform: Transform::from_translation(head_base),
-        ..default()
-    });
+    let mut head_pivot = parent.spawn(Transform::from_translation(head_base));
     head_pivot.insert(PlayerHeadPivot);
     head_pivot.with_children(|hd| {
         let tilt_l = Quat::from_rotation_z(0.30);
@@ -262,10 +252,7 @@ pub(crate) fn build_shuangren(
 
     // ---- 枪（与焰狐同一持枪枢轴，瞄准从腰际举到肩上） ----
     let (gun_center, _) = yanhu_px(4.2, 16.0, -6.0, 1.0, 1.0, 7.0);
-    let mut gun_pivot = parent.spawn(SpatialBundle {
-        transform: Transform::from_translation(Vec3::new(0.517, 1.55, 0.32)),
-        ..default()
-    });
+    let mut gun_pivot = parent.spawn(Transform::from_translation(Vec3::new(0.517, 1.55, 0.32)));
     gun_pivot.insert(PlayerAimGun {
         base: Vec3::new(0.517, 1.55, 0.32),
         raised: Vec3::new(0.517, 2.5, 0.38),
@@ -282,7 +269,7 @@ pub(crate) fn build_shuangren(
 /// 炭黑突击甲 + 狂野短发 + 豹耳 + 额前战术目镜 + 四肢雷纹（发光）+ 豹尾电环。
 /// 枢轴约定与焰狐一致（YanhuLimb 四肢 + TailA/B/C 豹尾链），动作由 yanhu_action_system 统一驱动。
 pub(crate) fn build_leibao(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     accent: &Handle<StandardMaterial>,
@@ -309,28 +296,28 @@ pub(crate) fn build_leibao(
 
     // ---- 四肢枢轴（与焰狐同一关节点，动作系统直接复用） ----
     let arm_l_pivot = yanhu_point(-6.0, 24.0, -0.5);
-    let mut arm_l = parent.spawn((SpatialBundle { transform: Transform::from_translation(arm_l_pivot), ..default() }, YanhuLimb::new(LimbKind::ArmL)));
+    let mut arm_l = parent.spawn((Transform::from_translation(arm_l_pivot), YanhuLimb::new(LimbKind::ArmL)));
     arm_l.with_children(|p| {
         let (c, s) = yanhu_px(-8.0, 19.0, -2.0, 4.0, 5.0, 4.0);    voxel_box(p, meshes, &charcoal, c - arm_l_pivot, s, q); // armLup
         let (c, s) = yanhu_px(-8.0, 12.0, -2.0, 4.0, 7.0, 4.0);    voxel_box(p, meshes, &skin, c - arm_l_pivot, s, q);     // armLlo
         let (c, s) = yanhu_px(-8.1, 14.5, -2.1, 4.2, 0.6, 4.2);    voxel_box(p, meshes, accent, c - arm_l_pivot, s, q);    // 雷纹臂
     });
     let arm_r_pivot = yanhu_point(6.0, 24.0, -0.5);
-    let mut arm_r = parent.spawn((SpatialBundle { transform: Transform::from_translation(arm_r_pivot), ..default() }, YanhuLimb::new(LimbKind::ArmR)));
+    let mut arm_r = parent.spawn((Transform::from_translation(arm_r_pivot), YanhuLimb::new(LimbKind::ArmR)));
     arm_r.with_children(|p| {
         let (c, s) = yanhu_px(4.0, 19.0, -2.0, 4.0, 5.0, 4.0);     voxel_box(p, meshes, &charcoal, c - arm_r_pivot, s, q); // armRup
         let (c, s) = yanhu_px(4.0, 12.0, -2.0, 4.0, 7.0, 4.0);     voxel_box(p, meshes, &skin, c - arm_r_pivot, s, q);     // armRlo
         let (c, s) = yanhu_px(3.9, 14.5, -2.1, 4.2, 0.6, 4.2);     voxel_box(p, meshes, accent, c - arm_r_pivot, s, q);    // 雷纹臂
     });
     let leg_l_pivot = yanhu_point(-2.0, 12.0, 0.0);
-    let mut leg_l = parent.spawn((SpatialBundle { transform: Transform::from_translation(leg_l_pivot), ..default() }, YanhuLimb::new(LimbKind::LegL)));
+    let mut leg_l = parent.spawn((Transform::from_translation(leg_l_pivot), YanhuLimb::new(LimbKind::LegL)));
     leg_l.with_children(|p| {
         let (c, s) = yanhu_px(-4.0, 3.0, -2.0, 4.0, 9.0, 4.0);     voxel_box(p, meshes, &charcoal, c - leg_l_pivot, s, q); // legL
         let (c, s) = yanhu_px(-4.0, 6.5, -2.1, 4.2, 0.6, 4.2);     voxel_box(p, meshes, accent, c - leg_l_pivot, s, q);    // 雷纹腿
         let (c, s) = yanhu_px(-4.0, 0.0, -3.0, 4.0, 3.0, 5.0);     voxel_box(p, meshes, &boot, c - leg_l_pivot, s, q);     // bootL
     });
     let leg_r_pivot = yanhu_point(2.0, 12.0, 0.0);
-    let mut leg_r = parent.spawn((SpatialBundle { transform: Transform::from_translation(leg_r_pivot), ..default() }, YanhuLimb::new(LimbKind::LegR)));
+    let mut leg_r = parent.spawn((Transform::from_translation(leg_r_pivot), YanhuLimb::new(LimbKind::LegR)));
     leg_r.with_children(|p| {
         let (c, s) = yanhu_px(0.0, 3.0, -2.0, 4.0, 9.0, 4.0);      voxel_box(p, meshes, &charcoal, c - leg_r_pivot, s, q); // legR
         let (c, s) = yanhu_px(-0.1, 6.5, -2.1, 4.2, 0.6, 4.2);     voxel_box(p, meshes, accent, c - leg_r_pivot, s, q);    // 雷纹腿
@@ -341,15 +328,15 @@ pub(crate) fn build_leibao(
     let tail_a_pivot = yanhu_point(0.0, 14.5, 2.0);
     let tail_b_pivot = yanhu_point(0.0, 15.5, 8.0);
     let tail_c_pivot = yanhu_point(0.0, 16.0, 13.0);
-    let mut tail_a = parent.spawn((SpatialBundle { transform: Transform::from_translation(tail_a_pivot), ..default() }, YanhuLimb::new(LimbKind::TailA)));
+    let mut tail_a = parent.spawn((Transform::from_translation(tail_a_pivot), YanhuLimb::new(LimbKind::TailA)));
     tail_a.with_children(|ta| {
         let (c, s) = yanhu_px(-1.0, 13.5, 2.0, 2.0, 3.0, 7.0);     voxel_box(ta, meshes, &hair_dark, c - tail_a_pivot, s, q); // tailA
         let (c, s) = yanhu_px(-1.1, 14.0, 6.6, 2.2, 2.2, 0.7);     voxel_box(ta, meshes, accent, c - tail_a_pivot, s, q);     // 电环A
-        let mut tail_b = ta.spawn((SpatialBundle { transform: Transform::from_translation(tail_b_pivot - tail_a_pivot), ..default() }, YanhuLimb::new(LimbKind::TailB)));
+        let mut tail_b = ta.spawn((Transform::from_translation(tail_b_pivot - tail_a_pivot), YanhuLimb::new(LimbKind::TailB)));
         tail_b.with_children(|tb| {
             let (c, s) = yanhu_px(-0.75, 14.5, 8.0, 1.5, 2.0, 6.0);    voxel_box(tb, meshes, &hair_dark, c - tail_b_pivot, s, q); // tailB
             let (c, s) = yanhu_px(-0.85, 15.0, 12.2, 1.7, 1.7, 0.7);   voxel_box(tb, meshes, accent, c - tail_b_pivot, s, q);     // 电环B
-            let mut tail_c = tb.spawn((SpatialBundle { transform: Transform::from_translation(tail_c_pivot - tail_b_pivot), ..default() }, YanhuLimb::new(LimbKind::TailC)));
+            let mut tail_c = tb.spawn((Transform::from_translation(tail_c_pivot - tail_b_pivot), YanhuLimb::new(LimbKind::TailC)));
             tail_c.with_children(|tc| {
                 let (c, s) = yanhu_px(-0.5, 15.0, 13.0, 1.0, 1.5, 4.0);    voxel_box(tc, meshes, &hair, c - tail_c_pivot, s, q);  // tailC（银白尾尖）
             });
@@ -358,10 +345,7 @@ pub(crate) fn build_leibao(
 
     // ---- 头（枢轴随瞄准俯仰；豹耳 + 额前战术目镜） ----
     let head_base = Vec3::new(0.0, 24.0 * YANHU_S, 0.0);
-    let mut head_pivot = parent.spawn(SpatialBundle {
-        transform: Transform::from_translation(head_base),
-        ..default()
-    });
+    let mut head_pivot = parent.spawn(Transform::from_translation(head_base));
     head_pivot.insert(PlayerHeadPivot);
     head_pivot.with_children(|hd| {
         let tilt_l = Quat::from_rotation_z(0.25);
@@ -382,10 +366,7 @@ pub(crate) fn build_leibao(
 
     // ---- 枪（与焰狐同一持枪枢轴） ----
     let (gun_center, _) = yanhu_px(4.2, 16.0, -6.0, 1.0, 1.0, 7.0);
-    let mut gun_pivot = parent.spawn(SpatialBundle {
-        transform: Transform::from_translation(Vec3::new(0.517, 1.55, 0.32)),
-        ..default()
-    });
+    let mut gun_pivot = parent.spawn(Transform::from_translation(Vec3::new(0.517, 1.55, 0.32)));
     gun_pivot.insert(PlayerAimGun {
         base: Vec3::new(0.517, 1.55, 0.32),
         raised: Vec3::new(0.517, 2.5, 0.38),
@@ -402,7 +383,7 @@ pub(crate) fn build_leibao(
 /// 紫袍兜帽 + 半脸面罩 + 四根蛛足（背部展开，静置装饰）+ 蛛徽 + 长直发。
 /// 枢轴约定与焰狐一致（YanhuLimb 四肢 + TailA/B/C 后发链），动作由 yanhu_action_system 统一驱动。
 pub(crate) fn build_duzhu(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     accent: &Handle<StandardMaterial>,
@@ -433,25 +414,25 @@ pub(crate) fn build_duzhu(
 
     // ---- 四肢枢轴（与焰狐同一关节点，动作系统直接复用） ----
     let arm_l_pivot = yanhu_point(-6.0, 24.0, -0.5);
-    let mut arm_l = parent.spawn((SpatialBundle { transform: Transform::from_translation(arm_l_pivot), ..default() }, YanhuLimb::new(LimbKind::ArmL)));
+    let mut arm_l = parent.spawn((Transform::from_translation(arm_l_pivot), YanhuLimb::new(LimbKind::ArmL)));
     arm_l.with_children(|p| {
         let (c, s) = yanhu_px(-8.0, 19.0, -2.0, 4.0, 5.0, 4.0);    voxel_box(p, meshes, &robe, c - arm_l_pivot, s, q);    // armLup
         let (c, s) = yanhu_px(-8.0, 12.0, -2.0, 4.0, 7.0, 4.0);    voxel_box(p, meshes, &robe_dark, c - arm_l_pivot, s, q); // armLlo（袖手套）
     });
     let arm_r_pivot = yanhu_point(6.0, 24.0, -0.5);
-    let mut arm_r = parent.spawn((SpatialBundle { transform: Transform::from_translation(arm_r_pivot), ..default() }, YanhuLimb::new(LimbKind::ArmR)));
+    let mut arm_r = parent.spawn((Transform::from_translation(arm_r_pivot), YanhuLimb::new(LimbKind::ArmR)));
     arm_r.with_children(|p| {
         let (c, s) = yanhu_px(4.0, 19.0, -2.0, 4.0, 5.0, 4.0);     voxel_box(p, meshes, &robe, c - arm_r_pivot, s, q);    // armRup
         let (c, s) = yanhu_px(4.0, 12.0, -2.0, 4.0, 7.0, 4.0);     voxel_box(p, meshes, &robe_dark, c - arm_r_pivot, s, q); // armRlo
     });
     let leg_l_pivot = yanhu_point(-2.0, 12.0, 0.0);
-    let mut leg_l = parent.spawn((SpatialBundle { transform: Transform::from_translation(leg_l_pivot), ..default() }, YanhuLimb::new(LimbKind::LegL)));
+    let mut leg_l = parent.spawn((Transform::from_translation(leg_l_pivot), YanhuLimb::new(LimbKind::LegL)));
     leg_l.with_children(|p| {
         let (c, s) = yanhu_px(-4.0, 3.0, -2.0, 4.0, 9.0, 4.0);     voxel_box(p, meshes, &robe_dark, c - leg_l_pivot, s, q); // legL
         let (c, s) = yanhu_px(-4.0, 0.0, -3.0, 4.0, 3.0, 5.0);     voxel_box(p, meshes, &boot, c - leg_l_pivot, s, q);      // bootL
     });
     let leg_r_pivot = yanhu_point(2.0, 12.0, 0.0);
-    let mut leg_r = parent.spawn((SpatialBundle { transform: Transform::from_translation(leg_r_pivot), ..default() }, YanhuLimb::new(LimbKind::LegR)));
+    let mut leg_r = parent.spawn((Transform::from_translation(leg_r_pivot), YanhuLimb::new(LimbKind::LegR)));
     leg_r.with_children(|p| {
         let (c, s) = yanhu_px(0.0, 3.0, -2.0, 4.0, 9.0, 4.0);      voxel_box(p, meshes, &robe_dark, c - leg_r_pivot, s, q); // legR
         let (c, s) = yanhu_px(0.0, 0.0, -3.0, 4.0, 3.0, 5.0);      voxel_box(p, meshes, &boot, c - leg_r_pivot, s, q);      // bootR
@@ -461,13 +442,13 @@ pub(crate) fn build_duzhu(
     let tail_a_pivot = yanhu_point(0.0, 24.0, 3.0);
     let tail_b_pivot = yanhu_point(0.0, 18.0, 3.0);
     let tail_c_pivot = yanhu_point(0.0, 10.0, 3.0);
-    let mut tail_a = parent.spawn((SpatialBundle { transform: Transform::from_translation(tail_a_pivot), ..default() }, YanhuLimb::new(LimbKind::TailA)));
+    let mut tail_a = parent.spawn((Transform::from_translation(tail_a_pivot), YanhuLimb::new(LimbKind::TailA)));
     tail_a.with_children(|ta| {
         let (c, s) = yanhu_px(-2.0, 18.0, 2.6, 4.0, 8.0, 3.0);     voxel_box(ta, meshes, &hair, c - tail_a_pivot, s, q);  // hairA
-        let mut tail_b = ta.spawn((SpatialBundle { transform: Transform::from_translation(tail_b_pivot - tail_a_pivot), ..default() }, YanhuLimb::new(LimbKind::TailB)));
+        let mut tail_b = ta.spawn((Transform::from_translation(tail_b_pivot - tail_a_pivot), YanhuLimb::new(LimbKind::TailB)));
         tail_b.with_children(|tb| {
             let (c, s) = yanhu_px(-1.75, 10.0, 2.8, 3.5, 8.0, 2.6);    voxel_box(tb, meshes, &hair, c - tail_b_pivot, s, q);  // hairB
-            let mut tail_c = tb.spawn((SpatialBundle { transform: Transform::from_translation(tail_c_pivot - tail_b_pivot), ..default() }, YanhuLimb::new(LimbKind::TailC)));
+            let mut tail_c = tb.spawn((Transform::from_translation(tail_c_pivot - tail_b_pivot), YanhuLimb::new(LimbKind::TailC)));
             tail_c.with_children(|tc| {
                 let (c, s) = yanhu_px(-1.5, 4.0, 3.0, 3.0, 6.0, 2.2);      voxel_box(tc, meshes, accent, c - tail_c_pivot, s, q); // 发梢（毒绿渐变）
             });
@@ -476,10 +457,7 @@ pub(crate) fn build_duzhu(
 
     // ---- 头（枢轴随瞄准俯仰；兜帽 + 半脸面罩） ----
     let head_base = Vec3::new(0.0, 24.0 * YANHU_S, 0.0);
-    let mut head_pivot = parent.spawn(SpatialBundle {
-        transform: Transform::from_translation(head_base),
-        ..default()
-    });
+    let mut head_pivot = parent.spawn(Transform::from_translation(head_base));
     head_pivot.insert(PlayerHeadPivot);
     head_pivot.with_children(|hd| {
         let (c, s) = yanhu_px(-4.0, 24.0, -4.0, 8.0, 8.0, 8.0);    voxel_box(hd, meshes, &skin, c - head_base, s, q);      // head
@@ -496,10 +474,7 @@ pub(crate) fn build_duzhu(
 
     // ---- 枪（与焰狐同一持枪枢轴） ----
     let (gun_center, _) = yanhu_px(4.2, 16.0, -6.0, 1.0, 1.0, 7.0);
-    let mut gun_pivot = parent.spawn(SpatialBundle {
-        transform: Transform::from_translation(Vec3::new(0.517, 1.55, 0.32)),
-        ..default()
-    });
+    let mut gun_pivot = parent.spawn(Transform::from_translation(Vec3::new(0.517, 1.55, 0.32)));
     gun_pivot.insert(PlayerAimGun {
         base: Vec3::new(0.517, 1.55, 0.32),
         raised: Vec3::new(0.517, 2.5, 0.38),

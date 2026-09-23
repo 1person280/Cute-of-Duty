@@ -31,7 +31,7 @@ pub(crate) fn spawn_player(
     apply_loadout(&mut inventory, &mut armor, loadout);
 
     let mut root = commands.spawn((
-        SpatialBundle { transform: Transform::from_translation(pos), ..default() },
+        Transform::from_translation(pos),
         Player,
         PlayerMovement::default(),
         Health::default(),
@@ -45,7 +45,7 @@ pub(crate) fn spawn_player(
         // 玩家模型包进带标记的根：切干员时由 operator_model_swap_system 整体换模型
         // 默认焰狐（焦狐）；切到霜刃时换成冰系专属模型。敌人仍用通用 steve
         let mut model_root = p.spawn((
-            SpatialBundle::default(),
+            Transform::default(),
             PlayerModelRoot { op_idx: 0 },
         ));
         model_root.with_children(|m| {
@@ -75,7 +75,7 @@ pub(crate) fn spawn_enemy(
     let boot = mat_voxel(materials, palette::BOOTS);
 
     let mut root = commands.spawn((
-        SpatialBundle { transform: Transform::from_translation(pos), ..default() },
+        Transform::from_translation(pos),
         VoxelCharacter,
         // 阵营标记：小地图上敌我异色（PlayerFire 只用于玩家本体，不会走到这里）
         match preset {
@@ -92,7 +92,7 @@ pub(crate) fn spawn_enemy(
 pub(crate) struct VoxelCharacter;
 
 pub(crate) fn build_steve(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     helmet: bool,
@@ -105,96 +105,79 @@ pub(crate) fn build_steve(
     boot: &Handle<StandardMaterial>,
 ) {
     // Head：包一层枢轴，玩家瞄准时做 Aim Offset 头部俯仰（敌人不需要）
-    let mut head_pivot = parent.spawn(SpatialBundle {
-        transform: Transform::from_xyz(0.0, 3.0, 0.0),
-        ..default()
-    });
+    let mut head_pivot = parent.spawn(Transform::from_xyz(0.0, 3.0, 0.0));
     if for_player { head_pivot.insert(PlayerHeadPivot); }
     head_pivot.with_children(|h| {
-        h.spawn(PbrBundle {
-            mesh: meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
-            material: if helmet { armor.clone() } else { skin.clone() },
-            ..default()
-        });
-        h.spawn(PbrBundle {
-            mesh: meshes.add(Cuboid::new(0.2, 0.15, 0.05)),
-            material: eye.clone(),
-            transform: Transform::from_xyz(-0.2, 0.05, 0.51),
-            ..default()
-        });
-        h.spawn(PbrBundle {
-            mesh: meshes.add(Cuboid::new(0.2, 0.15, 0.05)),
-            material: eye.clone(),
-            transform: Transform::from_xyz(0.2, 0.05, 0.51),
-            ..default()
-        });
-        h.spawn(PbrBundle {
-            mesh: meshes.add(Cuboid::new(0.3, 0.15, 0.3)),
-            material: accent.clone(),
-            transform: Transform::from_xyz(0.0, 0.55, 0.0),
-            ..default()
-        });
+        h.spawn((
+            Mesh3d(meshes.add(Cuboid::new(1.0, 1.0, 1.0))),
+            MeshMaterial3d(if helmet { armor.clone() } else { skin.clone() }),
+            Transform::default(),
+        ));
+        h.spawn((
+            Mesh3d(meshes.add(Cuboid::new(0.2, 0.15, 0.05))),
+            MeshMaterial3d(eye.clone()),
+            Transform::from_xyz(-0.2, 0.05, 0.51),
+        ));
+        h.spawn((
+            Mesh3d(meshes.add(Cuboid::new(0.2, 0.15, 0.05))),
+            MeshMaterial3d(eye.clone()),
+            Transform::from_xyz(0.2, 0.05, 0.51),
+        ));
+        h.spawn((
+            Mesh3d(meshes.add(Cuboid::new(0.3, 0.15, 0.3))),
+            MeshMaterial3d(accent.clone()),
+            Transform::from_xyz(0.0, 0.55, 0.0),
+        ));
     });
 
     // Torso
-    parent.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(1.0, 1.5, 0.5)),
-        material: body.clone(),
-        transform: Transform::from_xyz(0.0, 1.75, 0.0),
-        ..default()
-    });
-    parent.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(0.3, 0.3, 0.05)),
-        material: accent.clone(),
-        transform: Transform::from_xyz(0.0, 2.0, 0.26),
-        ..default()
-    });
+    parent.spawn((
+        Mesh3d(meshes.add(Cuboid::new(1.0, 1.5, 0.5))),
+        MeshMaterial3d(body.clone()),
+        Transform::from_xyz(0.0, 1.75, 0.0),
+    ));
+    parent.spawn((
+        Mesh3d(meshes.add(Cuboid::new(0.3, 0.3, 0.05))),
+        MeshMaterial3d(accent.clone()),
+        Transform::from_xyz(0.0, 2.0, 0.26),
+    ));
     // Shoulders
-    parent.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(0.4, 0.4, 0.4)),
-        material: armor.clone(),
-        transform: Transform::from_xyz(-0.7, 2.3, 0.0),
-        ..default()
-    });
-    parent.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(0.4, 0.4, 0.4)),
-        material: armor.clone(),
-        transform: Transform::from_xyz(0.7, 2.3, 0.0),
-        ..default()
-    });
+    parent.spawn((
+        Mesh3d(meshes.add(Cuboid::new(0.4, 0.4, 0.4))),
+        MeshMaterial3d(armor.clone()),
+        Transform::from_xyz(-0.7, 2.3, 0.0),
+    ));
+    parent.spawn((
+        Mesh3d(meshes.add(Cuboid::new(0.4, 0.4, 0.4))),
+        MeshMaterial3d(armor.clone()),
+        Transform::from_xyz(0.7, 2.3, 0.0),
+    ));
 
     // Arms
-    parent.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(0.5, 1.5, 0.5)),
-        material: skin.clone(),
-        transform: Transform::from_xyz(-0.75, 1.75, 0.0),
-        ..default()
-    });
-    parent.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(0.55, 0.6, 0.55)),
-        material: armor.clone(),
-        transform: Transform::from_xyz(-0.75, 2.2, 0.0),
-        ..default()
-    });
-    parent.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(0.5, 1.5, 0.5)),
-        material: skin.clone(),
-        transform: Transform::from_xyz(0.75, 1.75, 0.0),
-        ..default()
-    });
-    parent.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(0.55, 0.6, 0.55)),
-        material: armor.clone(),
-        transform: Transform::from_xyz(0.75, 2.2, 0.0),
-        ..default()
-    });
+    parent.spawn((
+        Mesh3d(meshes.add(Cuboid::new(0.5, 1.5, 0.5))),
+        MeshMaterial3d(skin.clone()),
+        Transform::from_xyz(-0.75, 1.75, 0.0),
+    ));
+    parent.spawn((
+        Mesh3d(meshes.add(Cuboid::new(0.55, 0.6, 0.55))),
+        MeshMaterial3d(armor.clone()),
+        Transform::from_xyz(-0.75, 2.2, 0.0),
+    ));
+    parent.spawn((
+        Mesh3d(meshes.add(Cuboid::new(0.5, 1.5, 0.5))),
+        MeshMaterial3d(skin.clone()),
+        Transform::from_xyz(0.75, 1.75, 0.0),
+    ));
+    parent.spawn((
+        Mesh3d(meshes.add(Cuboid::new(0.55, 0.6, 0.55))),
+        MeshMaterial3d(armor.clone()),
+        Transform::from_xyz(0.75, 2.2, 0.0),
+    ));
 
     // Gun：整体包一层枢轴；玩家瞄准时从腰际举到肩上（程序化持枪姿态）
     let gun = mat_voxel(materials, Color::srgb(0.3, 0.3, 0.35));
-    let mut gun_pivot = parent.spawn(SpatialBundle {
-        transform: Transform::from_xyz(0.4, 1.3, 0.6),
-        ..default()
-    });
+    let mut gun_pivot = parent.spawn(Transform::from_xyz(0.4, 1.3, 0.6));
     if for_player {
         gun_pivot.insert(PlayerAimGun {
             base: Vec3::new(0.4, 1.3, 0.6),
@@ -202,50 +185,44 @@ pub(crate) fn build_steve(
         });
     }
     gun_pivot.with_children(|g| {
-        g.spawn(PbrBundle {
-            mesh: meshes.add(Cuboid::new(0.15, 0.15, 1.2)),
-            material: gun.clone(),
-            ..default()
-        });
-        g.spawn(PbrBundle {
-            mesh: meshes.add(Cuboid::new(0.08, 0.08, 0.3)),
-            material: accent.clone(),
-            transform: Transform::from_xyz(0.0, 0.08, -0.1),
-            ..default()
-        });
-        g.spawn(PbrBundle {
-            mesh: meshes.add(Cuboid::new(0.12, 0.25, 0.4)),
-            material: gun,
-            transform: Transform::from_xyz(0.0, -0.1, -0.7),
-            ..default()
-        });
+        g.spawn((
+            Mesh3d(meshes.add(Cuboid::new(0.15, 0.15, 1.2))),
+            MeshMaterial3d(gun.clone()),
+            Transform::default(),
+        ));
+        g.spawn((
+            Mesh3d(meshes.add(Cuboid::new(0.08, 0.08, 0.3))),
+            MeshMaterial3d(accent.clone()),
+            Transform::from_xyz(0.0, 0.08, -0.1),
+        ));
+        g.spawn((
+            Mesh3d(meshes.add(Cuboid::new(0.12, 0.25, 0.4))),
+            MeshMaterial3d(gun),
+            Transform::from_xyz(0.0, -0.1, -0.7),
+        ));
     });
 
     // Legs
-    parent.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(0.5, 1.5, 0.5)),
-        material: body.clone(),
-        transform: Transform::from_xyz(-0.25, 0.75, 0.0),
-        ..default()
-    });
-    parent.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(0.55, 0.4, 0.6)),
-        material: boot.clone(),
-        transform: Transform::from_xyz(-0.25, 0.2, 0.05),
-        ..default()
-    });
-    parent.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(0.5, 1.5, 0.5)),
-        material: body.clone(),
-        transform: Transform::from_xyz(0.25, 0.75, 0.0),
-        ..default()
-    });
-    parent.spawn(PbrBundle {
-        mesh: meshes.add(Cuboid::new(0.55, 0.4, 0.6)),
-        material: boot.clone(),
-        transform: Transform::from_xyz(0.25, 0.2, 0.05),
-        ..default()
-    });
+    parent.spawn((
+        Mesh3d(meshes.add(Cuboid::new(0.5, 1.5, 0.5))),
+        MeshMaterial3d(body.clone()),
+        Transform::from_xyz(-0.25, 0.75, 0.0),
+    ));
+    parent.spawn((
+        Mesh3d(meshes.add(Cuboid::new(0.55, 0.4, 0.6))),
+        MeshMaterial3d(boot.clone()),
+        Transform::from_xyz(-0.25, 0.2, 0.05),
+    ));
+    parent.spawn((
+        Mesh3d(meshes.add(Cuboid::new(0.5, 1.5, 0.5))),
+        MeshMaterial3d(body.clone()),
+        Transform::from_xyz(0.25, 0.75, 0.0),
+    ));
+    parent.spawn((
+        Mesh3d(meshes.add(Cuboid::new(0.55, 0.4, 0.6))),
+        MeshMaterial3d(boot.clone()),
+        Transform::from_xyz(0.25, 0.2, 0.05),
+    ));
 }
 
 

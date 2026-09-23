@@ -36,18 +36,18 @@ pub(crate) fn skill_system(
 ) {
     // 背包/站点等 UI 打开（光标解锁）时不触发技能
     if !ctx.input_state.cursor_locked { return; }
-    let Ok((mut player_transform, mut op)) = player_query.get_single_mut() else { return };
-    let Ok(cam) = cam_query.get_single() else { return };
+    let Ok((mut player_transform, mut op)) = player_query.single_mut() else { return };
+    let Ok(cam) = cam_query.single() else { return };
 
     // 技能定义来自核心库干员名册：形态/机制/冷却全部随干员切换
     let op_def = &roster()[op.active];
     let element = op_def.element;
-    if ctx.keyboard.just_pressed(KeyCode::KeyQ) && op.q.finished() {
+    if ctx.keyboard.just_pressed(KeyCode::KeyQ) && op.q.is_finished() {
         op.q.reset();
         cast_skill(&mut commands, &mut ctx.effects, &mut ctx.materials, &ctx.element_system.0,
             &mut target_query, &colliders, SkillCast { player_transform: &mut player_transform, yaw: cam.yaw, element, skill: op_def.q });
     }
-    if ctx.keyboard.just_pressed(KeyCode::KeyE) && op.e.finished() {
+    if ctx.keyboard.just_pressed(KeyCode::KeyE) && op.e.is_finished() {
         op.e.reset();
         cast_skill(&mut commands, &mut ctx.effects, &mut ctx.materials, &ctx.element_system.0,
             &mut target_query, &colliders, SkillCast { player_transform: &mut player_transform, yaw: cam.yaw, element, skill: op_def.e });
@@ -77,12 +77,9 @@ pub(crate) fn cast_skill(
     match cast.skill.kind {
         SkillKind::Grenade { damage, radius } => {
             commands.spawn((
-                PbrBundle {
-                    mesh: effects.projectile.clone(),
-                    material: effects.material(materials, cast.element, EffectMatKind::Plain),
-                    transform: Transform::from_translation(cast.player_transform.translation + Vec3::new(0.0, 2.5, 0.0) + fwd * 0.5),
-                    ..default()
-                },
+                Mesh3d(effects.projectile.clone()),
+                MeshMaterial3d(effects.material(materials, cast.element, EffectMatKind::Plain)),
+                Transform::from_translation(cast.player_transform.translation + Vec3::new(0.0, 2.5, 0.0) + fwd * 0.5),
                 GrenadeProjectile {
                     velocity: fwd * 12.0 + Vec3::Y * 6.0,
                     element: cast.element,
@@ -128,12 +125,9 @@ pub(crate) fn cast_skill(
                         (rand::random::<f32>() - 0.5) * 2.0,
                     ).normalize();
                     commands.spawn((
-                        PbrBundle {
-                            mesh: effects.particle.clone(),
-                            material: effects.material(materials, cast.element, EffectMatKind::Particle),
-                            transform: Transform::from_translation(pos),
-                            ..default()
-                        },
+                        Mesh3d(effects.particle.clone()),
+                        MeshMaterial3d(effects.material(materials, cast.element, EffectMatKind::Particle)),
+                        Transform::from_translation(pos),
                         DamageParticle {
                             velocity: dir * 2.5,
                             timer: Timer::from_seconds(0.35, TimerMode::Once),
@@ -146,7 +140,7 @@ pub(crate) fn cast_skill(
 }
 
 pub(crate) fn operator_cooldown_tick(mut query: Query<&mut OperatorState, With<Player>>, time: Res<Time>) {
-    let Ok(mut op) = query.get_single_mut() else { return };
+    let Ok(mut op) = query.single_mut() else { return };
     op.q.tick(time.delta());
     op.e.tick(time.delta());
 }

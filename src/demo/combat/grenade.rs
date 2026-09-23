@@ -18,8 +18,8 @@ pub(crate) fn grenade_physics(
 ) {
     for (entity, mut transform, mut grenade) in query.iter_mut() {
         grenade.timer.tick(time.delta());
-        grenade.velocity.y -= 12.0 * time.delta_seconds();
-        transform.translation += grenade.velocity * time.delta_seconds();
+        grenade.velocity.y -= 12.0 * time.delta_secs();
+        transform.translation += grenade.velocity * time.delta_secs();
 
         // 落地或引信耗尽时引爆：范围伤害 + 机制 + 视觉特效（数值由投掷物自带）
         if transform.translation.y <= 0.15 {
@@ -37,7 +37,7 @@ pub(crate) fn grenade_physics(
             commands.entity(entity).despawn();
             continue;
         }
-        if grenade.timer.finished() {
+        if grenade.timer.is_finished() {
             let impact = transform.translation;
             apply_explosion_damage(&mut commands, &effects, &element_system.0, &mut target_query, ExplosionSpec {
                 pos: impact,

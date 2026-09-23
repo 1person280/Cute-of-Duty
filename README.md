@@ -4,14 +4,14 @@
 
 **战术撤离射击游戏** · 核心差异化 **元素互斥生态 + 反护航经济架构**
 
-基于 Rust + Bevy 0.14 的 3D 像素风 FPS · 无头确定性模拟与 3D Demo 双入口
+基于 Rust + Bevy 0.19 的 3D 像素风 FPS · 无头确定性模拟与 3D Demo 双入口
 配置文件表驱动的全部玩法规则 · 单一事实来源
 
 [![License](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.3.2--%E6%90%9C%E6%89%93%E6%92%A4-red.svg)](#四版本历史)
+[![Version](https://img.shields.io/badge/Version-0.5.0--%E5%BA%95%E5%B1%82%E6%9B%B4%E6%96%B0-red.svg)](#四版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
 [![Headless](https://img.shields.io/badge/%E6%97%A0%E5%A4%B4%E6%A8%A1%E6%8B%9F-passing-2ea44f.svg)](#一快速开始)
-[![Demo](https://img.shields.io/badge/3D%20Demo-Bevy%200.14-2ea44f.svg)](#一快速开始)
+[![Demo](https://img.shields.io/badge/3D%20Demo-Bevy%200.19-2ea44f.svg)](#一快速开始)
 
 **外部依赖 · 站在开源社区的肩膀上** · [![by Bevy](https://img.shields.io/badge/by-Bevy-E90000)](https://bevyengine.org)
 [![by Tokio](https://img.shields.io/badge/by-Tokio-blue)](https://tokio.rs)
@@ -48,7 +48,7 @@
 
 ```powershell
 cargo run --bin cod1          # 无头模拟：60Hz 固定 Tick + 确定性重放验证 + 战局/档案演示
-cargo run --features demo     # 3D 像素风 FPS Demo（Bevy 0.14）
+cargo run --features demo     # 3D 像素风 FPS Demo（Bevy 0.19）
 cargo test                    # 全部测试（不编译 bevy，秒级完成）
 cargo build --release         # 发布构建（已开启 LTO + strip）
 ```
@@ -166,7 +166,7 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
             ┌───────────▼──────────┐  ┌────▼─────────────────────┐
             │ cod1（src/main.rs）  │  │ 3D Demo                  │
             │ 无头模拟 · 默认构建   │  │ src/demo + src/model     │
-            │ 固定Tick+确定性验证  │  │ feature "demo" · Bevy 0.14│
+            │ 固定Tick+确定性验证  │  │ feature "demo" · Bevy 0.19│
             └──────────────────────┘  └──────────────────────────┘
 ```
 
@@ -255,6 +255,7 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 0.5.0 | 2026-09-23 | **底层更新落地（Bevy 0.14→0.19）**：全底层依赖升级完毕，核心是 Bevy 跨越 5 大版本（0.19.1）。渲染实体改造为组件式（`PbrBundle`→`Mesh3d`+`MeshMaterial3d`、`SpatialBundle`→`Transform`、`Camera3dBundle`→`Camera3d`）；文本/UI 迁移至 Parley/组件化（`TextBundle`+`TextStyle`→`Text`+`TextFont`+`TextColor`、`NodeBundle`+`Style`→`Node`）、`GlobalZIndex`；API 方法化（`.single()` 返回 `Result`、`.despawn()`、窗口光标 `CursorOptions`、`Assets::insert` 返回 `Result`）；`AmbientLight` 由资源改为相机组件。核心库业务逻辑零改动，核心测试 73 项全部通过。P1 依赖（tokio→1.53 / serde_yaml 最新）同步升级 |
 | 0.4.0 | 2026-09-22 | **底层更新路线图**：新增 [ROADMAP.md](ROADMAP.md)，规划全底层依赖升级（核心 Bevy 0.14→0.19，跨 5 大版本；含 tokio / serde_yaml / rand / blake3 等按优先级分批），完成即发布 0.5.0 |
 | 0.3.2 | 2026-09-22 | **搜打撤**：物资箱重塑为体素栅格木箱（四角立柱 + 四面通板 + 平顶盖）并接入统一交互菜单（站点优先于拾取，F 必开箱不误拾，弃用自建触发）；对局仓库/背包拖拽选装落地并打通 Tab 背包；README：友商对比扩到 CS2/Valorant/OW2/APEX/PUBG/Fortnite/CoD/R6S/Destiny/Battlefield/Halo/塔科夫并拆成「技术对比」+「商业化对比」两张表（商业化定位为无影响月卡制，付费对玩法零影响）；目录结构说明列改为「首行结构 + 其后逐文件一行」并为 `map` 新增嵌套子表；Demo 操作方式改为「按键组 × 触发环境」矩阵排版（A/B 环境列为玩法环境预留，当前标 `—`） |
 | 0.3.1 | 2026-09-21 | **渲染内存泄漏定向修复 + README 翻新**：修复 `damage_popup_system` 相机缺失时弹字永久存活的确定性泄漏；新增 `effect_guard.rs`（五类高频特效硬性存活上限兜底）；收敛特效密度/寿命（命中粒子 5→3、爆炸碎块 10→4 等）；新增 `debug_tracer.rs`（每 5s 实体/资产采样，供定位残余增长） |

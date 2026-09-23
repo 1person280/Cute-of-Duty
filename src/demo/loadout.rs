@@ -117,26 +117,26 @@ pub(crate) fn apply_loadout(inv: &mut Inventory, armor: &mut Armor, load: &Loado
 }
 
 /// 在主菜单根节点下构建仓库面板（覆盖层 + 压暗层），返回 (panel, backdrop)。
-pub(crate) fn spawn_loadout_panel(root: &mut ChildBuilder) -> (Entity, Entity) {
+/// `root` 来自主菜单根 `commands.entity(root).with_children(...)`，闭包参数为 ChildSpawnerCommands。
+pub(crate) fn spawn_loadout_panel(root: &mut ChildSpawnerCommands) -> (Entity, Entity) {
     let backdrop = root
-        .spawn(NodeBundle {
-            style: Style {
+        .spawn((
+            Node {
                 position_type: PositionType::Absolute,
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 ..default()
             },
-            background_color: BackgroundColor(Color::srgba(0.0, 0.0, 0.02, 0.60)),
-            visibility: Visibility::Hidden,
-            z_index: ZIndex::Global(15),
-            ..default()
-        })
-        .insert(LoadoutBackdrop)
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.02, 0.60)),
+            Visibility::Hidden,
+            GlobalZIndex(15),
+            LoadoutBackdrop,
+        ))
         .id();
 
     let panel = root
-        .spawn(NodeBundle {
-            style: Style {
+        .spawn((
+            Node {
                 position_type: PositionType::Absolute,
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
@@ -146,76 +146,69 @@ pub(crate) fn spawn_loadout_panel(root: &mut ChildBuilder) -> (Entity, Entity) {
                 row_gap: Val::Px(12.0),
                 ..default()
             },
-            visibility: Visibility::Hidden,
-            z_index: ZIndex::Global(20),
-            ..default()
-        })
-        .insert(LoadoutPanelRoot)
+            Visibility::Hidden,
+            GlobalZIndex(20),
+            LoadoutPanelRoot,
+        ))
         .with_children(|panel| {
-            panel.spawn(TextBundle::from_section(
-                "仓 库 · 携带物资",
-                TextStyle { font_size: 34.0, color: Color::srgb(0.92, 0.95, 1.0), ..default() },
+            panel.spawn((
+                Text::new("仓 库 · 携带物资"),
+                TextFont { font_size: FontSize::Px(34.0), ..default() },
+                TextColor(Color::srgb(0.92, 0.95, 1.0)),
             ));
-            panel.spawn(TextBundle::from_section(
-                "拖拽仓库物资到右侧背包=携带 · 拖回左侧=不带 · Shift+左键 快捷移动",
-                TextStyle { font_size: 13.0, color: Color::srgb(0.55, 0.62, 0.72), ..default() },
+            panel.spawn((
+                Text::new("拖拽仓库物资到右侧背包=携带 · 拖回左侧=不带 · Shift+左键 快捷移动"),
+                TextFont { font_size: FontSize::Px(13.0), ..default() },
+                TextColor(Color::srgb(0.55, 0.62, 0.72)),
             ));
-            panel.spawn(NodeBundle {
-                style: Style {
-                    flex_direction: FlexDirection::Row,
-                    column_gap: Val::Px(28.0),
-                    align_items: AlignItems::FlexStart,
-                    ..default()
-                },
+            panel.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(28.0),
+                align_items: AlignItems::FlexStart,
                 ..default()
             }).with_children(|cols| {
                 // ---- 左侧：仓库物资池 ----
                 cols.spawn((
-                    NodeBundle {
-                        style: Style {
-                            flex_direction: FlexDirection::Column,
-                            row_gap: Val::Px(9.0),
-                            width: Val::Px(330.0),
-                            ..default()
-                        },
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(9.0),
+                        width: Val::Px(330.0),
                         ..default()
                     },
                     Interaction::default(),
                     WarehouseZone,
                 )).with_children(|wh| {
-                    wh.spawn(TextBundle::from_section(
-                        "仓 库（物资池）",
-                        TextStyle { font_size: 18.0, color: Color::srgb(0.92, 0.95, 1.0), ..default() },
+                    wh.spawn((
+                        Text::new("仓 库（物资池）"),
+                        TextFont { font_size: FontSize::Px(18.0), ..default() },
+                        TextColor(Color::srgb(0.92, 0.95, 1.0)),
                     ));
                     for (i, item) in WAREHOUSE_POOL.iter().enumerate() {
                         wh.spawn((
-                            NodeBundle {
-                                style: Style {
-                                    width: Val::Percent(100.0),
-                                    height: Val::Px(50.0),
-                                    justify_content: JustifyContent::SpaceBetween,
-                                    align_items: AlignItems::Center,
-                                    padding: UiRect::axes(Val::Px(22.0), Val::Px(0.0)),
-                                    border: UiRect::all(Val::Px(2.0)),
-                                    ..default()
-                                },
-                                background_color: BackgroundColor(Color::srgba(0.10, 0.14, 0.20, 0.95)),
-                                border_color: BorderColor(Color::srgb(0.22, 0.28, 0.36)),
+                            Node {
+                                width: Val::Percent(100.0),
+                                height: Val::Px(50.0),
+                                justify_content: JustifyContent::SpaceBetween,
+                                align_items: AlignItems::Center,
+                                padding: UiRect::axes(Val::Px(22.0), Val::Px(0.0)),
+                                border: UiRect::all(Val::Px(2.0)),
                                 border_radius: BorderRadius::all(Val::Px(4.0)),
                                 ..default()
                             },
+                            BackgroundColor(Color::srgba(0.10, 0.14, 0.20, 0.95)),
+                            BorderColor::all(Color::srgb(0.22, 0.28, 0.36)),
                             Interaction::default(),
                             WarehouseRow(i),
                         )).with_children(|row| {
-                            row.spawn(TextBundle::from_section(
-                                item.name,
-                                TextStyle { font_size: 19.0, color: item.color, ..default() },
+                            row.spawn((
+                                Text::new(item.name),
+                                TextFont { font_size: FontSize::Px(19.0), ..default() },
+                                TextColor(item.color),
                             ));
                             row.spawn((
-                                TextBundle::from_section(
-                                    " ",
-                                    TextStyle { font_size: 12.0, color: Color::srgb(0.4, 0.85, 0.4), ..default() },
-                                ),
+                                Text::new(" "),
+                                TextFont { font_size: FontSize::Px(12.0), ..default() },
+                                TextColor(Color::srgb(0.4, 0.85, 0.4)),
                                 WarehouseRowText(i),
                             ));
                         });
@@ -223,54 +216,47 @@ pub(crate) fn spawn_loadout_panel(root: &mut ChildBuilder) -> (Entity, Entity) {
                 });
                 // ---- 右侧：携带背包 ----
                 cols.spawn((
-                    NodeBundle {
-                        style: Style {
-                            flex_direction: FlexDirection::Column,
-                            row_gap: Val::Px(9.0),
-                            width: Val::Px(330.0),
-                            ..default()
-                        },
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(9.0),
+                        width: Val::Px(330.0),
                         ..default()
                     },
                     Interaction::default(),
                     BackpackZone,
                 )).with_children(|bp| {
-                    bp.spawn(TextBundle::from_section(
-                        "携带背包",
-                        TextStyle { font_size: 18.0, color: Color::srgb(0.92, 0.95, 1.0), ..default() },
+                    bp.spawn((
+                        Text::new("携带背包"),
+                        TextFont { font_size: FontSize::Px(18.0), ..default() },
+                        TextColor(Color::srgb(0.92, 0.95, 1.0)),
                     ));
                     bp.spawn((
-                        TextBundle::from_section(
-                            "0 / 8",
-                            TextStyle { font_size: 13.0, color: Color::srgb(0.55, 0.62, 0.72), ..default() },
-                        ),
+                        Text::new("0 / 8"),
+                        TextFont { font_size: FontSize::Px(13.0), ..default() },
+                        TextColor(Color::srgb(0.55, 0.62, 0.72)),
                         LoadoutCapacityText,
                     ));
                     for i in 0..LOADOUT_CAPACITY {
                         bp.spawn((
-                            NodeBundle {
-                                style: Style {
-                                    width: Val::Percent(100.0),
-                                    height: Val::Px(44.0),
-                                    justify_content: JustifyContent::SpaceBetween,
-                                    align_items: AlignItems::Center,
-                                    padding: UiRect::axes(Val::Px(22.0), Val::Px(0.0)),
-                                    border: UiRect::all(Val::Px(2.0)),
-                                    ..default()
-                                },
-                                background_color: BackgroundColor(Color::srgba(0.14, 0.14, 0.16, 0.95)),
-                                border_color: BorderColor(Color::srgba(0.3, 0.3, 0.35, 0.6)),
+                            Node {
+                                width: Val::Percent(100.0),
+                                height: Val::Px(44.0),
+                                justify_content: JustifyContent::SpaceBetween,
+                                align_items: AlignItems::Center,
+                                padding: UiRect::axes(Val::Px(22.0), Val::Px(0.0)),
+                                border: UiRect::all(Val::Px(2.0)),
                                 border_radius: BorderRadius::all(Val::Px(4.0)),
                                 ..default()
                             },
+                            BackgroundColor(Color::srgba(0.14, 0.14, 0.16, 0.95)),
+                            BorderColor::all(Color::srgba(0.3, 0.3, 0.35, 0.6)),
                             Interaction::default(),
                             CarriedSlot(i),
                         )).with_children(|slot| {
                             slot.spawn((
-                                TextBundle::from_section(
-                                    "空",
-                                    TextStyle { font_size: 17.0, color: Color::srgb(0.85, 0.85, 0.85), ..default() },
-                                ),
+                                Text::new("空"),
+                                TextFont { font_size: FontSize::Px(17.0), ..default() },
+                                TextColor(Color::srgb(0.85, 0.85, 0.85)),
                                 CarriedSlotText(i),
                             ));
                         });
@@ -279,56 +265,50 @@ pub(crate) fn spawn_loadout_panel(root: &mut ChildBuilder) -> (Entity, Entity) {
             });
             // 拖拽幽灵：面板内绝对定位跟随光标
             panel.spawn((
-                NodeBundle {
-                    style: Style {
-                        position_type: PositionType::Absolute,
-                        width: Val::Px(140.0),
-                        height: Val::Px(40.0),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        border: UiRect::all(Val::Px(1.0)),
-                        ..default()
-                    },
-                    background_color: BackgroundColor(Color::srgba(0.06, 0.06, 0.09, 0.95)),
-                    border_color: BorderColor(Color::srgb(0.6, 0.6, 0.65)),
+                Node {
+                    position_type: PositionType::Absolute,
+                    width: Val::Px(140.0),
+                    height: Val::Px(40.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border: UiRect::all(Val::Px(1.0)),
                     border_radius: BorderRadius::all(Val::Px(4.0)),
-                    visibility: Visibility::Hidden,
-                    z_index: ZIndex::Global(30),
                     ..default()
                 },
+                BackgroundColor(Color::srgba(0.06, 0.06, 0.09, 0.95)),
+                BorderColor::all(Color::srgb(0.6, 0.6, 0.65)),
+                Visibility::Hidden,
+                GlobalZIndex(30),
                 LoadoutGhost,
             )).with_children(|g| {
                 g.spawn((
-                    TextBundle::from_section(
-                        "",
-                        TextStyle { font_size: 15.0, color: Color::WHITE, ..default() },
-                    ),
+                    Text::new(""),
+                    TextFont { font_size: FontSize::Px(15.0), ..default() },
+                    TextColor(Color::WHITE),
                     LoadoutGhostText,
                 ));
             });
-            panel.spawn(NodeBundle { style: Style { height: Val::Px(8.0), ..default() }, ..default() });
+            panel.spawn(Node { height: Val::Px(8.0), ..default() });
             panel.spawn((
-                NodeBundle {
-                    style: Style {
-                        width: Val::Px(200.0),
-                        height: Val::Px(46.0),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        border: UiRect::all(Val::Px(2.0)),
-                        ..default()
-                    },
-                    background_color: BackgroundColor(Color::srgba(0.10, 0.14, 0.20, 0.95)),
-                    border_color: BorderColor(Color::srgb(0.22, 0.28, 0.36)),
+                Node {
+                    width: Val::Px(200.0),
+                    height: Val::Px(46.0),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border: UiRect::all(Val::Px(2.0)),
                     border_radius: BorderRadius::all(Val::Px(4.0)),
                     ..default()
                 },
+                BackgroundColor(Color::srgba(0.10, 0.14, 0.20, 0.95)),
+                BorderColor::all(Color::srgb(0.22, 0.28, 0.36)),
                 Interaction::default(),
                 MenuButton,
                 LoadoutCloseButton,
             )).with_children(|btn| {
-                btn.spawn(TextBundle::from_section(
-                    "返 回",
-                    TextStyle { font_size: 19.0, color: Color::srgb(0.92, 0.95, 1.0), ..default() },
+                btn.spawn((
+                    Text::new("返 回"),
+                    TextFont { font_size: FontSize::Px(19.0), ..default() },
+                    TextColor(Color::srgb(0.92, 0.95, 1.0)),
                 ));
             });
         })
@@ -342,15 +322,15 @@ fn carried_index(load: &Loadout, pool_idx: usize) -> Option<usize> {
     load.carried.iter().position(|it| it.name == WAREHOUSE_POOL[pool_idx].name)
 }
 
-// 三类文本查询别名：以互斥 With/Without 标记隔离可变 Text 访问，规避 clippy::type_complexity
+// 三类文本查询别名：以互斥 With/Without 标记隔离可变 Text/TextColor 访问，规避 clippy::type_complexity
 type WhTextQ<'w, 's> = Query<
     'w, 's,
-    (&'static WarehouseRowText, &'static mut Text),
+    (&'static WarehouseRowText, &'static mut Text, &'static mut TextColor),
     (Without<CarriedSlotText>, Without<LoadoutCapacityText>, Without<LoadoutGhostText>),
 >;
 type BpTextQ<'w, 's> = Query<
     'w, 's,
-    (&'static CarriedSlotText, &'static mut Text),
+    (&'static CarriedSlotText, &'static mut Text, &'static mut TextColor),
     (Without<WarehouseRowText>, Without<LoadoutCapacityText>, Without<LoadoutGhostText>),
 >;
 type CapTextQ<'w, 's> = Query<
@@ -360,31 +340,31 @@ type CapTextQ<'w, 's> = Query<
 >;
 type GhostTextQ<'w, 's> = Query<
     'w, 's,
-    &'static mut Text,
+    (&'static mut Text, &'static mut TextColor),
     (With<LoadoutGhostText>, Without<LoadoutCapacityText>, Without<WarehouseRowText>, Without<CarriedSlotText>),
 >;
 
 /// 刷新仓库行勾选态 / 背包槽文本 / 容量计数。暴露给主菜单行为层与拖拽系统共用。
 fn write_loadout_texts(load: &Loadout, wh_texts: &mut WhTextQ, bp_texts: &mut BpTextQ, capacity: &mut CapTextQ) {
-    for (row, mut text) in wh_texts.iter_mut() {
+    for (row, mut text, mut color) in wh_texts.iter_mut() {
         let on = carried_index(load, row.0).is_some();
-        text.sections[0].value = if on { "已携带 ✓".to_string() } else { String::new() };
-        text.sections[0].style.color = if on { Color::srgb(0.4, 0.85, 0.4) } else { Color::srgb(0.5, 0.5, 0.55) };
+        text.0 = if on { "已携带 ✓".to_string() } else { String::new() };
+        color.0 = if on { Color::srgb(0.4, 0.85, 0.4) } else { Color::srgb(0.5, 0.5, 0.55) };
     }
-    for (slot, mut text) in bp_texts.iter_mut() {
+    for (slot, mut text, mut color) in bp_texts.iter_mut() {
         match load.carried.get(slot.0) {
             Some(item) => {
-                text.sections[0].value = item.name.to_string();
-                text.sections[0].style.color = item.color;
+                text.0 = item.name.to_string();
+                color.0 = item.color;
             }
             None => {
-                text.sections[0].value = "空".to_string();
-                text.sections[0].style.color = Color::srgb(0.85, 0.85, 0.85);
+                text.0 = "空".to_string();
+                color.0 = Color::srgb(0.85, 0.85, 0.85);
             }
         }
     }
-    if let Ok(mut cap) = capacity.get_single_mut() {
-        cap.sections[0].value = format!("{} / {}", load.carried.len(), LOADOUT_CAPACITY);
+    if let Ok(mut cap) = capacity.single_mut() {
+        cap.0 = format!("{} / {}", load.carried.len(), LOADOUT_CAPACITY);
     }
 }
 
@@ -398,7 +378,7 @@ pub(crate) fn loadout_drag_system(
     mut load: ResMut<Loadout>,
     panel_vis: Query<&Visibility, With<LoadoutPanelRoot>>,
     mut window_query: Query<&mut Window, With<PrimaryWindow>>,
-    mut ghost: Query<(&mut Visibility, &mut Style), (With<LoadoutGhost>, Without<LoadoutPanelRoot>)>,
+    mut ghost: Query<(&mut Visibility, &mut Node), (With<LoadoutGhost>, Without<LoadoutPanelRoot>)>,
     mut ghost_text: GhostTextQ,
     wh_rows: Query<(&WarehouseRow, &Interaction), Without<CarriedSlot>>,
     bp_slots: Query<(&CarriedSlot, &Interaction), Without<WarehouseRow>>,
@@ -410,10 +390,10 @@ pub(crate) fn loadout_drag_system(
     mut bp_texts: BpTextQ,
     mut capacity: CapTextQ,
 ) {
-    let Ok(vis) = panel_vis.get_single() else { return };
+    let Ok(vis) = panel_vis.single() else { return };
     if *vis != Visibility::Visible {
         if drag.source.take().is_some() {
-            if let Ok((mut gv, _)) = ghost.get_single_mut() { *gv = Visibility::Hidden; }
+            if let Ok((mut gv, _)) = ghost.single_mut() { *gv = Visibility::Hidden; }
         }
         return;
     }
@@ -445,8 +425,8 @@ pub(crate) fn loadout_drag_system(
 
     // ---- 拖拽中：幽灵跟随光标 ----
     if let Some(source) = drag.source {
-        if let Ok((_, mut style)) = ghost.get_single_mut() {
-            if let Ok(window) = window_query.get_single_mut() {
+        if let Ok((_, mut style)) = ghost.single_mut() {
+            if let Ok(window) = window_query.single_mut() {
                 if let Some(cursor) = window.cursor_position() {
                     style.left = Val::Px(cursor.x - 70.0);
                     style.top = Val::Px(cursor.y - 20.0);
@@ -468,7 +448,7 @@ pub(crate) fn loadout_drag_system(
                 _ => {} // 松开在无效处：撤销
             }
             drag.source = None;
-            if let Ok((mut gv, _)) = ghost.get_single_mut() { *gv = Visibility::Hidden; }
+            if let Ok((mut gv, _)) = ghost.single_mut() { *gv = Visibility::Hidden; }
         }
         return;
     }
@@ -489,33 +469,33 @@ pub(crate) fn loadout_drag_system(
 
 /// 拖拽开始时初始化幽灵：显示被拖物资名并定位到光标处
 fn set_ghost(
-    ghost: &mut Query<(&mut Visibility, &mut Style), (With<LoadoutGhost>, Without<LoadoutPanelRoot>)>,
+    ghost: &mut Query<(&mut Visibility, &mut Node), (With<LoadoutGhost>, Without<LoadoutPanelRoot>)>,
     ghost_text: &mut GhostTextQ,
     load: &Loadout,
     source: &DragSource,
     window_query: &mut Query<&mut Window, With<PrimaryWindow>>,
 ) {
-    if let Ok((mut gv, mut gs)) = ghost.get_single_mut() {
+    if let Ok((mut gv, mut gs)) = ghost.single_mut() {
         *gv = Visibility::Visible;
-        if let Ok(window) = window_query.get_single_mut() {
+        if let Ok(window) = window_query.single_mut() {
             if let Some(cursor) = window.cursor_position() {
                 gs.left = Val::Px(cursor.x - 70.0);
                 gs.top = Val::Px(cursor.y - 20.0);
             }
         }
     }
-    if let Ok(mut text) = ghost_text.get_single_mut() {
+    if let Ok((mut text, mut color)) = ghost_text.single_mut() {
         match source {
             DragSource::Warehouse(i) => {
                 if let Some(item) = WAREHOUSE_POOL.get(*i) {
-                    text.sections[0].value = item.name.to_string();
-                    text.sections[0].style.color = item.color;
+                    text.0 = item.name.to_string();
+                    color.0 = item.color;
                 }
             }
             DragSource::Carried(i) => {
                 if let Some(item) = load.carried.get(*i) {
-                    text.sections[0].value = item.name.to_string();
-                    text.sections[0].style.color = item.color;
+                    text.0 = item.name.to_string();
+                    color.0 = item.color;
                 }
             }
         }

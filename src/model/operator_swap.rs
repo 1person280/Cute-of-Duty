@@ -19,11 +19,11 @@ pub fn operator_model_swap_system(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    let Ok((player, state, accent)) = player_query.get_single() else { return };
-    let Ok((model_e, model)) = model_query.get_single() else { return };
+    let Ok((player, state, accent)) = player_query.single() else { return };
+    let Ok((model_e, model)) = model_query.single() else { return };
     if model.op_idx == state.active { return; }
 
-    commands.entity(model_e).despawn_recursive();
+    commands.entity(model_e).despawn();
     let accent = accent.0.clone();
     let idx = state.active;
     // 眼睛颜色按干员区分：雷豹金黄 / 毒蛛毒绿 / 其余冰蓝；accent 沿用共享材质句柄
@@ -36,7 +36,7 @@ pub fn operator_model_swap_system(
     };
     let eye = mat_emissive(&mut materials, eye_color);
     commands.entity(player).with_children(move |p| {
-        let mut model_root = p.spawn((SpatialBundle::default(), PlayerModelRoot { op_idx: idx }));
+        let mut model_root = p.spawn((Transform::default(), PlayerModelRoot { op_idx: idx }));
         model_root.with_children(|m| {
             // 每名干员一套专属外观；未建模的干员暂用焰狐体型（accent 已随元素变色）
             match name {

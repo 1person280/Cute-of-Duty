@@ -1,6 +1,6 @@
 //! 跨模块共享的基础设施：光标锁定、CJK 字体、元素系统胶水、全局状态
 use bevy::prelude::*;
-use bevy::window::{CursorGrabMode, PrimaryWindow};
+use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 use crate::element::{ElementConfig, ElementSystem, ElementType};
 use super::components::*;
 use super::inventory::HeldGrenade;
@@ -20,24 +20,24 @@ pub(crate) enum AppState {
 
 /// 回到前端界面时释放鼠标（返回主菜单时复用）
 pub(crate) fn release_cursor(
-    mut window_query: Query<&mut Window, With<PrimaryWindow>>,
+    mut window_query: Query<&mut CursorOptions, With<PrimaryWindow>>,
     mut input_state: ResMut<InputState>,
 ) {
     unlock_cursor(&mut window_query, &mut input_state);
 }
 
-pub(crate) fn lock_cursor(windows: &mut Query<&mut Window, With<PrimaryWindow>>, input_state: &mut InputState) {
-    if let Ok(mut window) = windows.get_single_mut() {
-        window.cursor.visible = false;
-        window.cursor.grab_mode = CursorGrabMode::Locked;
+pub(crate) fn lock_cursor(windows: &mut Query<&mut CursorOptions, With<PrimaryWindow>>, input_state: &mut InputState) {
+    if let Ok(mut cursor) = windows.single_mut() {
+        cursor.visible = false;
+        cursor.grab_mode = CursorGrabMode::Locked;
     }
     input_state.cursor_locked = true;
 }
 
-pub(crate) fn unlock_cursor(windows: &mut Query<&mut Window, With<PrimaryWindow>>, input_state: &mut InputState) {
-    if let Ok(mut window) = windows.get_single_mut() {
-        window.cursor.visible = true;
-        window.cursor.grab_mode = CursorGrabMode::None;
+pub(crate) fn unlock_cursor(windows: &mut Query<&mut CursorOptions, With<PrimaryWindow>>, input_state: &mut InputState) {
+    if let Ok(mut cursor) = windows.single_mut() {
+        cursor.visible = true;
+        cursor.grab_mode = CursorGrabMode::None;
     }
     input_state.cursor_locked = false;
 }
@@ -45,17 +45,11 @@ pub(crate) fn unlock_cursor(windows: &mut Query<&mut Window, With<PrimaryWindow>
 pub(crate) const CJK_FONT_BYTES: &[u8] = include_bytes!("../../assets/fonts/simhei.ttf");
 
 pub(crate) fn load_cjk_font(mut fonts: ResMut<Assets<Font>>) {
-    match Font::try_from_bytes(CJK_FONT_BYTES.to_vec()) {
-        Ok(font) => {
-            // Bevy 在 TextPlugin::build 时把 FiraMono 注册在
-            // Handle<Font>::default() 这个资产 id 下，所有未显式指定
-            // font 的 TextStyle 都走它；原地覆盖即可让全部文本获得中文支持。
-            fonts.insert(Handle::<Font>::default().id(), font);
-        }
-        Err(e) => {
-            bevy::log::warn!("内置中文字体解析失败，中文将显示为方块: {:?}", e);
-        }
-    }
+    // Bevy 0.19 中 TextFont.font 默认取 FontSource::default()，
+    // 其解析到 Handle<Font>::default() 这个默认字体资产；
+    // 以 CJK 字体原地覆盖该资产 id 即可让所有未显式指定字体的文本获得中文支持。
+    let font = Font::from_bytes(CJK_FONT_BYTES.to_vec());
+    let _ = fonts.insert(Handle::<Font>::default().id(), font);
 }
 
 /// bevy_log 的订阅者在 DefaultPlugins 构建时才安装，
@@ -124,17 +118,17 @@ pub(crate) fn load_element_config() -> ElementConfig {
 }
 
 pub(crate) fn grab_cursor(
-    mut window_query: Query<&mut Window, With<PrimaryWindow>>,
+    mut window_query: Query<&mut CursorOptions, With<PrimaryWindow>>,
     mut input_state: ResMut<InputState>,
 ) {
-    let mut window = window_query.single_mut();
-    window.cursor.visible = false;
-    window.cursor.grab_mode = CursorGrabMode::Locked;
+    let mut cursor = window_query.single_mut().unwrap();
+    cursor.visible = false;
+    cursor.grab_mode = CursorGrabMode::Locked;
     input_state.cursor_locked = true;
 }
 
 pub(crate) fn cursor_grab_toggle(
-    mut window_query: Query<&mut Window, With<PrimaryWindow>>,
+    mut window_query: Query<&mut CursorOptions, With<PrimaryWindow>>,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut input_state: ResMut<InputState>,
     wheel: Res<WheelState>,
@@ -153,16 +147,16 @@ pub(crate) fn cursor_grab_toggle(
     if crate_win.crate_entity.is_some() { return; }
     // 背包打开时 Esc 由 inventory_toggle 负责关闭背包；
     // 若在这里把光标锁回，随后 station_system 会看到"光标已锁 + Esc"而误开补给台
-    if backpack_ui.get_single().map_or(false, |vis| *vis == Visibility::Visible) { return; }
+    if backpack_ui.single().map_or(false, |vis| *vis == Visibility::Visible) { return; }
     if keyboard.just_pressed(KeyCode::Escape) {
-        let mut window = window_query.single_mut();
-        if window.cursor.grab_mode == CursorGrabMode::Locked {
-            window.cursor.visible = true;
-            window.cursor.grab_mode = CursorGrabMode::None;
+        let mut cursor = window_query.single_mut().unwrap();
+        if cursor.grab_mode == CursorGrabMode::Locked {
+            cursor.visible = true;
+            cursor.grab_mode = CursorGrabMode::None;
             input_state.cursor_locked = false;
         } else {
-            window.cursor.visible = false;
-            window.cursor.grab_mode = CursorGrabMode::Locked;
+            cursor.visible = false;
+            cursor.grab_mode = CursorGrabMode::Locked;
             input_state.cursor_locked = true;
         }
     }

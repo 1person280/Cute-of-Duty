@@ -1,6 +1,6 @@
 [package]
 name = "cute_of_duty"
-version = "0.3.2"
+version = "0.5.0"
 edition = "2021"
 license = "GPL-3.0-with-linking-exception"
 authors = ["B站@3493264141322312", "Kimi AI Collaborator"]
@@ -34,7 +34,7 @@ tokio = { version = "1.35", features = ["rt-multi-thread", "time", "macros"] }
 blake3 = "1.5"
 
 # 3D 渲染引擎（可选：仅 feature "demo" 启用，cargo run --features demo）
-bevy = { version = "0.14", optional = true }
+bevy = { version = "0.19", features = ["mouse"], optional = true }
 
 [features]
 demo = ["dep:bevy"]

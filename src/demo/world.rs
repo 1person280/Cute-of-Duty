@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use bevy::prelude::*;
-use bevy::pbr::NotShadowCaster;
+use bevy::light::NotShadowCaster;
 use crate::map::{GlowKind, GlowSpec, MapLayout, MaterialKind, PickupKind, PickupSpec, Prop, Shape, StationSpec, TargetSpec};
 use crate::model::{
     mat_voxel, palette, PlayerCamera,
@@ -23,47 +23,44 @@ pub(crate) fn setup_world(
     loadout: Res<Loadout>,
 ) {
     // Main directional light
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
+    commands.spawn((
+        DirectionalLight {
             illuminance: 8000.0,
-            shadows_enabled: true,
+            shadow_maps_enabled: true,
             shadow_depth_bias: 0.02,
             shadow_normal_bias: 0.6,
             ..default()
         },
-        transform: Transform::from_rotation(Quat::from_euler(
+        Transform::from_rotation(Quat::from_euler(
             EulerRot::XYZ, -0.8, 0.5, 0.0,
         )),
-        ..default()
-    });
+    ));
 
     // Fill light
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
+    commands.spawn((
+        DirectionalLight {
             illuminance: 1500.0,
-            shadows_enabled: false,
+            shadow_maps_enabled: false,
             ..default()
         },
-        transform: Transform::from_rotation(Quat::from_euler(
+        Transform::from_rotation(Quat::from_euler(
             EulerRot::XYZ, -0.3, -1.5, 0.0,
         )),
-        ..default()
-    });
+    ));
 
     // Corner lights：随活动地图（1×1km 草坪场）的四角布置
     let corner = crate::map::lawn::HALF;
     for pos in [(corner, 2.5, corner), (-corner, 2.5, corner), (corner, 2.5, -corner), (-corner, 2.5, -corner)] {
-        commands.spawn(PointLightBundle {
-            point_light: PointLight {
+        commands.spawn((
+            PointLight {
                 intensity: 80000.0,
                 color: Color::srgb(0.9, 0.85, 0.75),
                 range: 60.0,
-                shadows_enabled: false,
+                shadow_maps_enabled: false,
                 ..default()
             },
-            transform: Transform::from_xyz(pos.0, pos.1, pos.2),
-            ..default()
-        });
+            Transform::from_xyz(pos.0, pos.1, pos.2),
+        ));
     }
 
     // Player：出生点取自当前活动地图（数据驱动，搜打撤大场出生在南端出生区）
@@ -75,24 +72,30 @@ pub(crate) fn setup_world(
     //   → SpringArm(右肩偏移 + 后方距离，带碰撞缩回) → Camera
     // 相机本地旋转保持单位，视线始终 = 枢轴前方（与瞄准方向平行越过右肩）
     commands.spawn((
-        SpatialBundle { transform: Transform::from_translation(player_pos), ..default() },
+        Transform::from_translation(player_pos),
         CamPivot,
     )).with_children(|pivot| {
-        pivot.spawn((SpatialBundle::default(), ShoulderPivot)).with_children(|yaw| {
+        pivot.spawn((Transform::default(), ShoulderPivot)).with_children(|yaw| {
             yaw.spawn((
-                SpatialBundle { transform: Transform::from_xyz(0.0, PIVOT_HEIGHT, 0.0), ..default() },
+                Transform::from_xyz(0.0, PIVOT_HEIGHT, 0.0),
                 PitchPivot,
             )).with_children(|pitch| {
                 pitch.spawn((
-                    SpatialBundle {
-                        transform: Transform::from_xyz(
-                            ARM_SHOULDER_X_NORMAL, ARM_EYE_Y_NORMAL, ARM_LEN_NORMAL),
-                        ..default()
-                    },
+                    Transform::from_xyz(
+                        ARM_SHOULDER_X_NORMAL, ARM_EYE_Y_NORMAL, ARM_LEN_NORMAL),
                     SpringArm,
                     SpringArmState { len: ARM_LEN_NORMAL },
                 )).with_children(|arm| {
-                    arm.spawn((Camera3dBundle::default(), PlayerCamera::default()));
+                    arm.spawn((
+                        Camera3d::default(),
+                        Projection::Perspective(PerspectiveProjection { fov: 1.2, ..default() }),
+                        PlayerCamera::default(),
+                        AmbientLight {
+                            color: Color::srgb(0.9, 0.92, 1.0),
+                            brightness: 0.55,
+                            ..default()
+                        },
+                    ));
                 });
             });
         });
@@ -176,12 +179,11 @@ pub(crate) fn spawn_floor(
     for x in -n..=n {
         for z in -n..=n {
             let is_dark = (x + z) % 2 == 0;
-            commands.spawn(PbrBundle {
-                mesh: tile_mesh.clone(),
-                material: if is_dark { ground_a.clone() } else { ground_b.clone() },
-                transform: Transform::from_xyz(x as f32 * tile, -0.1, z as f32 * tile),
-                ..default()
-            }).insert(NotShadowCaster);
+            commands.spawn((
+                Mesh3d(tile_mesh.clone()),
+                MeshMaterial3d(if is_dark { ground_a.clone() } else { ground_b.clone() }),
+                Transform::from_xyz(x as f32 * tile, -0.1, z as f32 * tile),
+            )).insert(NotShadowCaster);
         }
     }
 }
@@ -328,12 +330,11 @@ pub(crate) fn spawn_prop(
     if let Some((axis, angle)) = prop.rot {
         transform.rotation = Quat::from_axis_angle(Vec3::from(axis), angle);
     }
-    let mut entity = commands.spawn(PbrBundle {
-        mesh,
-        material: mats.get(prop.material),
+    let mut entity = commands.spawn((
+        Mesh3d(mesh),
+        MeshMaterial3d(mats.get(prop.material)),
         transform,
-        ..default()
-    });
+    ));
     entity.insert(NotShadowCaster);
     if prop.solid {
         entity.insert(Collider { half_size: Vec3::from(prop.aabb_half()) });
@@ -363,12 +364,12 @@ pub(crate) fn spawn_map_target(
             let board = pool.box_mesh(meshes, 0.8, 0.8, 0.2);
             let inner = pool.box_mesh(meshes, 0.4, 0.4, 0.25);
             commands.spawn((
-                SpatialBundle { transform: Transform::from_translation(pos), ..default() },
+                Transform::from_translation(pos),
                 MovingTarget { speed: m.speed, range: m.range, origin: pos, direction: m.start_dir },
                 TargetDummy { label: spec.label, ..default() },
             )).with_children(|p| {
-                p.spawn(PbrBundle { mesh: board, material: red, ..default() });
-                p.spawn(PbrBundle { mesh: inner, material: white, ..default() });
+                p.spawn((Mesh3d(board), MeshMaterial3d(red), Transform::default()));
+                p.spawn((Mesh3d(inner), MeshMaterial3d(white), Transform::default()));
             });
         }
     }
@@ -400,10 +401,7 @@ pub(crate) fn spawn_map_pickup(
 /// 生成场景功能站点（补给台/干员切换台的交互登记点，桌面几何由 props 提供）
 pub(crate) fn spawn_map_station(spec: &StationSpec, commands: &mut Commands) {
     commands.spawn((
-        SpatialBundle {
-            transform: Transform::from_translation(Vec3::from(spec.pos)),
-            ..default()
-        },
+        Transform::from_translation(Vec3::from(spec.pos)),
         Station { kind: spec.kind, label: spec.label },
     ));
 }
@@ -428,12 +426,11 @@ pub(crate) fn spawn_glow(
         Shape::Box => pool.box_mesh(meshes, glow.half[0] * 2.0, glow.half[1] * 2.0, glow.half[2] * 2.0),
         Shape::Cylinder { radius, height } => pool.cylinder_mesh(meshes, radius, height),
     };
-    commands.spawn(PbrBundle {
-        mesh,
-        material: pool.emissive_mat(materials, color, 2.0),
-        transform: Transform::from_translation(Vec3::from(glow.pos)),
-        ..default()
-    }).insert(NotShadowCaster);
+    commands.spawn((
+        Mesh3d(mesh),
+        MeshMaterial3d(pool.emissive_mat(materials, color, 2.0)),
+        Transform::from_translation(Vec3::from(glow.pos)),
+    )).insert(NotShadowCaster);
 }
 
 /// 靶子渲染方案：以红芯白环的两段式配色标识可命中目标
@@ -467,33 +464,17 @@ pub(crate) fn spawn_dummy(
     let pole_mat = pool.voxel_mat(materials, Color::srgb(0.4, 0.4, 0.4));
 
     commands.spawn((
-        SpatialBundle {
-            transform: Transform::from_translation(position),
-            ..default()
-        },
+        Transform::from_translation(position),
         TargetDummy { label: spec.label, ..default() },
     )).with_children(|p| {
-        p.spawn(PbrBundle {
-            mesh: board,
-            material: spec.scheme.red,
-            ..default()
-        });
-        p.spawn(PbrBundle {
-            mesh: inner,
-            material: spec.scheme.white,
-            ..default()
-        });
-        p.spawn(PbrBundle {
-            mesh: core,
-            material: core_mat,
-            ..default()
-        });
-        p.spawn(PbrBundle {
-            mesh: pole,
-            material: pole_mat,
-            transform: Transform::from_xyz(0.0, pole_y, 0.0),
-            ..default()
-        });
+        p.spawn((Mesh3d(board), MeshMaterial3d(spec.scheme.red), Transform::default()));
+        p.spawn((Mesh3d(inner), MeshMaterial3d(spec.scheme.white), Transform::default()));
+        p.spawn((Mesh3d(core), MeshMaterial3d(core_mat), Transform::default()));
+        p.spawn((
+            Mesh3d(pole),
+            MeshMaterial3d(pole_mat),
+            Transform::from_xyz(0.0, pole_y, 0.0),
+        ));
     });
 }
 
@@ -524,23 +505,17 @@ pub(crate) fn spawn_pickup_item(
     let orb = pool.sphere_mesh(meshes, 0.08);
     let orb_mat = pool.emissive_mat(materials, glow_color, 4.0);
     commands.spawn((
-        PbrBundle {
-            mesh: body,
-            material: body_mat,
-            transform: Transform::from_translation(spec.position),
-            ..default()
-        },
+        Mesh3d(body),
+        MeshMaterial3d(body_mat),
+        Transform::from_translation(spec.position),
         PickupItem { name: spec.name, item_type: spec.item_type.clone() },
         Collider { half_size: Vec3::new(mesh_size.x * 0.5, mesh_size.y * 0.5, mesh_size.z * 0.5) },
     )).with_children(|p| {
         // Floating indicator
         p.spawn((
-            PbrBundle {
-                mesh: orb,
-                material: orb_mat,
-                transform: Transform::from_xyz(0.0, mesh_size.y * 0.5 + 0.2, 0.0),
-                ..default()
-            },
+            Mesh3d(orb),
+            MeshMaterial3d(orb_mat),
+            Transform::from_xyz(0.0, mesh_size.y * 0.5 + 0.2, 0.0),
         ));
     });
 }

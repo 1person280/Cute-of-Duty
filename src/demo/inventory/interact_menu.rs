@@ -17,7 +17,7 @@ pub(crate) fn interact_detection_system(
     station_query: Query<(Entity, &Transform, &Station)>,
     mut nearby: ResMut<NearbyInteract>,
 ) {
-    let Ok(player_transform) = player_query.get_single() else { return };
+    let Ok(player_transform) = player_query.single() else { return };
     let player_pos = player_transform.translation;
 
     // 站点条目在最前：靠近桌子时优先开台，不会被地上的散落物抢走 F
@@ -58,7 +58,7 @@ pub(crate) fn interact_detection_system(
 }
 
 pub(crate) fn interact_scroll_system(
-    mut scroll_events: EventReader<MouseWheel>,
+    mut scroll_events: MessageReader<MouseWheel>,
     mut nearby: ResMut<NearbyInteract>,
     input_state: Res<InputState>,
     wheel: Res<WheelState>,
@@ -125,7 +125,7 @@ type InteractScrollbarQuery<'w, 's> = Query<
     'w, 's,
     (
         &'static InteractScrollBar,
-        &'static mut Style,
+        &'static mut Node,
         &'static mut Visibility,
     ),
     (
@@ -145,7 +145,7 @@ pub(crate) fn interact_menu_update(
     // bevy 0.14 UI 不会因祖先 Hidden 剔除子节点：收起时面板/标题/行/滚动条/文本都要各自隐藏
     mut panel_header_vis: InteractHeaderVisQuery,
     mut rows: InteractRowsQuery,
-    mut texts: Query<(&InteractRowText, &mut Text), Without<InteractMenuHintText>>,
+    mut texts: Query<(&InteractRowText, &mut Text, &mut TextColor), Without<InteractMenuHintText>>,
     mut hint: Query<&mut Text, (With<InteractMenuHintText>, Without<InteractRowText>)>,
     mut scrollbar: InteractScrollbarQuery,
 ) {
@@ -155,7 +155,7 @@ pub(crate) fn interact_menu_update(
         && !r.wheel.open
         && r.wheel.pending_key.is_none()
         && r.held.item.is_none();
-    if let Ok(mut vis) = root_vis.get_single_mut() {
+    if let Ok(mut vis) = root_vis.single_mut() {
         *vis = if show { Visibility::Visible } else { Visibility::Hidden };
     }
     for mut vis in &mut panel_header_vis {
@@ -181,53 +181,53 @@ pub(crate) fn interact_menu_update(
         } else {
             Color::srgba(0.10, 0.10, 0.13, 0.85)
         });
-        *border = BorderColor(if selected {
+        border.set_all(if selected {
             Color::srgba(1.0, 0.8, 0.25, 0.95)
         } else {
             Color::srgba(0.3, 0.3, 0.35, 0.4)
         });
     }
-    for (row, mut text) in texts.iter_mut() {
+    for (row, mut text, mut color) in texts.iter_mut() {
         let entry_idx = start + row.0;
         if !show {
-            text.sections[0].value = String::new();
+            text.0 = String::new();
             continue;
         }
         let Some(entry) = r.nearby.entries.get(entry_idx) else {
-            text.sections[0].value = String::new();
+            text.0 = String::new();
             continue;
         };
         match *entry {
             InteractEntry::Station { kind, label, .. } => {
-                text.sections[0].value = label.to_string();
-                text.sections[0].style.color = station_accent(kind);
+                text.0 = label.to_string();
+                color.0 = station_accent(kind);
             }
             InteractEntry::Pickup(entity) => {
                 if let Ok(item) = r.pickup_query.get(entity) {
-                    text.sections[0].value = item.name.clone();
-                    text.sections[0].style.color = pickup_text_color(&item.item_type);
+                    text.0 = item.name.clone();
+                    color.0 = pickup_text_color(&item.item_type);
                 }
             }
         }
     }
     // 滚动条：条目超出可见行数才显示；滑块高度 = 可见占比，位置对应窗口起点
     let scrolling = show && total > INTERACT_MENU_VISIBLE_ROWS;
-    for (part, mut style, mut vis) in scrollbar.iter_mut() {
+    for (part, mut node, mut vis) in scrollbar.iter_mut() {
         *vis = if scrolling { Visibility::Visible } else { Visibility::Hidden };
         if part.0 == ScrollbarPart::Thumb && scrolling {
             let thumb_h = INTERACT_SCROLL_TRACK_H * (INTERACT_MENU_VISIBLE_ROWS as f32 / total as f32);
             let travel = INTERACT_SCROLL_TRACK_H - thumb_h;
-            style.height = Val::Px(thumb_h);
-            style.top = Val::Px(if max_start > 0 { travel * (start as f32 / max_start as f32) } else { 0.0 });
+            node.height = Val::Px(thumb_h);
+            node.top = Val::Px(if max_start > 0 { travel * (start as f32 / max_start as f32) } else { 0.0 });
         }
     }
     // 底部提示：操作说明 + 选中拾取物的满载/替换警告（弹药直接入池永不占槽）
-    if let Ok(mut text) = hint.get_single_mut() {
+    if let Ok(mut text) = hint.single_mut() {
         let mut value = if show { "滚轮选择 · F 确认".to_string() } else { String::new() };
         if show {
             if let Some(InteractEntry::Pickup(entity)) = r.nearby.entries.get(r.nearby.selected) {
                 if let Ok(item) = r.pickup_query.get(*entity) {
-                    if let Ok((inventory, weapon_slot)) = r.player_query.get_single() {
+                    if let Ok((inventory, weapon_slot)) = r.player_query.single() {
                         match item.item_type {
                             PickupType::Weapon { .. } => {
                                 if inventory.weapons.len() >= inventory.max_weapons {
@@ -246,7 +246,7 @@ pub(crate) fn interact_menu_update(
                 }
             }
         }
-        text.sections[0].value = value;
+        text.0 = value;
     }
 }
 
@@ -293,7 +293,7 @@ pub(crate) fn interact_execute_system(
     let Some(InteractEntry::Pickup(selected_entity)) = ctx.nearby.entries.get(ctx.nearby.selected).copied() else { return };
     // 本次 F 已被拾取消费：清掉按下态，避免同帧 station_system 再把面板打开
     ctx.keyboard.clear_just_pressed(KeyCode::KeyF);
-    let Ok((mut inventory, weapon_slot)) = player_query.get_single_mut() else { return };
+    let Ok((mut inventory, weapon_slot)) = player_query.single_mut() else { return };
 
     if let Ok(item) = pickup_query.get(selected_entity) {
         // 弹药直接补充弹药池，武器替换当前手持，其余物资入背包槽
@@ -319,7 +319,7 @@ pub(crate) fn interact_execute_system(
 
         if taken {
             // Remove pickup entity from world
-            commands.entity(selected_entity).despawn_recursive();
+            commands.entity(selected_entity).despawn();
             // Remove from nearby list
             ctx.nearby.entries.retain(|e| !matches!(e, InteractEntry::Pickup(e2) if *e2 == selected_entity));
             if ctx.nearby.selected >= ctx.nearby.entries.len() && !ctx.nearby.entries.is_empty() {

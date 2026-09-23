@@ -1,7 +1,7 @@
-﻿//! 暂停菜单与设置：GameSettings、设置行/鸣谢面板 UI、暂停交互、teardown_game
+//! 暂停菜单与设置：GameSettings、设置行/鸣谢面板 UI、暂停交互、teardown_game
 
 use bevy::prelude::*;
-use bevy::window::PrimaryWindow;
+use bevy::window::{CursorOptions, PrimaryWindow};
 use crate::model::PlayerCamera;
 use super::menu::{spawn_menu_button, menu_accent, menu_button_palette, MenuButton};
 use super::inventory::HeldGrenade;
@@ -87,7 +87,7 @@ pub(crate) fn pause_toggle(
     ui: Option<Res<PauseMenuUi>>,
     settings: Res<GameSettings>,
     mut commands: Commands,
-    mut windows: Query<&mut Window, With<PrimaryWindow>>,
+    mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
     mut input_state: ResMut<InputState>,
 ) {
     if let Some(grace) = grace.as_mut() {
@@ -109,8 +109,8 @@ pub(crate) fn pause_toggle(
         _ => {
             *pause = PauseMenu::Closed;
             if let Some(ui) = ui {
-                // bevy 0.14 despawn() 不递归，UI 树必须 despawn_recursive
-                commands.entity(ui.root).despawn_recursive();
+                // bevy 0.19 的 despawn() 已递归销毁子节点
+                commands.entity(ui.root).despawn();
                 commands.remove_resource::<PauseMenuUi>();
                 commands.remove_resource::<PauseGrace>();
             }
@@ -127,15 +127,12 @@ pub(crate) fn spawn_pause_ui(commands: &mut Commands, settings: &GameSettings) {
     let mut back_btn = Entity::PLACEHOLDER;
 
     let root = commands
-        .spawn(NodeBundle {
-            style: Style {
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                ..default()
-            },
+        .spawn(Node {
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
             ..default()
         })
         .id();
@@ -145,67 +142,56 @@ pub(crate) fn spawn_pause_ui(commands: &mut Commands, settings: &GameSettings) {
 
     commands.entity(root).with_children(|root| {
         // 全屏压暗层：独立绝对定位节点（与 HUD 边缘光同款写法，可靠渲染）
-        root.spawn(NodeBundle {
-            style: Style {
+        root.spawn((
+            Node {
                 position_type: PositionType::Absolute,
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 ..default()
             },
-            background_color: BackgroundColor(Color::srgba(0.0, 0.0, 0.02, 0.55)),
-            ..default()
-        });
-        main_panel = root.spawn(NodeBundle {
-            style: Style {
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                row_gap: Val::Px(14.0),
-                ..default()
-            },
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.02, 0.55)),
+        ));
+        main_panel = root.spawn(Node {
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(14.0),
             ..default()
         }).with_children(|panel| {
-            panel.spawn(TextBundle::from_section(
-                "游 戏 暂 停",
-                TextStyle { font_size: 46.0, color: Color::srgb(0.92, 0.95, 1.0), ..default() },
+            panel.spawn((
+                Text::new("游 戏 暂 停"),
+                TextFont { font_size: FontSize::Px(46.0), ..default() },
+                TextColor(Color::srgb(0.92, 0.95, 1.0)),
             ));
-            panel.spawn(TextBundle::from_section(
-                "按 / 或 ~ 键继续游戏",
-                TextStyle { font_size: 14.0, color: Color::srgb(0.55, 0.62, 0.72), ..default() },
+            panel.spawn((
+                Text::new("按 / 或 ~ 键继续游戏"),
+                TextFont { font_size: FontSize::Px(14.0), ..default() },
+                TextColor(Color::srgb(0.55, 0.62, 0.72)),
             ));
-            panel.spawn(NodeBundle {
-                style: Style { height: Val::Px(18.0), ..default() },
-                ..default()
-            });
+            panel.spawn(Node { height: Val::Px(18.0), ..default() });
             resume_btn = spawn_menu_button(panel, "返 回 游 戏", "继续当前训练", true);
             settings_btn = spawn_menu_button(panel, "游 戏 设 置", "灵敏度 · 视野 · 亮度", true);
             return_btn = spawn_menu_button(panel, "返 回 主 界 面", "结束本次训练", true);
         }).id();
 
-        settings_panel = root.spawn(NodeBundle {
-            style: Style {
+        settings_panel = root.spawn((
+            Node {
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
                 row_gap: Val::Px(14.0),
                 ..default()
             },
-            visibility: Visibility::Hidden,
-            ..default()
-        }).with_children(|panel| {
-            panel.spawn(TextBundle::from_section(
-                "游 戏 设 置",
-                TextStyle { font_size: 40.0, color: Color::srgb(0.92, 0.95, 1.0), ..default() },
+            Visibility::Hidden,
+        )).with_children(|panel| {
+            panel.spawn((
+                Text::new("游 戏 设 置"),
+                TextFont { font_size: FontSize::Px(40.0), ..default() },
+                TextColor(Color::srgb(0.92, 0.95, 1.0)),
             ));
-            panel.spawn(NodeBundle {
-                style: Style { height: Val::Px(10.0), ..default() },
-                ..default()
-            });
+            panel.spawn(Node { height: Val::Px(10.0), ..default() });
             spawn_setting_row(panel, settings, SettingKind::Sensitivity, "鼠标灵敏度");
             spawn_setting_row(panel, settings, SettingKind::Fov, "视野 (FOV)");
             spawn_setting_row(panel, settings, SettingKind::Ambient, "环境亮度");
-            panel.spawn(NodeBundle {
-                style: Style { height: Val::Px(12.0), ..default() },
-                ..default()
-            });
+            panel.spawn(Node { height: Val::Px(12.0), ..default() });
             spawn_credits_panel(panel);
             back_btn = spawn_menu_button(panel, "返 回", "回到暂停菜单", true);
         }).id();
@@ -221,7 +207,7 @@ pub(crate) fn spawn_pause_ui(commands: &mut Commands, settings: &GameSettings) {
 }
 
 /// 开源代码鸣谢面板：逐条列出本项目用到的核心开源库及其用途
-pub(crate) fn spawn_credits_panel(parent: &mut ChildBuilder) {
+pub(crate) fn spawn_credits_panel(parent: &mut ChildSpawnerCommands) {
     /// (库名 · 版本, 一句话说明"是什么、用在哪")
     const CREDITS: &[(&str, &str)] = &[
         ("Bevy 0.14", "3D 游戏引擎（MIT / Apache-2.0）—— 渲染、输入、UI、ECS 场景调度"),
@@ -234,52 +220,49 @@ pub(crate) fn spawn_credits_panel(parent: &mut ChildBuilder) {
         ("Criterion 0.5", "基准测试框架（MIT / Apache-2.0，仅 dev 依赖）—— 性能回归基准"),
     ];
 
-    parent.spawn(NodeBundle {
-        style: Style {
+    parent.spawn((
+        Node {
             width: Val::Px(760.0),
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::Center,
             row_gap: Val::Px(4.0),
             padding: UiRect::px(20.0, 10.0, 14.0, 12.0),
             border: UiRect::all(Val::Px(2.0)),
+            border_radius: BorderRadius::all(Val::Px(4.0)),
             ..default()
         },
-        background_color: BackgroundColor(Color::srgba(0.06, 0.09, 0.13, 0.92)),
-        border_color: BorderColor(Color::srgb(0.22, 0.28, 0.36)),
-        border_radius: BorderRadius::all(Val::Px(4.0)),
-        ..default()
-    }).with_children(|panel| {
-        panel.spawn(TextBundle::from_section(
-            "开 源 代 码 鸣 谢",
-            TextStyle { font_size: 17.0, color: menu_accent(), ..default() },
+        BackgroundColor(Color::srgba(0.06, 0.09, 0.13, 0.92)),
+        BorderColor::all(Color::srgb(0.22, 0.28, 0.36)),
+    )).with_children(|panel| {
+        panel.spawn((
+            Text::new("开 源 代 码 鸣 谢"),
+            TextFont { font_size: FontSize::Px(17.0), ..default() },
+            TextColor(menu_accent()),
         ));
-        panel.spawn(TextBundle::from_section(
-            "本项目是开源软件（GPL-3.0 with linking exception），站在下列开源库的肩膀上",
-            TextStyle { font_size: 12.0, color: Color::srgb(0.55, 0.62, 0.72), ..default() },
+        panel.spawn((
+            Text::new("本项目是开源软件（GPL-3.0 with linking exception），站在下列开源库的肩膀上"),
+            TextFont { font_size: FontSize::Px(12.0), ..default() },
+            TextColor(Color::srgb(0.55, 0.62, 0.72)),
         ));
-        panel.spawn(NodeBundle {
-            style: Style { height: Val::Px(4.0), ..default() },
-            ..default()
-        });
+        panel.spawn(Node { height: Val::Px(4.0), ..default() });
         for (name, desc) in CREDITS {
-            panel.spawn(NodeBundle {
-                style: Style {
-                    width: Val::Percent(100.0),
-                    flex_direction: FlexDirection::Row,
-                    justify_content: JustifyContent::SpaceBetween,
-                    column_gap: Val::Px(16.0),
-                    ..default()
-                },
+            panel.spawn(Node {
+                width: Val::Percent(100.0),
+                flex_direction: FlexDirection::Row,
+                justify_content: JustifyContent::SpaceBetween,
+                column_gap: Val::Px(16.0),
                 ..default()
             }).with_children(|row| {
                 // 左列定宽，保证右侧说明文字纵向对齐
-                row.spawn(TextBundle::from_section(
-                    *name,
-                    TextStyle { font_size: 13.0, color: Color::srgb(0.85, 0.89, 0.95), ..default() },
+                row.spawn((
+                    Text::new(*name),
+                    TextFont { font_size: FontSize::Px(13.0), ..default() },
+                    TextColor(Color::srgb(0.85, 0.89, 0.95)),
                 ));
-                row.spawn(TextBundle::from_section(
-                    *desc,
-                    TextStyle { font_size: 13.0, color: Color::srgb(0.62, 0.70, 0.80), ..default() },
+                row.spawn((
+                    Text::new(*desc),
+                    TextFont { font_size: FontSize::Px(13.0), ..default() },
+                    TextColor(Color::srgb(0.62, 0.70, 0.80)),
                 ));
             });
         }
@@ -287,9 +270,9 @@ pub(crate) fn spawn_credits_panel(parent: &mut ChildBuilder) {
 }
 
 /// 设置行：标签 + ◀ 值 ▶
-pub(crate) fn spawn_setting_row(parent: &mut ChildBuilder, settings: &GameSettings, kind: SettingKind, label: &str) {
-    parent.spawn(NodeBundle {
-        style: Style {
+pub(crate) fn spawn_setting_row(parent: &mut ChildSpawnerCommands, settings: &GameSettings, kind: SettingKind, label: &str) {
+    parent.spawn((
+        Node {
             width: Val::Px(460.0),
             height: Val::Px(46.0),
             flex_direction: FlexDirection::Row,
@@ -297,32 +280,28 @@ pub(crate) fn spawn_setting_row(parent: &mut ChildBuilder, settings: &GameSettin
             justify_content: JustifyContent::SpaceBetween,
             padding: UiRect::px(18.0, 12.0, 0.0, 0.0),
             border: UiRect::all(Val::Px(2.0)),
+            border_radius: BorderRadius::all(Val::Px(4.0)),
             ..default()
         },
-        background_color: BackgroundColor(Color::srgba(0.10, 0.14, 0.20, 0.95)),
-        border_color: BorderColor(Color::srgb(0.22, 0.28, 0.36)),
-        border_radius: BorderRadius::all(Val::Px(4.0)),
-        ..default()
-    }).with_children(|row| {
-        row.spawn(TextBundle::from_section(
-            label,
-            TextStyle { font_size: 19.0, color: Color::srgb(0.85, 0.89, 0.95), ..default() },
+        BackgroundColor(Color::srgba(0.10, 0.14, 0.20, 0.95)),
+        BorderColor::all(Color::srgb(0.22, 0.28, 0.36)),
+    )).with_children(|row| {
+        row.spawn((
+            Text::new(label),
+            TextFont { font_size: FontSize::Px(19.0), ..default() },
+            TextColor(Color::srgb(0.85, 0.89, 0.95)),
         ));
-        row.spawn(NodeBundle {
-            style: Style {
-                flex_direction: FlexDirection::Row,
-                align_items: AlignItems::Center,
-                column_gap: Val::Px(8.0),
-                ..default()
-            },
+        row.spawn(Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(8.0),
             ..default()
         }).with_children(|ctrl| {
             spawn_step_button(ctrl, "<", kind, -setting_step(kind));
             ctrl.spawn((
-                TextBundle::from_section(
-                    setting_label(settings, kind),
-                    TextStyle { font_size: 18.0, color: menu_accent(), ..default() },
-                ),
+                Text::new(setting_label(settings, kind)),
+                TextFont { font_size: FontSize::Px(18.0), ..default() },
+                TextColor(menu_accent()),
                 SettingValueText(kind),
             ));
             spawn_step_button(ctrl, ">", kind, setting_step(kind));
@@ -330,29 +309,27 @@ pub(crate) fn spawn_setting_row(parent: &mut ChildBuilder, settings: &GameSettin
     });
 }
 
-pub(crate) fn spawn_step_button(parent: &mut ChildBuilder, glyph: &str, kind: SettingKind, delta: f32) {
+pub(crate) fn spawn_step_button(parent: &mut ChildSpawnerCommands, glyph: &str, kind: SettingKind, delta: f32) {
     parent.spawn((
-        NodeBundle {
-            style: Style {
-                width: Val::Px(40.0),
-                height: Val::Px(34.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                border: UiRect::all(Val::Px(2.0)),
-                ..default()
-            },
-            background_color: BackgroundColor(Color::srgba(0.14, 0.20, 0.28, 0.98)),
-            border_color: BorderColor(menu_accent()),
+        Node {
+            width: Val::Px(40.0),
+            height: Val::Px(34.0),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            border: UiRect::all(Val::Px(2.0)),
             border_radius: BorderRadius::all(Val::Px(4.0)),
             ..default()
         },
+        BackgroundColor(Color::srgba(0.14, 0.20, 0.28, 0.98)),
+        BorderColor::all(menu_accent()),
         Interaction::default(),
         MenuButton,
         SettingAdjust { kind, delta },
     )).with_children(|btn| {
-        btn.spawn(TextBundle::from_section(
-            glyph,
-            TextStyle { font_size: 18.0, color: Color::srgb(0.92, 0.95, 1.0), ..default() },
+        btn.spawn((
+            Text::new(glyph),
+            TextFont { font_size: FontSize::Px(18.0), ..default() },
+            TextColor(Color::srgb(0.92, 0.95, 1.0)),
         ));
     });
 }
@@ -387,7 +364,7 @@ pub(crate) fn pause_menu_interaction(
     mut pause: ResMut<PauseMenu>,
     mut settings: ResMut<GameSettings>,
     ui: Option<Res<PauseMenuUi>>,
-    mut windows: Query<&mut Window, With<PrimaryWindow>>,
+    mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
     mut input_state: ResMut<InputState>,
     mut visibility: Query<&mut Visibility>,
     mut hover_buttons: Query<
@@ -400,7 +377,7 @@ pub(crate) fn pause_menu_interaction(
     grace: Option<Res<PauseGrace>>,
 ) {
     if let Some(grace) = grace {
-        if !grace.0.finished() {
+        if !grace.0.is_finished() {
             return;
         }
     }
@@ -424,7 +401,7 @@ pub(crate) fn pause_menu_interaction(
             PauseAction::Resume => {
                 *pause = PauseMenu::Closed;
                 if let Some(ui) = ui.as_ref() {
-                    commands.entity(ui.root).despawn_recursive();
+                    commands.entity(ui.root).despawn();
                     commands.remove_resource::<PauseMenuUi>();
                     commands.remove_resource::<PauseGrace>();
                 }
@@ -464,7 +441,7 @@ pub(crate) fn pause_menu_interaction(
     }
     if adjusted {
         for (value, mut text) in value_texts.iter_mut() {
-            text.sections[0].value = setting_label(&settings, value.0);
+            text.0 = setting_label(&settings, value.0);
         }
     }
 }
@@ -515,10 +492,11 @@ pub(crate) fn settings_apply_fov(
     }
 }
 
-pub(crate) fn settings_apply_ambient(settings: Res<GameSettings>, mut ambient: ResMut<AmbientLight>) {
+pub(crate) fn settings_apply_ambient(settings: Res<GameSettings>, mut ambient: Query<&mut AmbientLight>) {
     if !settings.is_changed() {
         return;
     }
-    ambient.brightness = settings.ambient_brightness;
+    if let Ok(mut ambient) = ambient.single_mut() {
+        ambient.brightness = settings.ambient_brightness;
+    }
 }
-

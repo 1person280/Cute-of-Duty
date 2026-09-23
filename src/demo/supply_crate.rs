@@ -12,7 +12,7 @@
 //! - 拖拽半透明幻影跟随光标，松开在背包格上才真正结算（否则不消耗战利品）。
 
 use bevy::prelude::*;
-use bevy::pbr::NotShadowCaster;
+use bevy::light::NotShadowCaster;
 use bevy::window::PrimaryWindow;
 use rand::Rng;
 use crate::element::ElementType;
@@ -149,10 +149,7 @@ pub(crate) fn spawn_crates(
     for (i, pos) in spots.iter().enumerate() {
         commands
             .spawn((
-                SpatialBundle {
-                    transform: Transform::from_translation(*pos),
-                    ..default()
-                },
+                Transform::from_translation(*pos),
                 SupplyCrate {
                     loot: random_crate_loot(),
                     label: "物资箱",
@@ -167,12 +164,11 @@ pub(crate) fn spawn_crates(
                 // 四角立柱（略内收，形成仓体骨架）
                 for (dx, dz) in [(1.0, 1.0), (-1.0, 1.0), (1.0, -1.0), (-1.0, -1.0)] {
                     let inset = CRATE_HALF[0] - 0.06;
-                    c.spawn(PbrBundle {
-                        mesh: post.clone(),
-                        material: frame_mat.clone(),
-                        transform: Transform::from_xyz(dx * inset, 0.0, dz * inset),
-                        ..default()
-                    });
+                    c.spawn((
+                        Mesh3d(post.clone()),
+                        MeshMaterial3d(frame_mat.clone()),
+                        Transform::from_xyz(dx * inset, 0.0, dz * inset),
+                    ));
                 }
                 // 四面木板条：+z 面 / -z 面（沿 x 铺开），+x 面 / -x 面需绕 y 轴转 90°
                 let side_off = CRATE_HALF[2] - 0.03;
@@ -180,37 +176,33 @@ pub(crate) fn spawn_crates(
                 for y in slat_ys {
                     // 前后（z 面）
                     for z in [side_off, -side_off] {
-                        c.spawn(PbrBundle {
-                            mesh: slat.clone(),
-                            material: plank_mat.clone(),
-                            transform: Transform::from_xyz(0.0, y, z),
-                            ..default()
-                        });
+                        c.spawn((
+                            Mesh3d(slat.clone()),
+                            MeshMaterial3d(plank_mat.clone()),
+                            Transform::from_xyz(0.0, y, z),
+                        ));
                     }
                     // 左右（x 面，绕 y 转 90°）
                     for x in [side_off_x, -side_off_x] {
-                        c.spawn(PbrBundle {
-                            mesh: slat.clone(),
-                            material: plank_mat.clone(),
-                            transform: Transform::from_rotation(Quat::from_rotation_y(std::f32::consts::FRAC_PI_2))
+                        c.spawn((
+                            Mesh3d(slat.clone()),
+                            MeshMaterial3d(plank_mat.clone()),
+                            Transform::from_rotation(Quat::from_rotation_y(std::f32::consts::FRAC_PI_2))
                                 .with_translation(Vec3::new(x, y, 0.0)),
-                            ..default()
-                        });
+                        ));
                     }
                 }
                 // 平顶箱盖
-                c.spawn(PbrBundle {
-                    mesh: lid.clone(),
-                    material: lid_mat.clone(),
-                    transform: Transform::from_xyz(0.0, CRATE_HALF[1], 0.0),
-                    ..default()
-                });
-                c.spawn(PbrBundle {
-                    mesh: beacon_mesh.clone(),
-                    material: beacon_mat.clone(),
-                    transform: Transform::from_xyz(0.0, CRATE_HALF[1] + 0.25, 0.0),
-                    ..default()
-                });
+                c.spawn((
+                    Mesh3d(lid.clone()),
+                    MeshMaterial3d(lid_mat.clone()),
+                    Transform::from_xyz(0.0, CRATE_HALF[1], 0.0),
+                ));
+                c.spawn((
+                    Mesh3d(beacon_mesh.clone()),
+                    MeshMaterial3d(beacon_mat.clone()),
+                    Transform::from_xyz(0.0, CRATE_HALF[1] + 0.25, 0.0),
+                ));
             });
         bevy::log::info!("[crate {}] spawned at ({}, {})", i + 1, pos.x, pos.z);
     }
@@ -219,49 +211,42 @@ pub(crate) fn spawn_crates(
 /// 构建物资箱面板（隐藏，由 station_system 在打开时控制显隐）
 pub(crate) fn setup_crate_ui(mut commands: Commands) {
     commands.spawn((
-        NodeBundle {
-            style: Style {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                ..default()
-            },
-            background_color: BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
-            visibility: Visibility::Hidden,
+        Node {
+            position_type: PositionType::Absolute,
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
             ..default()
         },
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
+        Visibility::Hidden,
         CrateUIRoot,
     )).with_children(|root| {
-        root.spawn(NodeBundle {
-            style: Style {
+        root.spawn((
+            Node {
                 width: Val::Px(430.0),
                 height: Val::Auto,
                 flex_direction: FlexDirection::Column,
                 padding: UiRect::all(Val::Px(16.0)),
                 row_gap: Val::Px(10.0),
+                border_radius: BorderRadius::all(Val::Px(8.0)),
                 ..default()
             },
-            background_color: BackgroundColor(Color::srgba(0.06, 0.06, 0.08, 0.95)),
-            border_radius: BorderRadius::all(Val::Px(8.0)),
-            ..default()
-        }).with_children(|panel| {
-            panel.spawn(TextBundle {
-                text: Text::from_section(
-                    "物资箱 · 3×4 随机战利品",
-                    TextStyle { font_size: 20.0, color: Color::srgb(0.9, 0.9, 0.9), ..default() }
-                ),
-                ..default()
-            });
-            panel.spawn(NodeBundle {
-                style: Style { width: Val::Percent(100.0), height: Val::Px(2.0), ..default() },
-                background_color: BackgroundColor(Color::srgba(0.4, 0.4, 0.5, 0.3)),
-                ..default()
-            });
+            BackgroundColor(Color::srgba(0.06, 0.06, 0.08, 0.95)),
+        )).with_children(|panel| {
+            panel.spawn((
+                Text::new("物资箱 · 3×4 随机战利品"),
+                TextFont { font_size: FontSize::Px(20.0), ..default() },
+                TextColor(Color::srgb(0.9, 0.9, 0.9)),
+            ));
+            panel.spawn((
+                Node { width: Val::Percent(100.0), height: Val::Px(2.0), ..default() },
+                BackgroundColor(Color::srgba(0.4, 0.4, 0.5, 0.3)),
+            ));
             // 3×4 战利品格
-            panel.spawn(NodeBundle {
-                style: Style {
+            panel.spawn((
+                Node {
                     flex_direction: FlexDirection::Row,
                     flex_wrap: FlexWrap::Wrap,
                     column_gap: Val::Px(10.0),
@@ -269,35 +254,32 @@ pub(crate) fn setup_crate_ui(mut commands: Commands) {
                     margin: UiRect::top(Val::Px(6.0)),
                     ..default()
                 },
-                background_color: BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
-                ..default()
-            }).with_children(|grid| {
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
+            )).with_children(|grid| {
                 for i in 0..CRATE_CELLS {
                     grid.spawn((
-                        NodeBundle {
-                            style: Style {
-                                width: Val::Px((390.0 - 20.0) / 3.0),
-                                height: Val::Px(48.0),
-                                justify_content: JustifyContent::Center,
-                                align_items: AlignItems::Center,
-                                border: UiRect::all(Val::Px(2.0)),
-                                ..default()
-                            },
-                            background_color: BackgroundColor(Color::srgba(0.14, 0.14, 0.16, 0.95)),
-                            border_color: BorderColor(Color::srgba(0.3, 0.3, 0.35, 0.6)),
+                        Node {
+                            width: Val::Px((390.0 - 20.0) / 3.0),
+                            height: Val::Px(48.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            border: UiRect::all(Val::Px(2.0)),
                             border_radius: BorderRadius::all(Val::Px(4.0)),
                             ..default()
                         },
+                        BackgroundColor(Color::srgba(0.14, 0.14, 0.16, 0.95)),
+                        BorderColor::all(Color::srgba(0.3, 0.3, 0.35, 0.6)),
                         CrateCellUI(i),
                         Interaction::default(),
                     )).with_children(|cell| {
                         cell.spawn((
-                            TextBundle {
-                                text: Text::from_section(
-                                    " ",
-                                    TextStyle { font_size: 12.0, color: Color::srgb(0.85, 0.85, 0.85), ..default() }
-                                ),
-                                style: Style { width: Val::Percent(96.0), justify_content: JustifyContent::Center, align_items: AlignItems::Center, ..default() },
+                            Text::new(" "),
+                            TextFont { font_size: FontSize::Px(12.0), ..default() },
+                            TextColor(Color::srgb(0.85, 0.85, 0.85)),
+                            Node {
+                                width: Val::Percent(96.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
                                 ..default()
                             },
                             CrateCellText(i),
@@ -306,22 +288,19 @@ pub(crate) fn setup_crate_ui(mut commands: Commands) {
                 }
             });
             // 分隔线
-            panel.spawn(NodeBundle {
-                style: Style { width: Val::Percent(100.0), height: Val::Px(2.0), margin: UiRect::top(Val::Px(2.0)), ..default() },
-                background_color: BackgroundColor(Color::srgba(0.4, 0.4, 0.5, 0.3)),
-                ..default()
-            });
+            panel.spawn((
+                Node { width: Val::Percent(100.0), height: Val::Px(2.0), margin: UiRect::top(Val::Px(2.0)), ..default() },
+                BackgroundColor(Color::srgba(0.4, 0.4, 0.5, 0.3)),
+            ));
             // 背包落点
-            panel.spawn(TextBundle {
-                text: Text::from_section(
-                    "背包（拖到此处领取 · 满格需先在 Tab 背包用掉）",
-                    TextStyle { font_size: 12.0, color: Color::srgb(0.5, 0.5, 0.55), ..default() }
-                ),
-                style: Style { margin: UiRect::top(Val::Px(4.0)), ..default() },
-                ..default()
-            });
-            panel.spawn(NodeBundle {
-                style: Style {
+            panel.spawn((
+                Text::new("背包（拖到此处领取 · 满格需先在 Tab 背包用掉）"),
+                TextFont { font_size: FontSize::Px(12.0), ..default() },
+                TextColor(Color::srgb(0.5, 0.5, 0.55)),
+                Node { margin: UiRect::top(Val::Px(4.0)), ..default() },
+            ));
+            panel.spawn((
+                Node {
                     flex_direction: FlexDirection::Row,
                     flex_wrap: FlexWrap::Wrap,
                     column_gap: Val::Px(10.0),
@@ -329,35 +308,32 @@ pub(crate) fn setup_crate_ui(mut commands: Commands) {
                     margin: UiRect::top(Val::Px(4.0)),
                     ..default()
                 },
-                background_color: BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
-                ..default()
-            }).with_children(|slots| {
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.0)),
+            )).with_children(|slots| {
                 for i in 0..CRATE_SLOTS {
                     slots.spawn((
-                        NodeBundle {
-                            style: Style {
-                                width: Val::Px(86.0),
-                                height: Val::Px(52.0),
-                                justify_content: JustifyContent::Center,
-                                align_items: AlignItems::Center,
-                                border: UiRect::all(Val::Px(2.0)),
-                                ..default()
-                            },
-                            background_color: BackgroundColor(Color::srgba(0.14, 0.14, 0.16, 0.95)),
-                            border_color: BorderColor(Color::srgba(0.3, 0.3, 0.35, 0.6)),
+                        Node {
+                            width: Val::Px(86.0),
+                            height: Val::Px(52.0),
+                            justify_content: JustifyContent::Center,
+                            align_items: AlignItems::Center,
+                            border: UiRect::all(Val::Px(2.0)),
                             border_radius: BorderRadius::all(Val::Px(4.0)),
                             ..default()
                         },
+                        BackgroundColor(Color::srgba(0.14, 0.14, 0.16, 0.95)),
+                        BorderColor::all(Color::srgba(0.3, 0.3, 0.35, 0.6)),
                         CrateSlotUI(i),
                         Interaction::default(),
                     )).with_children(|slot| {
                         slot.spawn((
-                            TextBundle {
-                                text: Text::from_section(
-                                    " ",
-                                    TextStyle { font_size: 11.0, color: Color::srgb(0.85, 0.85, 0.85), ..default() }
-                                ),
-                                style: Style { width: Val::Percent(96.0), justify_content: JustifyContent::Center, align_items: AlignItems::Center, ..default() },
+                            Text::new(" "),
+                            TextFont { font_size: FontSize::Px(11.0), ..default() },
+                            TextColor(Color::srgb(0.85, 0.85, 0.85)),
+                            Node {
+                                width: Val::Percent(96.0),
+                                justify_content: JustifyContent::Center,
+                                align_items: AlignItems::Center,
                                 ..default()
                             },
                             CrateSlotText(i),
@@ -366,45 +342,35 @@ pub(crate) fn setup_crate_ui(mut commands: Commands) {
                 }
             });
             panel.spawn((
-                TextBundle {
-                    text: Text::from_section(
-                        "",
-                        TextStyle { font_size: 13.0, color: Color::srgb(0.6, 0.9, 0.6), ..default() }
-                    ),
-                    ..default()
-                },
+                Text::new(""),
+                TextFont { font_size: FontSize::Px(13.0), ..default() },
+                TextColor(Color::srgb(0.6, 0.9, 0.6)),
                 CrateHintText,
             ));
-            panel.spawn(TextBundle {
-                text: Text::from_section(
-                    "拖拽或 Shift+左键 领取战利品 · F / Esc 关闭",
-                    TextStyle { font_size: 12.0, color: Color::srgb(0.5, 0.5, 0.55), ..default() }
-                ),
-                ..default()
-            });
+            panel.spawn((
+                Text::new("拖拽或 Shift+左键 领取战利品 · F / Esc 关闭"),
+                TextFont { font_size: FontSize::Px(12.0), ..default() },
+                TextColor(Color::srgb(0.5, 0.5, 0.55)),
+            ));
         });
         // 拖拽幻影（相对屏幕全屏定位，默认隐藏）
         root.spawn((
-            NodeBundle {
-                style: Style {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(0.0),
-                    top: Val::Px(0.0),
-                    padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
-                    ..default()
-                },
-                background_color: BackgroundColor(Color::srgba(0.2, 0.2, 0.25, 0.9)),
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(0.0),
+                top: Val::Px(0.0),
+                padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
                 border_radius: BorderRadius::all(Val::Px(6.0)),
-                visibility: Visibility::Hidden,
                 ..default()
             },
+            BackgroundColor(Color::srgba(0.2, 0.2, 0.25, 0.9)),
+            Visibility::Hidden,
             CrateGhost,
         )).with_children(|g| {
             g.spawn((
-                TextBundle {
-                    text: Text::from_section("", TextStyle { font_size: 13.0, color: Color::WHITE, ..default() }),
-                    ..default()
-                },
+                Text::new(""),
+                TextFont { font_size: FontSize::Px(13.0), ..default() },
+                TextColor(Color::WHITE),
                 CrateGhostText,
             ));
         });
@@ -451,9 +417,9 @@ fn try_transfer(
 /// 刷新战利品格/背包落点文本与悬停高亮、提示文案。
 pub(crate) fn crate_ui_system(
     win: Res<CrateWindow>,
-    mut cell_texts: Query<(&CrateCellUI, &mut Text), (Without<CrateSlotUI>, Without<CrateHintText>)>,
+    mut cell_texts: Query<(&CrateCellUI, &mut Text, &mut TextColor), (Without<CrateSlotUI>, Without<CrateHintText>)>,
     mut cell_bgs: Query<(&CrateCellUI, &Interaction, &mut BorderColor, &mut BackgroundColor), Without<CrateSlotUI>>,
-    mut slot_texts: Query<(&CrateSlotUI, &mut Text), (Without<CrateCellUI>, Without<CrateHintText>)>,
+    mut slot_texts: Query<(&CrateSlotUI, &mut Text, &mut TextColor), (Without<CrateCellUI>, Without<CrateHintText>)>,
     mut slot_bgs: Query<(&CrateSlotUI, &Interaction, &mut BorderColor, &mut BackgroundColor), Without<CrateCellUI>>,
     mut hint: Query<&mut Text, (With<CrateHintText>, Without<CrateCellUI>, Without<CrateSlotUI>)>,
     crates: Query<&SupplyCrate>,
@@ -461,50 +427,50 @@ pub(crate) fn crate_ui_system(
 ) {
     let Some(entity) = win.crate_entity else { return };
     let Ok(crate_comp) = crates.get(entity) else { return };
-    let Ok(inventory) = player.get_single() else { return };
+    let Ok(inventory) = player.single() else { return };
 
-    for (cell, mut text) in cell_texts.iter_mut() {
+    for (cell, mut text, mut color) in cell_texts.iter_mut() {
         match crate_comp.loot.get(cell.0).cloned().flatten() {
             Some(item) => {
-                text.sections[0].value = item.name;
-                text.sections[0].style.color = pickup_text_color(&item.item_type);
+                text.0 = item.name;
+                color.0 = pickup_text_color(&item.item_type);
             }
             None => {
-                text.sections[0].value = String::new();
-                text.sections[0].style.color = Color::srgb(0.4, 0.4, 0.4);
+                text.0 = String::new();
+                color.0 = Color::srgb(0.4, 0.4, 0.4);
             }
         }
     }
     for (_cell, interaction, mut border, mut bg) in cell_bgs.iter_mut() {
         if *interaction == Interaction::Hovered {
-            border.0 = Color::srgba(1.0, 0.8, 0.25, 0.95);
+            *border = BorderColor::all(Color::srgba(1.0, 0.8, 0.25, 0.95));
             bg.0 = Color::srgba(0.26, 0.27, 0.32, 0.95);
         } else {
-            border.0 = Color::srgba(0.3, 0.3, 0.35, 0.6);
+            *border = BorderColor::all(Color::srgba(0.3, 0.3, 0.35, 0.6));
             bg.0 = Color::srgba(0.14, 0.14, 0.16, 0.95);
         }
     }
-    for (slot, mut text) in slot_texts.iter_mut() {
+    for (slot, mut text, mut color) in slot_texts.iter_mut() {
         if let Some(item) = inventory.items.get(slot.0) {
-            text.sections[0].value = item.name.clone();
-            text.sections[0].style.color = pickup_text_color(&item.item_type);
+            text.0 = item.name.clone();
+            color.0 = pickup_text_color(&item.item_type);
         } else {
-            text.sections[0].value = " ".to_string();
-            text.sections[0].style.color = Color::srgb(0.4, 0.4, 0.4);
+            text.0 = " ".to_string();
+            color.0 = Color::srgb(0.4, 0.4, 0.4);
         }
     }
     for (_slot, interaction, mut border, mut bg) in slot_bgs.iter_mut() {
         if *interaction == Interaction::Hovered {
-            border.0 = Color::srgba(1.0, 0.8, 0.25, 0.95);
+            *border = BorderColor::all(Color::srgba(1.0, 0.8, 0.25, 0.95));
             bg.0 = Color::srgba(0.26, 0.27, 0.32, 0.95);
         } else {
-            border.0 = Color::srgba(0.3, 0.3, 0.35, 0.6);
+            *border = BorderColor::all(Color::srgba(0.3, 0.3, 0.35, 0.6));
             bg.0 = Color::srgba(0.14, 0.14, 0.16, 0.95);
         }
     }
     // 提示：若背包已满则告警
-    if let Ok(mut text) = hint.get_single_mut() {
-        text.sections[0].value = if inventory.items.len() >= inventory.max_slots {
+    if let Ok(mut text) = hint.single_mut() {
+        text.0 = if inventory.items.len() >= inventory.max_slots {
             "背包已满，先在 Tab 背包用掉物资".to_string()
         } else {
             String::new()
@@ -521,7 +487,7 @@ pub(crate) fn crate_drag_system(
     mut crates: Query<&mut SupplyCrate>,
     mut player: Query<(&mut Inventory, &WeaponSlot), With<Player>>,
     window_query: Query<&Window, With<PrimaryWindow>>,
-    mut ghost: Query<(&mut Visibility, &mut Style), With<CrateGhost>>,
+    mut ghost: Query<(&mut Visibility, &mut Node), With<CrateGhost>>,
     mut ghost_text: Query<&mut Text, (With<CrateGhostText>, Without<CrateHintText>)>,
     mut hint: Query<&mut Text, (With<CrateHintText>, Without<CrateGhostText>)>,
     cell_interactions: Query<(&CrateCellUI, &Interaction), Without<CrateSlotUI>>,
@@ -529,22 +495,22 @@ pub(crate) fn crate_drag_system(
 ) {
     let Some(entity) = win.crate_entity else { return };
     let Ok(mut crate_comp) = crates.get_mut(entity) else { return };
-    let Ok((mut inventory, weapon_slot)) = player.get_single_mut() else { return };
+    let Ok((mut inventory, weapon_slot)) = player.single_mut() else { return };
     let loot = &mut crate_comp.loot;
 
     let mut report: Option<String> = None;
-    let cursor = window_query.get_single().ok().and_then(|w| w.cursor_position());
+    let cursor = window_query.single().ok().and_then(|w| w.cursor_position());
 
     // ---- 幻影跟随光标 ----
     if drag.source.is_some() {
-        if let Ok((mut vis, mut style)) = ghost.get_single_mut() {
+        if let Ok((mut vis, mut style)) = ghost.single_mut() {
             if let Some(c) = cursor {
                 style.left = Val::Px(c.x - CRATE_GHOST_SNAP);
                 style.top = Val::Px(c.y - 12.0);
             }
             *vis = Visibility::Visible;
         }
-    } else if let Ok((mut vis, _)) = ghost.get_single_mut() {
+    } else if let Ok((mut vis, _)) = ghost.single_mut() {
         *vis = Visibility::Hidden;
     }
 
@@ -556,9 +522,9 @@ pub(crate) fn crate_drag_system(
                 Err(e) => e,
             });
         }
-        if let Ok(mut text) = hint.get_single_mut() {
+        if let Ok(mut text) = hint.single_mut() {
             if let Some(message) = &report {
-                text.sections[0].value = message.clone();
+                text.0 = message.clone();
             }
         }
         return;
@@ -572,8 +538,8 @@ pub(crate) fn crate_drag_system(
         {
             drag.source = Some(cell.0);
             // 初始化幻影文本
-            if let Ok(mut text) = ghost_text.get_single_mut() {
-                text.sections[0].value = loot[cell.0].as_ref().map(|i| i.name.clone()).unwrap_or_default();
+            if let Ok(mut text) = ghost_text.single_mut() {
+                text.0 = loot[cell.0].as_ref().map(|i| i.name.clone()).unwrap_or_default();
             }
         }
     }
@@ -592,12 +558,12 @@ pub(crate) fn crate_drag_system(
                 });
             }
             drag.source = None;
-            if let Ok((mut vis, _)) = ghost.get_single_mut() {
+            if let Ok((mut vis, _)) = ghost.single_mut() {
                 *vis = Visibility::Hidden;
             }
-            if let Ok(mut text) = hint.get_single_mut() {
+            if let Ok(mut text) = hint.single_mut() {
                 if let Some(message) = &report {
-                    text.sections[0].value = message.clone();
+                    text.0 = message.clone();
                 }
             }
         }

@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 use bevy::ecs::system::SystemParam;
-use bevy::window::{CursorGrabMode, PrimaryWindow};
+use bevy::window::{CursorGrabMode, CursorOptions, PrimaryWindow};
 use crate::element::ElementType;
 use crate::map::StationKind;
 use crate::operator::roster;
@@ -18,184 +18,169 @@ use super::supply_crate::{CrateUIRoot, CrateWindow};
 pub(crate) fn setup_station_ui(mut commands: Commands) {
     // --- 干员切换台面板 ---
     commands.spawn((
-        NodeBundle {
-            style: Style {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                ..default()
-            },
-            background_color: BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
-            visibility: Visibility::Hidden,
+        Node {
+            position_type: PositionType::Absolute,
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
             ..default()
         },
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
+        Visibility::Hidden,
         OperatorUIRoot,
     )).with_children(|root| {
-        root.spawn(NodeBundle {
-            style: Style {
+        root.spawn((
+            Node {
                 width: Val::Px(520.0),
                 height: Val::Auto,
                 flex_direction: FlexDirection::Column,
                 padding: UiRect::all(Val::Px(16.0)),
                 row_gap: Val::Px(8.0),
+                border_radius: BorderRadius::all(Val::Px(8.0)),
                 ..default()
             },
-            background_color: BackgroundColor(Color::srgba(0.06, 0.06, 0.08, 0.95)),
-            border_radius: BorderRadius::all(Val::Px(8.0)),
-            ..default()
-        }).with_children(|panel| {
-            panel.spawn(TextBundle {
-                text: Text::from_section(
-                    "干员切换台",
-                    TextStyle { font_size: 20.0, color: Color::srgb(0.9, 0.9, 0.9), ..default() }
-                ),
-                ..default()
-            });
-            panel.spawn(NodeBundle {
-                style: Style { width: Val::Percent(100.0), height: Val::Px(2.0), ..default() },
-                background_color: BackgroundColor(Color::srgba(0.4, 0.4, 0.5, 0.3)),
-                ..default()
-            });
+            BackgroundColor(Color::srgba(0.06, 0.06, 0.08, 0.95)),
+        )).with_children(|panel| {
+            panel.spawn((
+                Text::new("干员切换台"),
+                TextFont { font_size: FontSize::Px(20.0), ..default() },
+                TextColor(Color::srgb(0.9, 0.9, 0.9)),
+            ));
+            panel.spawn((
+                Node { width: Val::Percent(100.0), height: Val::Px(2.0), ..default() },
+                BackgroundColor(Color::srgba(0.4, 0.4, 0.5, 0.3)),
+            ));
             for i in 0..roster().len() {
                 panel.spawn((
-                    NodeBundle {
-                        style: Style {
-                            width: Val::Percent(100.0),
-                            height: Val::Auto,
-                            padding: UiRect::axes(Val::Px(10.0), Val::Px(8.0)),
-                            border: UiRect::all(Val::Px(2.0)),
-                            ..default()
-                        },
-                        background_color: BackgroundColor(Color::srgba(0.10, 0.10, 0.13, 0.92)),
-                        border_color: BorderColor(Color::srgba(0.35, 0.35, 0.4, 0.6)),
+                    Node {
+                        width: Val::Percent(100.0),
+                        height: Val::Auto,
+                        padding: UiRect::axes(Val::Px(10.0), Val::Px(8.0)),
+                        border: UiRect::all(Val::Px(2.0)),
                         border_radius: BorderRadius::all(Val::Px(6.0)),
                         ..default()
                     },
+                    BackgroundColor(Color::srgba(0.10, 0.10, 0.13, 0.92)),
+                    BorderColor::all(Color::srgba(0.35, 0.35, 0.4, 0.6)),
                     Interaction::default(),
                     OperatorCard(i),
                 )).with_children(|card| {
+                    // 干员卡正文：父 Text 为名称行，3 个子 TextSpan 依次为 Q/E/被动行。
+                    // 父子共用 OperatorCardText 标记，更新时按组件类型（Text vs TextSpan）区分。
                     card.spawn((
-                        TextBundle {
-                            text: Text::from_sections([
-                                TextSection::new("", TextStyle { font_size: 15.0, color: Color::WHITE, ..default() }),
-                                TextSection::new("", TextStyle { font_size: 12.0, color: Color::srgb(0.75, 0.75, 0.78), ..default() }),
-                                TextSection::new("", TextStyle { font_size: 12.0, color: Color::srgb(0.75, 0.75, 0.78), ..default() }),
-                                TextSection::new("", TextStyle { font_size: 11.0, color: Color::srgb(0.5, 0.5, 0.55), ..default() }),
-                            ]),
-                            ..default()
-                        },
+                        Text::new(""),
+                        TextFont { font_size: FontSize::Px(15.0), ..default() },
+                        TextColor(Color::WHITE),
                         OperatorCardText(i),
-                    ));
+                    )).with_children(|lines| {
+                        lines.spawn((
+                            TextSpan::new(""),
+                            TextFont { font_size: FontSize::Px(12.0), ..default() },
+                            TextColor(Color::srgb(0.75, 0.75, 0.78)),
+                        ));
+                        lines.spawn((
+                            TextSpan::new(""),
+                            TextFont { font_size: FontSize::Px(12.0), ..default() },
+                            TextColor(Color::srgb(0.75, 0.75, 0.78)),
+                        ));
+                        lines.spawn((
+                            TextSpan::new(""),
+                            TextFont { font_size: FontSize::Px(11.0), ..default() },
+                            TextColor(Color::srgb(0.5, 0.5, 0.55)),
+                        ));
+                    });
                 });
             }
             panel.spawn((
-                TextBundle {
-                    text: Text::from_section(
-                        "",
-                        TextStyle { font_size: 13.0, color: Color::srgb(0.6, 0.9, 0.6), ..default() }
-                    ),
-                    ..default()
-                },
+                Text::new(""),
+                TextFont { font_size: FontSize::Px(13.0), ..default() },
+                TextColor(Color::srgb(0.6, 0.9, 0.6)),
                 OperatorStatusText,
             ));
-            panel.spawn(TextBundle {
-                text: Text::from_section(
-                    "点击卡片切换干员（Q/E 技能组与元素随之更换） · F / Esc 关闭",
-                    TextStyle { font_size: 12.0, color: Color::srgb(0.5, 0.5, 0.55), ..default() }
-                ),
-                ..default()
-            });
+            panel.spawn((
+                Text::new("点击卡片切换干员（Q/E 技能组与元素随之更换） · F / Esc 关闭"),
+                TextFont { font_size: FontSize::Px(12.0), ..default() },
+                TextColor(Color::srgb(0.5, 0.5, 0.55)),
+            ));
         });
     });
 
     // --- 无限物资补给台面板 ---
     commands.spawn((
-        NodeBundle {
-            style: Style {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                ..default()
-            },
-            background_color: BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
-            visibility: Visibility::Hidden,
+        Node {
+            position_type: PositionType::Absolute,
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
             ..default()
         },
+        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.35)),
+        Visibility::Hidden,
         SupplyUIRoot,
     )).with_children(|root| {
-        root.spawn(NodeBundle {
-            style: Style {
+        root.spawn((
+            Node {
                 width: Val::Px(420.0),
                 height: Val::Auto,
                 flex_direction: FlexDirection::Column,
                 padding: UiRect::all(Val::Px(16.0)),
                 row_gap: Val::Px(8.0),
+                border_radius: BorderRadius::all(Val::Px(8.0)),
                 ..default()
             },
-            background_color: BackgroundColor(Color::srgba(0.06, 0.06, 0.08, 0.95)),
-            border_radius: BorderRadius::all(Val::Px(8.0)),
-            ..default()
-        }).with_children(|panel| {
-            panel.spawn(TextBundle {
-                text: Text::from_section(
-                    "补给台 · 无限物资",
-                    TextStyle { font_size: 20.0, color: Color::srgb(0.9, 0.9, 0.9), ..default() }
-                ),
-                ..default()
-            });
-            panel.spawn(NodeBundle {
-                style: Style { width: Val::Percent(100.0), height: Val::Px(2.0), ..default() },
-                background_color: BackgroundColor(Color::srgba(0.4, 0.4, 0.5, 0.3)),
-                ..default()
-            });
+            BackgroundColor(Color::srgba(0.06, 0.06, 0.08, 0.95)),
+        )).with_children(|panel| {
+            panel.spawn((
+                Text::new("补给台 · 无限物资"),
+                TextFont { font_size: FontSize::Px(20.0), ..default() },
+                TextColor(Color::srgb(0.9, 0.9, 0.9)),
+            ));
+            panel.spawn((
+                Node { width: Val::Percent(100.0), height: Val::Px(2.0), ..default() },
+                BackgroundColor(Color::srgba(0.4, 0.4, 0.5, 0.3)),
+            ));
             for (i, (name, hint)) in SUPPLY_ROWS.iter().enumerate() {
                 panel.spawn((
-                    NodeBundle {
-                        style: Style {
-                            width: Val::Percent(100.0),
-                            height: Val::Auto,
-                            padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
-                            border: UiRect::all(Val::Px(2.0)),
-                            ..default()
-                        },
-                        background_color: BackgroundColor(Color::srgba(0.10, 0.10, 0.13, 0.92)),
-                        border_color: BorderColor(Color::srgba(0.35, 0.35, 0.4, 0.6)),
+                    Node {
+                        width: Val::Percent(100.0),
+                        height: Val::Auto,
+                        padding: UiRect::axes(Val::Px(10.0), Val::Px(6.0)),
+                        border: UiRect::all(Val::Px(2.0)),
                         border_radius: BorderRadius::all(Val::Px(4.0)),
                         ..default()
                     },
+                    BackgroundColor(Color::srgba(0.10, 0.10, 0.13, 0.92)),
+                    BorderColor::all(Color::srgba(0.35, 0.35, 0.4, 0.6)),
                     Interaction::default(),
                     SupplyRow(i),
                 )).with_children(|row| {
-                    row.spawn(TextBundle {
-                        text: Text::from_sections([
-                            TextSection::new(*name, TextStyle { font_size: 14.0, color: Color::srgb(0.9, 0.9, 0.9), ..default() }),
-                            TextSection::new(format!("  —  {}", hint), TextStyle { font_size: 11.0, color: Color::srgb(0.5, 0.5, 0.55), ..default() }),
-                        ]),
-                        ..default()
+                    // 行标题 + 说明：静态文本，父 Text + 子 TextSpan
+                    row.spawn((
+                        Text::new(*name),
+                        TextFont { font_size: FontSize::Px(14.0), ..default() },
+                        TextColor(Color::srgb(0.9, 0.9, 0.9)),
+                    )).with_children(|row_span| {
+                        row_span.spawn((
+                            TextSpan::new(format!("  —  {}", hint)),
+                            TextFont { font_size: FontSize::Px(11.0), ..default() },
+                            TextColor(Color::srgb(0.5, 0.5, 0.55)),
+                        ));
                     });
                 });
             }
             panel.spawn((
-                TextBundle {
-                    text: Text::from_section(
-                        "",
-                        TextStyle { font_size: 13.0, color: Color::srgb(0.6, 0.9, 0.6), ..default() }
-                    ),
-                    ..default()
-                },
+                Text::new(""),
+                TextFont { font_size: FontSize::Px(13.0), ..default() },
+                TextColor(Color::srgb(0.6, 0.9, 0.6)),
                 SupplyStatusText,
             ));
-            panel.spawn(TextBundle {
-                text: Text::from_section(
-                    "点击行领取（弹药入池、其余入背包） · F / Esc 关闭",
-                    TextStyle { font_size: 12.0, color: Color::srgb(0.5, 0.5, 0.55), ..default() }
-                ),
-                ..default()
-            });
+            panel.spawn((
+                Text::new("点击行领取（弹药入池、其余入背包） · F / Esc 关闭"),
+                TextFont { font_size: FontSize::Px(12.0), ..default() },
+                TextColor(Color::srgb(0.5, 0.5, 0.55)),
+            ));
         });
     });
     // 旧的"站点提示条"已并入底部统一交互菜单（interact_menu_update），不再单独生成
@@ -221,7 +206,7 @@ pub(crate) fn station_system(
     // 纯资源统一走 SystemParam，查询参数直连（避开派生 SystemParam 与 &mut 查询项的 lifetime 限制）
     mut st: StationState,
     mut crate_win: ResMut<CrateWindow>,
-    mut window_query: Query<&mut Window, With<PrimaryWindow>>,
+    mut cursor_query: Query<&mut CursorOptions, With<PrimaryWindow>>,
     mut supply_vis: Query<&mut Visibility, (With<SupplyUIRoot>, Without<OperatorUIRoot>)>,
     mut operator_vis: Query<&mut Visibility, (With<OperatorUIRoot>, Without<SupplyUIRoot>)>,
     mut crate_vis: Query<&mut Visibility, (With<CrateUIRoot>, Without<SupplyUIRoot>, Without<OperatorUIRoot>)>,
@@ -244,47 +229,47 @@ pub(crate) fn station_system(
                             OpenStation::Crate
                         }
                     };
-                    if let Ok(mut window) = window_query.get_single_mut() {
-                        window.cursor.visible = true;
-                        window.cursor.grab_mode = CursorGrabMode::None;
+                    if let Ok(mut cursor) = cursor_query.single_mut() {
+                        cursor.visible = true;
+                        cursor.grab_mode = CursorGrabMode::None;
                     }
                     st.input_state.cursor_locked = false;
                 }
             }
         } else {
-            close_station_panel(&mut window_query, &mut st.input_state, &mut st.open, &mut crate_win);
+            close_station_panel(&mut cursor_query, &mut st.input_state, &mut st.open, &mut crate_win);
         }
     } else if st.keyboard.just_pressed(KeyCode::Escape) {
         // Esc 只负责关闭已打开的面板
         if *st.open != OpenStation::None {
-            close_station_panel(&mut window_query, &mut st.input_state, &mut st.open, &mut crate_win);
+            close_station_panel(&mut cursor_query, &mut st.input_state, &mut st.open, &mut crate_win);
         }
     }
 
     // 面板显隐兜底：每帧按状态刷新，任何提前 return 都不会把面板留在屏幕上
-    if let Ok(mut vis) = supply_vis.get_single_mut() {
+    if let Ok(mut vis) = supply_vis.single_mut() {
         *vis = if *st.open == OpenStation::Supply { Visibility::Visible } else { Visibility::Hidden };
     }
-    if let Ok(mut vis) = operator_vis.get_single_mut() {
+    if let Ok(mut vis) = operator_vis.single_mut() {
         *vis = if *st.open == OpenStation::Operator { Visibility::Visible } else { Visibility::Hidden };
     }
-    if let Ok(mut vis) = crate_vis.get_single_mut() {
+    if let Ok(mut vis) = crate_vis.single_mut() {
         *vis = if *st.open == OpenStation::Crate { Visibility::Visible } else { Visibility::Hidden };
     }
 }
 
 /// 关闭站点面板：锁回光标并清空打开态（含复位物资箱窗口）
 pub(crate) fn close_station_panel(
-    window_query: &mut Query<&mut Window, With<PrimaryWindow>>,
+    cursor_query: &mut Query<&mut CursorOptions, With<PrimaryWindow>>,
     input_state: &mut InputState,
     open: &mut OpenStation,
     crate_win: &mut CrateWindow,
 ) {
     *open = OpenStation::None;
     crate_win.crate_entity = None;
-    if let Ok(mut window) = window_query.get_single_mut() {
-        window.cursor.visible = false;
-        window.cursor.grab_mode = CursorGrabMode::Locked;
+    if let Ok(mut cursor) = cursor_query.single_mut() {
+        cursor.visible = false;
+        cursor.grab_mode = CursorGrabMode::Locked;
     }
     input_state.cursor_locked = true;
 }
@@ -325,10 +310,10 @@ pub(crate) fn supply_station_click_system(
     if *open != OpenStation::Supply { return; }
     if !mouse.just_pressed(MouseButton::Left) { return; }
     let Some((row, _)) = rows.iter().find(|(_, interaction)| **interaction == Interaction::Pressed) else { return };
-    let Ok(mut inventory) = player_query.get_single_mut() else { return };
+    let Ok(mut inventory) = player_query.single_mut() else { return };
     let msg = grant_supply(row.0, &mut inventory);
-    if let Ok(mut text) = status.get_single_mut() {
-        text.sections[0].value = msg;
+    if let Ok(mut text) = status.single_mut() {
+        text.0 = msg;
     }
 }
 
@@ -344,16 +329,16 @@ pub(crate) fn operator_station_click_system(
     if *open != OpenStation::Operator { return; }
     if !mouse.just_pressed(MouseButton::Left) { return; }
     let Some((card, _)) = cards.iter().find(|(_, interaction)| **interaction == Interaction::Pressed) else { return };
-    let Ok((mut op, accent)) = player_query.get_single_mut() else { return };
+    let Ok((mut op, accent)) = player_query.single_mut() else { return };
     if card.0 == op.active {
-        if let Ok(mut text) = status.get_single_mut() {
-            text.sections[0].value = format!("当前已是 {}", roster()[op.active].name);
+        if let Ok(mut text) = status.single_mut() {
+            text.0 = format!("当前已是 {}", roster()[op.active].name);
         }
         return;
     }
     switch_operator(&mut op, accent, &mut materials, card.0);
-    if let Ok(mut text) = status.get_single_mut() {
-        text.sections[0].value = format!("已切换至 {}", roster()[card.0].name);
+    if let Ok(mut text) = status.single_mut() {
+        text.0 = format!("已切换至 {}", roster()[card.0].name);
     }
 }
 
@@ -371,10 +356,10 @@ pub(crate) fn supply_ui_update_system(
 ) {
     for (_row, interaction, mut border, mut bg) in rows.iter_mut() {
         if *interaction == Interaction::Hovered {
-            border.0 = Color::srgba(1.0, 0.8, 0.25, 0.95);
+            *border = BorderColor::all(Color::srgba(1.0, 0.8, 0.25, 0.95));
             bg.0 = Color::srgba(0.26, 0.27, 0.32, 0.95);
         } else {
-            border.0 = Color::srgba(0.35, 0.35, 0.4, 0.6);
+            *border = BorderColor::all(Color::srgba(0.35, 0.35, 0.4, 0.6));
             bg.0 = Color::srgba(0.10, 0.10, 0.13, 0.92);
         }
     }
@@ -388,23 +373,27 @@ type OperatorCardHover<'w, 's> = Query<
     Without<SupplyRow>,
 >;
 
-/// 干员切换台面板：卡片高亮（当前干员金色 + 元素底色，悬停白框）与文本刷新
+/// 干员切换台面板：卡片高亮（当前干员金色 + 元素底色，悬停白框）与文本刷新。
+/// 卡片正文为父 Text（名称行）+ 3 个子 TextSpan（Q/E/被动行），父子共用 `OperatorCardText` 标记，
+/// 按组件类型（Text/TextSpan）与子实体顺序（0=Q,1=E,2=被动）区分。
 pub(crate) fn operator_ui_update_system(
     mut cards: OperatorCardHover,
-    mut texts: Query<(&OperatorCardText, &mut Text)>,
+    card_children: Query<(&OperatorCardText, &Children), Without<TextSpan>>,
+    mut title_texts: Query<(&OperatorCardText, &mut Text, &mut TextColor), Without<TextSpan>>,
+    mut span_texts: Query<&mut TextSpan, Without<Text>>,
     player_query: Query<&OperatorState, With<Player>>,
 ) {
-    let active = player_query.get_single().map(|op| op.active).unwrap_or(usize::MAX);
+    let active = player_query.single().map(|op| op.active).unwrap_or(usize::MAX);
     for (card, interaction, mut border, mut bg) in cards.iter_mut() {
         let selected = card.0 == active;
         let hovered = *interaction == Interaction::Hovered;
-        border.0 = if hovered {
+        *border = BorderColor::all(if hovered {
             Color::srgba(0.95, 0.95, 0.95, 0.95)
         } else if selected {
             Color::srgba(1.0, 0.8, 0.25, 0.95)
         } else {
             Color::srgba(0.35, 0.35, 0.4, 0.6)
-        };
+        });
         bg.0 = if selected {
             roster().get(card.0).map(|op| op.element.color().with_alpha(0.28)).unwrap_or(Color::srgba(0.10, 0.10, 0.13, 0.92))
         } else if hovered {
@@ -413,28 +402,27 @@ pub(crate) fn operator_ui_update_system(
             Color::srgba(0.10, 0.10, 0.13, 0.92)
         };
     }
-    for (ct, mut text) in texts.iter_mut() {
+    // 名称行（父 Text）
+    for (ct, mut text, mut color) in title_texts.iter_mut() {
         let Some(op) = roster().get(ct.0) else { continue };
         let mark = if ct.0 == active { "   ✓ 当前" } else { "" };
-        text.sections[0].value = format!("{} · {}{}", op.name, op.title, mark);
-        text.sections[0].style.color = op.element.color();
-        text.sections[1].value = format!(
-            "\nQ {}（{}s 冷却）：{}",
-            op.q.name, op.q.cooldown_secs, op.q.desc
-        );
-        text.sections[1].style.color = Color::srgb(0.75, 0.75, 0.78);
-        text.sections[2].value = format!(
-            "\nE {}（{}s 冷却）：{}",
-            op.e.name, op.e.cooldown_secs, op.e.desc
-        );
-        text.sections[2].style.color = Color::srgb(0.75, 0.75, 0.78);
-        text.sections[3].value = format!("\n{}", op.passive);
-        text.sections[3].style.color = Color::srgb(0.5, 0.5, 0.55);
+        text.0 = format!("{} · {}{}", op.name, op.title, mark);
+        color.0 = op.element.color();
+    }
+    // Q/E/被动行（子 TextSpan，颜色在构建时已固定）
+    for (ct, children) in card_children.iter() {
+        let Some(op) = roster().get(ct.0) else { continue };
+        for (i, child) in children.iter().take(3).enumerate() {
+            let Ok(mut span) = span_texts.get_mut(child) else { continue };
+            span.0 = match i {
+                0 => format!("\nQ {}（{}s 冷却）：{}", op.q.name, op.q.cooldown_secs, op.q.desc),
+                1 => format!("\nE {}（{}s 冷却）：{}", op.e.name, op.e.cooldown_secs, op.e.desc),
+                _ => format!("\n{}", op.passive),
+            };
+        }
     }
 }
 
 // =============================================================================
 // Kill Feed (top-right)
 // =============================================================================
-
-

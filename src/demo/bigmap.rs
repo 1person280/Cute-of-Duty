@@ -9,7 +9,7 @@
 //! 因此地图改布局后总览自动同步。
 
 use bevy::prelude::*;
-use bevy::window::PrimaryWindow;
+use bevy::window::{CursorOptions, PrimaryWindow};
 use crate::map::{PickupKind, StationKind};
 use crate::map::lawn;
 use crate::model::{Player, PlayerCamera};
@@ -74,54 +74,48 @@ pub(crate) fn setup_bigmap(mut commands: Commands, mut open: ResMut<BigMapOpen>)
     // 整屏覆盖层：暗色背景 + 垂直居中
     commands
         .spawn((
-            NodeBundle {
-                style: Style {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(0.0),
-                    top: Val::Px(0.0),
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(100.0),
-                    flex_direction: FlexDirection::Column,
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    row_gap: Val::Px(8.0),
-                    ..default()
-                },
-                background_color: BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.6)),
-                visibility: Visibility::Hidden,
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(0.0),
+                top: Val::Px(0.0),
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                flex_direction: FlexDirection::Column,
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(8.0),
                 ..default()
             },
+            BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.6)),
+            Visibility::Hidden,
             BigMapRoot,
         ))
         .with_children(|root| {
             // 标题栏
-            root.spawn(TextBundle {
-                text: Text::from_section(
-                    "战术全景图 · 搜打撤草坪训练场（1×1km）· 按 M / Esc 关闭",
-                    TextStyle { font_size: 16.0, color: Color::srgb(0.95, 0.95, 0.9), ..default() },
-                ),
-                ..default()
-            });
+            root.spawn((
+                Text::new("战术全景图 · 搜打撤草坪训练场（1×1km）· 按 M / Esc 关闭"),
+                TextFont { font_size: FontSize::Px(16.0), ..default() },
+                TextColor(Color::srgb(0.95, 0.95, 0.9)),
+            ));
 
             // 方形地图
-            root.spawn(NodeBundle {
-                style: Style {
+            root.spawn((
+                Node {
                     width: Val::Px(BIGMAP_PX),
                     height: Val::Px(BIGMAP_PX),
                     border: UiRect::all(Val::Px(BIGMAP_BORDER)),
                     overflow: Overflow::clip(),
                     ..default()
                 },
-                background_color: BackgroundColor(Color::srgba(0.04, 0.05, 0.07, 0.9)),
-                border_color: BorderColor(Color::srgba(0.6, 0.63, 0.67, 0.95)),
-                ..default()
-            })
+                BackgroundColor(Color::srgba(0.04, 0.05, 0.07, 0.9)),
+                BorderColor::all(Color::srgba(0.6, 0.63, 0.67, 0.95)),
+            ))
             .with_children(|map| {
                 // ---- 分区色带 + 标签（最底层）----
                 for (label, z_top, z_bottom, rgb) in ZONES {
                     let (top, height) = band_top_height(z_top, z_bottom, half);
-                    map.spawn(NodeBundle {
-                        style: Style {
+                    map.spawn((
+                        Node {
                             position_type: PositionType::Absolute,
                             left: Val::Px(BIGMAP_BORDER),
                             top: Val::Px(top),
@@ -129,35 +123,32 @@ pub(crate) fn setup_bigmap(mut commands: Commands, mut open: ResMut<BigMapOpen>)
                             height: Val::Px(height),
                             ..default()
                         },
-                        background_color: BackgroundColor(Color::srgba(rgb[0], rgb[1], rgb[2], 0.16)),
-                        ..default()
-                    });
+                        BackgroundColor(Color::srgba(rgb[0], rgb[1], rgb[2], 0.16)),
+                    ));
                     // 色带中央标签
                     let z_mid = (z_top + z_bottom) * 0.5;
-                    map.spawn(NodeBundle {
-                        style: Style {
+                    map.spawn((
+                        Node {
                             position_type: PositionType::Absolute,
                             left: Val::Px(BIGMAP_BORDER + 6.0),
                             top: Val::Px(world_to_px(z_mid, half) - 8.0),
                             ..default()
                         },
-                        background_color: BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.45)),
-                        ..default()
-                    }).with_children(|t| {
-                        t.spawn(TextBundle {
-                            text: Text::from_section(
-                                label,
-                                TextStyle { font_size: 12.0, color: Color::srgb(0.95, 0.95, 0.9), ..default() },
-                            ),
-                            ..default()
-                        });
+                        BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.45)),
+                    ))
+                    .with_children(|t| {
+                        t.spawn((
+                            Text::new(label),
+                            TextFont { font_size: FontSize::Px(12.0), ..default() },
+                            TextColor(Color::srgb(0.95, 0.95, 0.9)),
+                        ));
                     });
                 }
 
                 // ---- 分区边界线（虚线状细条）----
                 for z in BOUNDARY_Z {
-                    map.spawn(NodeBundle {
-                        style: Style {
+                    map.spawn((
+                        Node {
                             position_type: PositionType::Absolute,
                             left: Val::Px(BIGMAP_BORDER),
                             top: Val::Px(world_to_px(z, half) - 1.0),
@@ -165,14 +156,13 @@ pub(crate) fn setup_bigmap(mut commands: Commands, mut open: ResMut<BigMapOpen>)
                             height: Val::Px(2.0),
                             ..default()
                         },
-                        background_color: BackgroundColor(Color::srgba(0.95, 0.95, 0.95, 0.7)),
-                        ..default()
-                    });
+                        BackgroundColor(Color::srgba(0.95, 0.95, 0.95, 0.7)),
+                    ));
                 }
 
                 // ---- 撤离信标（北端红色，比普通目标更大）----
-                map.spawn(NodeBundle {
-                    style: Style {
+                map.spawn((
+                    Node {
                         position_type: PositionType::Absolute,
                         left: Val::Px(world_to_px(0.0, half) - 4.0),
                         top: Val::Px(world_to_px(-440.0, half) - 4.0),
@@ -180,9 +170,8 @@ pub(crate) fn setup_bigmap(mut commands: Commands, mut open: ResMut<BigMapOpen>)
                         height: Val::Px(8.0),
                         ..default()
                     },
-                    background_color: BackgroundColor(Color::srgb(1.0, 0.2, 0.15)),
-                    ..default()
-                });
+                    BackgroundColor(Color::srgb(1.0, 0.2, 0.15)),
+                ));
 
                 // ---- 围墙（有碰撞且高过膝的 solid 掩体）----
                 for prop in &layout.props {
@@ -196,8 +185,8 @@ pub(crate) fn setup_bigmap(mut commands: Commands, mut open: ResMut<BigMapOpen>)
                     let scale = BIGMAP_INNER / (2.0 * half);
                     let w = (aabb[0] * 2.0 * scale).max(2.0);
                     let h = (aabb[2] * 2.0 * scale).max(2.0);
-                    map.spawn(NodeBundle {
-                        style: Style {
+                    map.spawn((
+                        Node {
                             position_type: PositionType::Absolute,
                             left: Val::Px(world_to_px(prop.pos[0], half) - w * 0.5),
                             top: Val::Px(world_to_px(prop.pos[2], half) - h * 0.5),
@@ -205,15 +194,14 @@ pub(crate) fn setup_bigmap(mut commands: Commands, mut open: ResMut<BigMapOpen>)
                             height: Val::Px(h),
                             ..default()
                         },
-                        background_color: BackgroundColor(Color::srgba(0.58, 0.6, 0.64, 0.85)),
-                        ..default()
-                    });
+                        BackgroundColor(Color::srgba(0.58, 0.6, 0.64, 0.85)),
+                    ));
                 }
 
                 // ---- 静态目标（红芯小点）----
                 for t in &layout.targets {
-                    map.spawn(NodeBundle {
-                        style: Style {
+                    map.spawn((
+                        Node {
                             position_type: PositionType::Absolute,
                             left: Val::Px(world_to_px(t.pos[0], half) - 2.5),
                             top: Val::Px(world_to_px(t.pos[2], half) - 2.5),
@@ -221,9 +209,8 @@ pub(crate) fn setup_bigmap(mut commands: Commands, mut open: ResMut<BigMapOpen>)
                             height: Val::Px(5.0),
                             ..default()
                         },
-                        background_color: BackgroundColor(Color::srgba(0.95, 0.35, 0.3, 0.95)),
-                        ..default()
-                    });
+                        BackgroundColor(Color::srgba(0.95, 0.35, 0.3, 0.95)),
+                    ));
                 }
 
                 // ---- 拾取物（按类型配色）----
@@ -231,11 +218,11 @@ pub(crate) fn setup_bigmap(mut commands: Commands, mut open: ResMut<BigMapOpen>)
                     let color = match pk.kind {
                         PickupKind::Ammo { .. } => Color::srgba(0.9, 0.7, 0.2, 0.95),
                         PickupKind::Health { .. } => Color::srgba(0.9, 0.25, 0.25, 0.95),
-                        PickupKind::Armor { .. } => Color::srgba(0.3, 0.55, 0.95, 0.95),
+                        PickupKind::Armor { .. } => Color::srgba(0.45, 0.6, 0.95, 0.95),
                         PickupKind::Grenade { element } | PickupKind::Weapon { element } => element.color().with_alpha(0.95),
                     };
-                    map.spawn(NodeBundle {
-                        style: Style {
+                    map.spawn((
+                        Node {
                             position_type: PositionType::Absolute,
                             left: Val::Px(world_to_px(pk.pos[0], half) - 2.0),
                             top: Val::Px(world_to_px(pk.pos[2], half) - 2.0),
@@ -243,9 +230,8 @@ pub(crate) fn setup_bigmap(mut commands: Commands, mut open: ResMut<BigMapOpen>)
                             height: Val::Px(4.0),
                             ..default()
                         },
-                        background_color: BackgroundColor(color),
-                        ..default()
-                    });
+                        BackgroundColor(color),
+                    ));
                 }
 
                 // ---- 功能站点（补给=琥珀 / 干员=青）----
@@ -255,8 +241,8 @@ pub(crate) fn setup_bigmap(mut commands: Commands, mut open: ResMut<BigMapOpen>)
                         StationKind::OperatorDesk => Color::srgb(0.2, 0.9, 0.95),
                         StationKind::SupplyCrate => Color::srgb(1.0, 0.55, 0.12),
                     };
-                    map.spawn(NodeBundle {
-                        style: Style {
+                    map.spawn((
+                        Node {
                             position_type: PositionType::Absolute,
                             left: Val::Px(world_to_px(st.pos[0], half) - 3.0),
                             top: Val::Px(world_to_px(st.pos[2], half) - 3.0),
@@ -264,55 +250,46 @@ pub(crate) fn setup_bigmap(mut commands: Commands, mut open: ResMut<BigMapOpen>)
                             height: Val::Px(6.0),
                             ..default()
                         },
-                        background_color: BackgroundColor(color),
-                        ..default()
-                    });
+                        BackgroundColor(color),
+                    ));
                 }
 
                 // ---- 玩家：白色定位点 + 朝向箭头（后生成者在上层）----
                 let px = world_to_px(layout.player_spawn[0], half);
                 let py = world_to_px(layout.player_spawn[2], half);
                 map.spawn((
-                    NodeBundle {
-                        style: Style {
-                            position_type: PositionType::Absolute,
-                            left: Val::Px(px - 2.0),
-                            top: Val::Px(py - 2.0),
-                            width: Val::Px(4.0),
-                            height: Val::Px(4.0),
-                            ..default()
-                        },
-                        background_color: BackgroundColor(Color::srgb(0.95, 0.95, 0.95)),
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(px - 2.0),
+                        top: Val::Px(py - 2.0),
+                        width: Val::Px(4.0),
+                        height: Val::Px(4.0),
                         ..default()
                     },
+                    BackgroundColor(Color::srgb(0.95, 0.95, 0.95)),
                     BigMapPlayerDot,
                 ));
                 map.spawn((
-                    NodeBundle {
-                        style: Style {
-                            position_type: PositionType::Absolute,
-                            left: Val::Px(px - 5.5),
-                            top: Val::Px(py - 5.5),
-                            width: Val::Px(11.0),
-                            height: Val::Px(11.0),
-                            ..default()
-                        },
-                        background_color: BackgroundColor(Color::srgba(0.35, 0.95, 0.6, 0.5)),
-                        transform: Transform::from_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_4)),
+                    Node {
+                        position_type: PositionType::Absolute,
+                        left: Val::Px(px - 5.5),
+                        top: Val::Px(py - 5.5),
+                        width: Val::Px(11.0),
+                        height: Val::Px(11.0),
                         ..default()
                     },
+                    BackgroundColor(Color::srgba(0.35, 0.95, 0.6, 0.5)),
+                    Transform::from_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_4)),
                     BigMapPlayerArrow,
                 ));
             });
 
             // 图例说明
-            root.spawn(TextBundle {
-                text: Text::from_section(
-                    "绿=出生 · 黄=搜索(搜) · 橙=射击(打) · 红=撤离(撤)　白点=玩家 · 红点=目标 · 彩点=拾取物",
-                    TextStyle { font_size: 12.0, color: Color::srgb(0.85, 0.87, 0.9), ..default() },
-                ),
-                ..default()
-            });
+            root.spawn((
+                Text::new("绿=出生 · 黄=搜索(搜) · 橙=射击(打) · 红=撤离(撤)　白点=玩家 · 红点=目标 · 彩点=拾取物"),
+                TextFont { font_size: FontSize::Px(12.0), ..default() },
+                TextColor(Color::srgb(0.85, 0.87, 0.9)),
+            ));
         });
 }
 
@@ -321,7 +298,7 @@ pub(crate) fn bigmap_toggle(
     mut keyboard: ResMut<ButtonInput<KeyCode>>,
     mut bigmap: ResMut<BigMapOpen>,
     mut root: Query<&mut Visibility, With<BigMapRoot>>,
-    mut windows: Query<&mut Window, With<PrimaryWindow>>,
+    mut windows: Query<&mut CursorOptions, With<PrimaryWindow>>,
     mut input_state: ResMut<InputState>,
     wheel: Res<WheelState>,
     held: Res<HeldGrenade>,
@@ -336,7 +313,7 @@ pub(crate) fn bigmap_toggle(
             keyboard.clear_just_pressed(KeyCode::Escape);
             bigmap.open = false;
             lock_cursor(&mut windows, &mut input_state);
-            if let Ok(mut v) = root.get_single_mut() {
+            if let Ok(mut v) = root.single_mut() {
                 *v = Visibility::Hidden;
             }
         }
@@ -349,14 +326,14 @@ pub(crate) fn bigmap_toggle(
     if wheel.open || held.item.is_some()
         || *open_station != OpenStation::None
         || crate_win.crate_entity.is_some()
-        || backpack_ui.get_single().map_or(false, |v| *v == Visibility::Visible)
+        || backpack_ui.single().map_or(false, |v| *v == Visibility::Visible)
     {
         return;
     }
     keyboard.clear_just_pressed(KeyCode::KeyM);
     bigmap.open = true;
     unlock_cursor(&mut windows, &mut input_state);
-    if let Ok(mut v) = root.get_single_mut() {
+    if let Ok(mut v) = root.single_mut() {
         *v = Visibility::Visible;
     }
 }
@@ -366,20 +343,20 @@ pub(crate) fn bigmap_update_system(
     cam_query: Query<&PlayerCamera>,
     player_query: Query<&Transform, (With<Player>, Without<BigMapPlayerArrow>)>,
     map_half: Option<Res<MinimapMap>>,
-    mut dot: Query<&mut Style, (With<BigMapPlayerDot>, Without<BigMapPlayerArrow>)>,
-    mut arrow: Query<(&mut Style, &mut Transform), (With<BigMapPlayerArrow>, Without<BigMapPlayerDot>)>,
+    mut dot: Query<&mut Node, (With<BigMapPlayerDot>, Without<BigMapPlayerArrow>)>,
+    mut arrow: Query<(&mut Node, &mut Transform), (With<BigMapPlayerArrow>, Without<BigMapPlayerDot>)>,
 ) {
-    let (Ok(cam), Ok(player)) = (cam_query.get_single(), player_query.get_single()) else { return };
+    let (Ok(cam), Ok(player)) = (cam_query.single(), player_query.single()) else { return };
     let half = map_half.map_or(lawn::layout().half_extent, |m| m.half_extent);
     let px = world_to_px(player.translation.x, half);
     let py = world_to_px(player.translation.z, half);
-    if let Ok(mut style) = dot.get_single_mut() {
-        style.left = Val::Px(px - 2.0);
-        style.top = Val::Px(py - 2.0);
+    if let Ok(mut node) = dot.single_mut() {
+        node.left = Val::Px(px - 2.0);
+        node.top = Val::Px(py - 2.0);
     }
-    if let Ok((mut style, mut transform)) = arrow.get_single_mut() {
-        style.left = Val::Px(px - 5.5);
-        style.top = Val::Px(py - 5.5);
+    if let Ok((mut node, mut transform)) = arrow.single_mut() {
+        node.left = Val::Px(px - 5.5);
+        node.top = Val::Px(py - 5.5);
         let heading = heading_rad(cam.yaw);
         transform.rotation = Quat::from_rotation_z(heading + std::f32::consts::FRAC_PI_4);
     }

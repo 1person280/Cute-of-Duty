@@ -1,7 +1,7 @@
-﻿//! 持续区域（毒雾/毒区）：展开、周期性结算与到期消散
+//! 持续区域（毒雾/毒区）：展开、周期性结算与到期消散
 
 use bevy::prelude::*;
-use bevy::pbr::NotShadowCaster;
+use bevy::light::NotShadowCaster;
 use crate::element::ElementType;
 use crate::operator::SkillEffect;
 use crate::demo::frontend::*;
@@ -32,13 +32,10 @@ pub(crate) fn spawn_skill_zone(
     let element = ElementType::Poison;
     let radius = 3.5;
     commands.spawn((
-        PbrBundle {
-            mesh: effects.zone_cylinder.clone(),
-            material: effects.material(materials, element, EffectMatKind::Zone),
-            transform: Transform::from_translation(pos.with_y(0.0) + Vec3::Y * 0.7)
-                .with_scale(Vec3::new(radius, 1.0, radius)),
-            ..default()
-        },
+        Mesh3d(effects.zone_cylinder.clone()),
+        MeshMaterial3d(effects.material(materials, element, EffectMatKind::Zone)),
+        Transform::from_translation(pos.with_y(0.0) + Vec3::Y * 0.7)
+            .with_scale(Vec3::new(radius, 1.0, radius)),
         NotShadowCaster,
         SkillZone {
             element,
@@ -90,7 +87,7 @@ pub(crate) fn zone_tick_system(
                 );
             }
         }
-        if zone.lifetime.finished() {
+        if zone.lifetime.is_finished() {
             commands.entity(entity).despawn();
         }
     }

@@ -57,7 +57,7 @@ type MenuCategoryQuery<'w, 's> = Query<
 
 pub(crate) fn main_menu_interaction(
     mut next_state: ResMut<NextState<AppState>>,
-    mut app_exit: EventWriter<AppExit>,
+    mut app_exit: MessageWriter<AppExit>,
     time: Res<Time>,
     mut grace: ResMut<MenuGrace>,
     keys: Res<ButtonInput<KeyCode>>,
@@ -74,7 +74,7 @@ pub(crate) fn main_menu_interaction(
     mode_rows: Query<(&ModeRow, &Interaction), Changed<Interaction>>,
 ) {
     grace.0.tick(time.delta());
-    if !grace.0.finished() {
+    if !grace.0.is_finished() {
         return;
     }
 
@@ -128,7 +128,7 @@ pub(crate) fn main_menu_interaction(
                 return;
             }
             if let Ok(mut text) = status_texts.get_mut(ui.status_text) {
-                text.sections[0].value = format!("「{}」尚未开放，敬请期待", spec.name);
+                text.0 = format!("「{}」尚未开放，敬请期待", spec.name);
             }
         } else if gear.is_some() {
             if let Ok(mut vis) = visibility.get_mut(ui.settings_overlay) {
@@ -138,7 +138,7 @@ pub(crate) fn main_menu_interaction(
                 *backdrop_vis = Visibility::Visible;
             }
         } else if quit.is_some() {
-            app_exit.send(AppExit::Success);
+            app_exit.write(AppExit::Success);
             return;
         }
     }
@@ -167,7 +167,7 @@ pub(crate) fn main_menu_interaction(
     }
     if adjusted {
         for (value, mut text) in value_texts.iter_mut() {
-            text.sections[0].value = setting_label(&settings, value.0);
+            text.0 = setting_label(&settings, value.0);
         }
     }
 }
@@ -227,7 +227,7 @@ pub(crate) fn main_menu_style(
     category: Res<SelectedCategory>,
     panel_vis: Query<&Visibility, (With<ModePanelRoot>, Without<ModeRow>)>,
     gear_hover: Query<&Interaction, (With<GearButton>, Changed<Interaction>)>,
-    mut gear_icon: Query<&mut UiImage, With<GearIcon>>,
+    mut gear_icon: Query<&mut ImageNode, With<GearIcon>>,
     mut hover_buttons: MenuHoverButtonQuery,
     row_changed: Query<&Interaction, (With<ModeRow>, Changed<Interaction>)>,
     category_changed: Query<&Interaction, (With<CategoryButton>, Changed<Interaction>)>,
@@ -259,8 +259,8 @@ pub(crate) fn main_menu_style(
     }
 
     // 齿轮图标随悬停着色
-    if let Ok(interaction) = gear_hover.get_single() {
-        if let Ok(mut image) = gear_icon.get_single_mut() {
+    if let Ok(interaction) = gear_hover.single() {
+        if let Ok(mut image) = gear_icon.single_mut() {
             image.color = if *interaction == Interaction::Hovered {
                 menu_accent()
             } else {
@@ -285,10 +285,10 @@ pub(crate) fn main_menu_style(
         };
         if row.0 == selected.0 {
             *bg = BackgroundColor(Color::srgba(0.12, 0.22, 0.30, 0.98));
-            *border = BorderColor(menu_accent());
+            *border = BorderColor::all(menu_accent());
         } else if !spec.available {
             *bg = BackgroundColor(Color::srgba(0.07, 0.09, 0.12, 0.90));
-            *border = BorderColor(Color::srgb(0.15, 0.18, 0.24));
+            *border = BorderColor::all(Color::srgb(0.15, 0.18, 0.24));
         } else if hovered {
             *bg = hover_bg;
             *border = hover_border;
@@ -303,7 +303,7 @@ pub(crate) fn main_menu_style(
         let hovered = *interaction == Interaction::Hovered;
         if cat.0 == category.0 {
             *bg = BackgroundColor(Color::srgba(0.12, 0.22, 0.30, 0.98));
-            *border = BorderColor(menu_accent());
+            *border = BorderColor::all(menu_accent());
         } else if hovered {
             *bg = hover_bg;
             *border = hover_border;
@@ -316,7 +316,7 @@ pub(crate) fn main_menu_style(
     // 选中模式变化 → 右下角状态行同步
     if selected.is_changed() {
         if let Ok(mut text) = status_texts.get_mut(ui.status_text) {
-            text.sections[0].value = format!("当前模式：{}", game_mode_spec(selected.0).name);
+            text.0 = format!("当前模式：{}", game_mode_spec(selected.0).name);
         }
     }
 }

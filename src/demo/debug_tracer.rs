@@ -54,7 +54,7 @@ pub(crate) fn memory_tracer(
     materials: Res<Assets<StandardMaterial>>,
     effects: Res<EffectAssets>,
 ) {
-    timer.acc += time.delta_seconds();
+    timer.acc += time.delta_secs();
     if timer.acc < SAMPLE_INTERVAL_SECS {
         return;
     }

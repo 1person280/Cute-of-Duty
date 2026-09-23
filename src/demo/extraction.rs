@@ -24,22 +24,22 @@ pub(crate) fn extraction_zone_system(
     mut keyboard: ResMut<ButtonInput<KeyCode>>,
     mut next_state: ResMut<NextState<AppState>>,
     mut root_vis: Query<&mut Visibility, (With<ExtractionHintRoot>, Without<ExtractionHintText>)>,
-    mut hint: Query<&mut Text, (With<ExtractionHintText>, Without<ExtractionHintRoot>)>,
+    mut hint: Query<(&mut Text, &mut TextColor), (With<ExtractionHintText>, Without<ExtractionHintRoot>)>,
 ) {
-    let Ok(player) = player_query.get_single() else { return };
+    let Ok(player) = player_query.single() else { return };
     // 平面距离（忽略 Y）：站上光垫即触发，不受角色站立高度影响
     let planar = Vec2::new(player.translation.x - EXTRACTION_POINT.x, player.translation.z - EXTRACTION_POINT.z);
     let in_zone = planar.length() <= EXTRACTION_RANGE;
 
-    if let Ok(mut vis) = root_vis.get_single_mut() {
+    if let Ok(mut vis) = root_vis.single_mut() {
         *vis = if in_zone { Visibility::Visible } else { Visibility::Hidden };
     }
-    if let Ok(mut text) = hint.get_single_mut() {
+    if let Ok((mut text, mut color)) = hint.single_mut() {
         if in_zone {
-            text.sections[0].value = "已抵达撤离区 · 按 Enter 确认撤离".to_string();
-            text.sections[0].style.color = Color::srgb(0.9, 0.2, 0.2);
+            text.0 = "已抵达撤离区 · 按 Enter 确认撤离".to_string();
+            color.0 = Color::srgb(0.9, 0.2, 0.2);
         } else {
-            text.sections[0].value = String::new();
+            text.0 = String::new();
         }
     }
 

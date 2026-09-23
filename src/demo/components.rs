@@ -91,7 +91,7 @@ pub(crate) fn switch_operator(
     state.active = idx;
     state.q = ready_timer(op.q.cooldown_secs);
     state.e = ready_timer(op.e.cooldown_secs);
-    if let Some(mat) = materials.get_mut(&accent.0) {
+    if let Some(mut mat) = materials.get_mut(&accent.0) {
         mat.base_color = op.element.color();
         mat.emissive = op.element.emissive();
     }
@@ -508,7 +508,7 @@ pub(crate) struct HudItemSlotLabel(pub(crate) usize);
 
 // --- 击杀播报（右上角） ---
 
-#[derive(Event)]
+#[derive(Message)]
 pub(crate) struct KillEvent {
     pub(crate) name: String,
 }

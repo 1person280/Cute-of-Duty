@@ -28,11 +28,11 @@ pub fn yanhu_action_system(
     )>,
     time: Res<Time>,
 ) {
-    let Ok(cam) = cam_query.get_single() else { return };
+    let Ok(cam) = cam_query.single() else { return };
     // 与 aim_rig_system 相同的 smoothstep 过渡系数
     let a = cam.aim_lerp;
     let aim_t = a * a * (3.0 - 2.0 * a);
-    let t = time.elapsed_seconds();
+    let t = time.elapsed_secs();
     // 尾巴慢摆相位（待机也在摇）
     let tail_idle = t * 1.7;
 
@@ -79,7 +79,7 @@ pub fn yanhu_action_system(
         }
 
         // 枪身后坐：在 aim_rig_system 写入的瞄准旋转上叠加一个上抬增量
-        if let Ok(mut gun_t) = gun_query.get_single_mut() {
+        if let Ok(mut gun_t) = gun_query.single_mut() {
             gun_t.rotation = gun_t.rotation * Quat::from_rotation_x(0.10 * kick);
         }
     }

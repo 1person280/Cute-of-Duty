@@ -1,7 +1,7 @@
 //! 爆炸：范围伤害结算（含点燃/冰冻机制）、爆炸视觉扩展与消散
 
 use bevy::prelude::*;
-use bevy::pbr::NotShadowCaster;
+use bevy::light::NotShadowCaster;
 use crate::element::{ElementSystem, ElementType};
 use crate::model::Player;
 use crate::operator::SkillEffect;
@@ -67,12 +67,9 @@ pub(crate) fn apply_explosion_damage(
             if dummy.frozen.is_none() {
                 dummy.frozen = Some(Timer::from_seconds(spec.effect.freeze_secs, TimerMode::Once));
                 let ice = commands.spawn((
-                    PbrBundle {
-                        mesh: effects.frost_cube.clone(),
-                        material: effects.frost_material.clone(),
-                        transform: Transform::from_translation(Vec3::new(0.0, 0.4, 0.0)),
-                        ..default()
-                    },
+                    Mesh3d(effects.frost_cube.clone()),
+                    MeshMaterial3d(effects.frost_material.clone()),
+                    Transform::from_translation(Vec3::new(0.0, 0.4, 0.0)),
                     NotShadowCaster,
                 )).id();
                 commands.entity(entity).add_child(ice);
@@ -105,12 +102,9 @@ pub(crate) fn spawn_explosion(
     max_scale: f32,
 ) {
     commands.spawn((
-        PbrBundle {
-            mesh: effects.explosion_sphere.clone(),
-            material: effects.material(materials, element, EffectMatKind::Explosion),
-            transform: Transform::from_translation(pos).with_scale(Vec3::splat(0.1)),
-            ..default()
-        },
+        Mesh3d(effects.explosion_sphere.clone()),
+        MeshMaterial3d(effects.material(materials, element, EffectMatKind::Explosion)),
+        Transform::from_translation(pos).with_scale(Vec3::splat(0.1)),
         ExplosionEffect { timer: Timer::from_seconds(0.45, TimerMode::Once), max_scale },
     ));
     for _ in 0..4 {
@@ -120,12 +114,9 @@ pub(crate) fn spawn_explosion(
             (rand::random::<f32>() - 0.5) * 2.0,
         ).normalize();
         commands.spawn((
-            PbrBundle {
-                mesh: effects.explosion_debris.clone(),
-                material: effects.material(materials, element, EffectMatKind::Plain),
-                transform: Transform::from_translation(pos + dir * 0.5),
-                ..default()
-            },
+            Mesh3d(effects.explosion_debris.clone()),
+            MeshMaterial3d(effects.material(materials, element, EffectMatKind::Plain)),
+            Transform::from_translation(pos + dir * 0.5),
             BulletHit { timer: Timer::from_seconds(0.5, TimerMode::Once) },
         ));
     }
@@ -141,7 +132,7 @@ pub(crate) fn explosion_expand(
         let t = effect.timer.elapsed_secs() / effect.timer.duration().as_secs_f32();
         let scale = effect.max_scale * t.min(1.0);
         transform.scale = Vec3::splat(scale);
-        if effect.timer.finished() {
+        if effect.timer.is_finished() {
             commands.entity(entity).despawn();
         }
     }

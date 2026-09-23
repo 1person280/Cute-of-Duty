@@ -79,13 +79,13 @@ pub(crate) fn grenade_throw_system(
     mut hint_vis: Query<&mut Visibility, With<HeldHintRoot>>,
 ) {
     // 持握提示：只在持握时显示（文案固定，创建时已写好）
-    if let Ok(mut vis) = hint_vis.get_single_mut() {
+    if let Ok(mut vis) = hint_vis.single_mut() {
         *vis = if r.held.item.is_some() { Visibility::Visible } else { Visibility::Hidden };
     }
     if r.held.item.is_none() { return; }
     // UI 打开（光标解锁）时不投掷也不取消：左键属于界面
     if !r.input_state.cursor_locked { return; }
-    let Ok((player_transform, mut inventory)) = player_query.get_single_mut() else { return };
+    let Ok((player_transform, mut inventory)) = player_query.single_mut() else { return };
 
     // Esc 取消：手雷放回背包（cursor_grab_toggle 在持握期间跳过 Esc，由这里接管）
     if r.keyboard.just_pressed(KeyCode::Escape) {
@@ -103,17 +103,14 @@ pub(crate) fn grenade_throw_system(
             inventory.items.push(item);
             return;
         };
-        let Ok(cam_tf) = r.cam_query.get_single() else { return };
+        let Ok(cam_tf) = r.cam_query.single() else { return };
         let (_, rotation, _) = cam_tf.to_scale_rotation_translation();
         let dir = (rotation * Vec3::NEG_Z).normalize();
         let origin = player_transform.translation + Vec3::Y * 1.7 + dir * 0.4;
         commands.spawn((
-            PbrBundle {
-                mesh: r.effects.projectile.clone(),
-                material: r.effects.material(&mut r.materials, element, EffectMatKind::Plain),
-                transform: Transform::from_translation(origin),
-                ..default()
-            },
+            Mesh3d(r.effects.projectile.clone()),
+            MeshMaterial3d(r.effects.material(&mut r.materials, element, EffectMatKind::Plain)),
+            Transform::from_translation(origin),
             GrenadeProjectile {
                 velocity: dir * 13.0 + Vec3::Y * 3.0,
                 element,

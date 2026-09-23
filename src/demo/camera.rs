@@ -124,11 +124,11 @@ pub(crate) fn aim_rig_system(
     colliders: Query<(&Transform, &Collider), (Without<CamPivot>, Without<ShoulderPivot>, Without<PitchPivot>, Without<SpringArm>, Without<PlayerHeadPivot>, Without<PlayerAimGun>, Without<Player>)>,
     time: Res<Time>,
 ) {
-    let Ok(player_transform) = player_query.get_single() else { return };
-    let Ok(cam) = cam_query.get_single() else { return };
+    let Ok(player_transform) = player_query.single() else { return };
+    let Ok(cam) = cam_query.single() else { return };
 
     // 瞄准过渡系数（smoothstep）
-    let step = time.delta_seconds() / ARM_TRANSITION_SECS;
+    let step = time.delta_secs() / ARM_TRANSITION_SECS;
     let aim_lerp = if cam.aiming { (cam.aim_lerp + step).min(1.0) } else { (cam.aim_lerp - step).max(0.0) };
     let t = aim_lerp * aim_lerp * (3.0 - 2.0 * aim_lerp);
 
@@ -136,13 +136,13 @@ pub(crate) fn aim_rig_system(
     // 俯仰旋转量（rotation_x 正值 = 抬头，取负与"pitch 正 = 俯视"约定对齐）
     let rot = Quat::from_rotation_y(cam.yaw + std::f32::consts::PI) * Quat::from_rotation_x(-pitch);
 
-    if let Ok(mut pivot) = pivot_query.get_single_mut() {
+    if let Ok(mut pivot) = pivot_query.single_mut() {
         pivot.translation = player_transform.translation;
     }
-    if let Ok(mut yaw_p) = yaw_query.get_single_mut() {
+    if let Ok(mut yaw_p) = yaw_query.single_mut() {
         yaw_p.rotation = Quat::from_rotation_y(cam.yaw + std::f32::consts::PI);
     }
-    if let Ok(mut pitch_p) = pitch_query.get_single_mut() {
+    if let Ok(mut pitch_p) = pitch_query.single_mut() {
         pitch_p.rotation = Quat::from_rotation_x(-pitch);
     }
 
@@ -166,18 +166,18 @@ pub(crate) fn aim_rig_system(
     }
     let target_len = blocked.max(ARM_MIN_LEN).min(want_len);
 
-    if let Ok((mut arm, mut state)) = arm_query.get_single_mut() {
+    if let Ok((mut arm, mut state)) = arm_query.single_mut() {
         let rate = if target_len < state.len { ARM_RETRACT_RATE } else { ARM_EXTEND_RATE };
-        state.len = lerp(state.len, target_len, 1.0 - (-rate * time.delta_seconds()).exp());
+        state.len = lerp(state.len, target_len, 1.0 - (-rate * time.delta_secs()).exp());
         arm.translation = Vec3::new(shoulder_x, eye_y, state.len);
     }
 
     // 程序化 Aim Offset：头部随视线俯仰（约 45%，上限 25°），枪从腰际举到肩上
     let head_pitch = (-pitch * HEAD_AIM_RATIO).clamp(-HEAD_AIM_MAX, HEAD_AIM_MAX) * aim_lerp;
-    if let Ok(mut head) = head_query.get_single_mut() {
+    if let Ok(mut head) = head_query.single_mut() {
         head.rotation = Quat::from_rotation_x(head_pitch);
     }
-    if let Ok((gun, mut gun_t)) = gun_query.get_single_mut() {
+    if let Ok((gun, mut gun_t)) = gun_query.single_mut() {
         gun_t.translation = gun.base.lerp(gun.raised, t);
         gun_t.rotation = Quat::from_rotation_x(-pitch * 0.6 * aim_lerp);
     }
@@ -188,7 +188,7 @@ pub(crate) fn aim_lerp_system(
     mut cam_query: Query<&mut PlayerCamera>,
     time: Res<Time>,
 ) {
-    let step = time.delta_seconds() / ARM_TRANSITION_SECS;
+    let step = time.delta_secs() / ARM_TRANSITION_SECS;
     for mut cam in &mut cam_query {
         cam.aim_lerp = if cam.aiming { (cam.aim_lerp + step).min(1.0) } else { (cam.aim_lerp - step).max(0.0) };
     }
@@ -203,7 +203,7 @@ pub(crate) fn aim_system(
     held: Res<HeldGrenade>,
     mut cam_query: Query<&mut PlayerCamera>,
 ) {
-    let Ok(mut cam) = cam_query.get_single_mut() else { return };
+    let Ok(mut cam) = cam_query.single_mut() else { return };
     cam.aiming = held.item.is_some()
         || (input_state.cursor_locked && mouse.pressed(MouseButton::Right));
 }

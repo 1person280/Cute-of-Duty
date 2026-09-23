@@ -6,19 +6,19 @@ use crate::demo::components::*;
 
 /// 弹药不足时主弹药显示红色闪烁提示
 pub(crate) fn low_ammo_blink(
-    mut ammo_main: Query<&mut Text, With<HudAmmoMain>>,
+    mut ammo_main: Query<(&mut Text, &mut TextColor), With<HudAmmoMain>>,
     player_query: Query<(&WeaponSlot, &Inventory), With<Player>>,
     time: Res<Time>,
 ) {
-    let Ok((weapon_slot, inventory)) = player_query.get_single() else { return };
+    let Ok((weapon_slot, inventory)) = player_query.single() else { return };
     let weapon = &inventory.weapons[weapon_slot.current];
-    let Ok(mut text) = ammo_main.get_single_mut() else { return };
+    let Ok((mut _text, mut color)) = ammo_main.single_mut() else { return };
 
     if weapon.ammo <= 5 && weapon.ammo > 0 {
-        let flash = (time.elapsed_seconds() * 6.0).sin() > 0.0;
-        text.sections[0].style.color = if flash { Color::srgb(1.0, 0.2, 0.2) } else { Color::srgb(0.95, 0.95, 0.95) };
+        let flash = (time.elapsed_secs() * 6.0).sin() > 0.0;
+        color.0 = if flash { Color::srgb(1.0, 0.2, 0.2) } else { Color::srgb(0.95, 0.95, 0.95) };
     } else {
-        text.sections[0].style.color = Color::srgb(0.95, 0.95, 0.95);
+        color.0 = Color::srgb(0.95, 0.95, 0.95);
     }
 }
 
@@ -27,8 +27,8 @@ pub(crate) fn screen_edge_glow(
     mut edge_glow: Query<&mut BackgroundColor, With<HudEdgeGlow>>,
     player_query: Query<&Health, With<Player>>,
 ) {
-    let Ok(health) = player_query.get_single() else { return };
-    let Ok(mut bg) = edge_glow.get_single_mut() else { return };
+    let Ok(health) = player_query.single() else { return };
+    let Ok(mut bg) = edge_glow.single_mut() else { return };
 
     let hp_ratio = health.current / health.max;
     if hp_ratio < 0.3 {

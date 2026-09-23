@@ -1,4 +1,4 @@
-﻿//! 加载屏：占位启动过渡、进度条动画与"任意键跳过"逻辑。
+//! 加载屏：占位启动过渡、进度条动画与"任意键跳过"逻辑。
 
 use bevy::prelude::*;
 use super::*;
@@ -34,8 +34,8 @@ pub(crate) fn setup_loading_screen(mut commands: Commands) {
     let mut fill_id = Entity::PLACEHOLDER;
 
     let root = commands
-        .spawn(NodeBundle {
-            style: Style {
+        .spawn((
+            Node {
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 flex_direction: FlexDirection::Column,
@@ -44,54 +44,53 @@ pub(crate) fn setup_loading_screen(mut commands: Commands) {
                 row_gap: Val::Px(14.0),
                 ..default()
             },
-            background_color: BackgroundColor(Color::srgb(0.04, 0.06, 0.09)),
-            ..default()
-        })
+            BackgroundColor(Color::srgb(0.04, 0.06, 0.09)),
+        ))
         .with_children(|root| {
-            root.spawn(TextBundle::from_section(
-                "CUTE OF DUTY",
-                TextStyle { font_size: 84.0, color: Color::srgb(0.92, 0.95, 1.0), ..default() },
+            root.spawn((
+                Text::new("CUTE OF DUTY"),
+                TextFont { font_size: FontSize::Px(84.0), ..default() },
+                TextColor(Color::srgb(0.92, 0.95, 1.0)),
             ));
-            root.spawn(TextBundle::from_section(
-                "SIMPLE · 像素战术撤离 · PRE-ALPHA",
-                TextStyle { font_size: 20.0, color: Color::srgb(0.55, 0.62, 0.72), ..default() },
+            root.spawn((
+                Text::new("SIMPLE · 像素战术撤离 · PRE-ALPHA"),
+                TextFont { font_size: FontSize::Px(20.0), ..default() },
+                TextColor(Color::srgb(0.55, 0.62, 0.72)),
             ));
-            root.spawn(NodeBundle {
-                style: Style { height: Val::Px(56.0), ..default() },
-                ..default()
-            });
-            step_id = root.spawn(TextBundle::from_section(
-                LOADING_STEPS[0],
-                TextStyle { font_size: 18.0, color: Color::srgb(0.70, 0.78, 0.88), ..default() },
+            root.spawn(Node { height: Val::Px(56.0), ..default() });
+            step_id = root.spawn((
+                Text::new(LOADING_STEPS[0]),
+                TextFont { font_size: FontSize::Px(18.0), ..default() },
+                TextColor(Color::srgb(0.70, 0.78, 0.88)),
             )).id();
         })
         .id();
 
     commands.entity(root).with_children(|root| {
         // 进度条：容器 + 百分比宽度的填充条
-        root.spawn(NodeBundle {
-            style: Style {
+        root.spawn((
+            Node {
                 width: Val::Px(520.0),
                 height: Val::Px(16.0),
                 padding: UiRect::all(Val::Px(2.0)),
                 ..default()
             },
-            background_color: BackgroundColor(Color::srgb(0.10, 0.13, 0.18)),
-            ..default()
-        }).with_children(|bar| {
-            fill_id = bar.spawn(NodeBundle {
-                style: Style { width: Val::Percent(0.0), height: Val::Percent(100.0), ..default() },
-                background_color: BackgroundColor(menu_accent()),
-                ..default()
-            }).id();
+            BackgroundColor(Color::srgb(0.10, 0.13, 0.18)),
+        )).with_children(|bar| {
+            fill_id = bar.spawn((
+                Node { width: Val::Percent(0.0), height: Val::Percent(100.0), ..default() },
+                BackgroundColor(menu_accent()),
+            )).id();
         });
-        pct_id = root.spawn(TextBundle::from_section(
-            "0%",
-            TextStyle { font_size: 15.0, color: menu_accent(), ..default() },
+        pct_id = root.spawn((
+            Text::new("0%"),
+            TextFont { font_size: FontSize::Px(15.0), ..default() },
+            TextColor(menu_accent()),
         )).id();
-        root.spawn(TextBundle::from_section(
-            "首次启动需要编译渲染管线，请稍候 · 按任意键跳过",
-            TextStyle { font_size: 13.0, color: Color::srgb(0.40, 0.46, 0.55), ..default() },
+        root.spawn((
+            Text::new("首次启动需要编译渲染管线，请稍候 · 按任意键跳过"),
+            TextFont { font_size: FontSize::Px(13.0), ..default() },
+            TextColor(Color::srgb(0.40, 0.46, 0.55)),
         ));
     });
 
@@ -106,7 +105,7 @@ pub(crate) fn loading_tick(
     mut timer: ResMut<LoadingTimer>,
     screen: Res<LoadingScreen>,
     mut texts: Query<&mut Text>,
-    mut styles: Query<&mut Style>,
+    mut nodes: Query<&mut Node>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     timer.0.tick(time.delta());
@@ -120,23 +119,23 @@ pub(crate) fn loading_tick(
     let step_index = ((t * LOADING_STEPS.len() as f32) as usize).min(LOADING_STEPS.len() - 1);
 
     if let Ok(mut text) = texts.get_mut(screen.step) {
-        text.sections[0].value = LOADING_STEPS[step_index].to_string();
+        text.0 = LOADING_STEPS[step_index].to_string();
     }
-    if let Ok(mut style) = styles.get_mut(screen.fill) {
-        style.width = Val::Percent(t * 100.0);
+    if let Ok(mut node) = nodes.get_mut(screen.fill) {
+        node.width = Val::Percent(t * 100.0);
     }
     if let Ok(mut text) = texts.get_mut(screen.percent) {
-        text.sections[0].value = format!("{:.0}%", t * 100.0);
+        text.0 = format!("{:.0}%", t * 100.0);
     }
 
-    if timer.0.finished() {
+    if timer.0.is_finished() {
         next_state.set(AppState::MainMenu);
     }
 }
 
 pub(crate) fn despawn_loading_screen(mut commands: Commands, screen: Res<LoadingScreen>) {
-    // bevy 0.14 的 despawn() 不递归销毁子节点，UI 树必须用 despawn_recursive
-    commands.entity(screen.root).despawn_recursive();
+    // bevy 0.19 的 despawn() 已递归销毁子节点
+    commands.entity(screen.root).despawn();
     commands.remove_resource::<LoadingScreen>();
     commands.remove_resource::<LoadingTimer>();
 }
