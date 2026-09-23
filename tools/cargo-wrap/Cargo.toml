@@ -1,0 +1,29 @@
+# 为什么独立成筒身：tools/cargo-wrap 与主包解耦，使用自己的 target 目录与 Cargo.lock，
+# 既不占用主包编译缓存，也不会与 Bevy 长构建争用目标目录/文件锁。
+# 它是"开发者工具"，不参与主 crate（cute_of_duty）的发布或测试流水线。
+
+[package]
+name = "cargo-wrap"
+version = "0.1.0"
+edition = "2021"
+description = "Cargo 代理封装器：限 rustc 并发、结构化日志、进度条展示"
+publish = false
+
+[dependencies]
+indicatif = "0.17"
+colored = "2"
+regex = "1"
+
+[target.'cfg(windows)'.dependencies]
+# 仅用 Job Object 三个 API，feature 最小化；避免引入笨重的 windows crate。
+# CreateJobObjectW 的签名引用了 SECURITY_ATTRIBUTES，故需 Win32_Security feature。
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_Threading",
+    "Win32_System_JobObjects",
+    "Win32_Security",
+] }
+
+[profile.release]
+opt-level = 3
+strip = true

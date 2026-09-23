@@ -10,6 +10,9 @@ description = "Cute Of Duty 1: Simple - 战术撤离射击游戏（核心库 + 3
 # 自 0.2.3 起 demo3d 独立 crate 已并回本包：3D Demo 代码位于
 # src/demo（玩法/渲染）与 src/model（干员模型/动作），
 # 由 feature "demo" 门控，默认 cargo build/test 不编译 bevy。
+# tools/cargo-wrap 是独立开发者工具，有自己的 target 与 lockfile，
+# 从主 workspace 排除，避免与 bevy 长构建争用目标目录/文件锁。
+exclude = ["tools/cargo-wrap"]
 
 [dependencies]
 # 序列化与配置解析

@@ -210,13 +210,14 @@ pub(crate) fn spawn_pause_ui(commands: &mut Commands, settings: &GameSettings) {
 pub(crate) fn spawn_credits_panel(parent: &mut ChildSpawnerCommands) {
     /// (库名 · 版本, 一句话说明"是什么、用在哪")
     const CREDITS: &[(&str, &str)] = &[
-        ("Bevy 0.14", "3D 游戏引擎（MIT / Apache-2.0）—— 渲染、输入、UI、ECS 场景调度"),
-        ("Tokio 1.35", "异步运行时（MIT）—— 驱动固定 Tick 主循环的实时节流与定时"),
+        ("Bevy 0.19.1", "3D 游戏引擎（MIT / Apache-2.0）—— 渲染、输入、UI、ECS 场景调度；文本由 Parley 驱动"),
+        ("Parley", "文本布局引擎（MIT / Apache-2.0，随 Bevy 引入）—— CJK 中文文本的排版与渲染"),
+        ("Tokio 1.53", "异步运行时（MIT）—— 驱动固定 Tick 主循环的实时节流与定时"),
         ("Serde / serde_yaml", "序列化框架（MIT / Apache-2.0）—— 解析 config/element_reactions.yaml 元素反应配置"),
         ("Tracing", "结构化日志（MIT）—— 主循环、战局与档案系统的运行日志输出"),
         ("Rand / rand_pcg", "随机数（MIT / Apache-2.0）—— 装备元素掉落与 AI 行为的确定性随机"),
         ("Crossbeam-queue", "无锁队列（MIT / Apache-2.0）—— HAL 层环形缓冲的低延迟通信"),
-        ("BLAKE3 1.5", "密码学哈希（CC0 / Apache-2.0）—— 交易记录审计与确定性验证的状态哈希"),
+        ("BLAKE3 1.x", "密码学哈希（CC0 / Apache-2.0）—— 交易记录审计与确定性验证的状态哈希"),
         ("Criterion 0.5", "基准测试框架（MIT / Apache-2.0，仅 dev 依赖）—— 性能回归基准"),
     ];
 

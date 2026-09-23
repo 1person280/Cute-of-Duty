@@ -1,6 +1,7 @@
 //! 加载屏：占位启动过渡、进度条动画与"任意键跳过"逻辑。
 
 use bevy::prelude::*;
+use std::time::Duration;
 use super::*;
 use crate::demo::frontend::*;
 
@@ -108,7 +109,9 @@ pub(crate) fn loading_tick(
     mut nodes: Query<&mut Node>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
-    timer.0.tick(time.delta());
+    // 每秒最多推进 0.1s：Bevy 首帧/卡顿的 `time.delta()` 可能高达数秒，
+    // 若让这一大段 delta 一次性推进，加载时长会在首帧被"蒸发"，肉眼只见直接进主界面。
+    timer.0.tick(time.delta().min(Duration::from_secs_f32(0.1)));
     // 任意键/点击跳过加载动画
     if keys.get_just_pressed().next().is_some() || mouse.get_just_pressed().next().is_some() {
         let total = timer.0.duration();

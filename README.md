@@ -303,6 +303,7 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
   - 定位其余增长点时，可用内置诊断采样（`cargo run --features demo` 游玩后看日志，`debug_tracer.rs`
     每 5s 打印各类特效实体存活数与 `Mesh`/`Material` 资产表容量）。
 - 自动化试玩提示：若用外部自动化驱动本 Demo，winit 可能拦截合成鼠标事件，可用系统级 `mouse_event` 绕过。
+- **任务管理器折叠编译进程（已搁置）**：曾尝试用命名 Job Object 把 cargo/rustc 在任务管理器折叠成一个可展开的「Rust 编译器」分组。实测确认 **任务管理器不按 Job Object 分组**（控制台编译进程在「进程」页永远平铺，命名作业仅是内核管理对象，不产生界面分组）。该方案不可行、问题过多，故**搁置**。折中做法已落地：`tools/cargo-wrap` 默认 `-j1` 串行编译，强制限制 rustc 并发，避免后台进程区被一排 rustc 淹屏（命令行 `-j/--jobs` 或环境变量 `CARGO_WRAP_JOBS` 可覆盖）。
 
 ---
 

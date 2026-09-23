@@ -15,6 +15,7 @@ Thumbs.db
 # 本地实验产物
 *.log
 /target/
+/tools/cargo-wrap/target/
 *.zip
 check_out.txt
 smoke_out.log
