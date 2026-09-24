@@ -8,7 +8,7 @@
 配置文件表驱动的全部玩法规则 · 单一事实来源
 
 [![License](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.5.1--%E7%B4%A7%E6%80%A5%E5%9B%9E%E9%80%80-red.svg)](#五版本历史)
+[![Version](https://img.shields.io/badge/Version-0.6.0--%E9%9B%99%20crate%20workspace-blue.svg)](#六版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
 [![Headless](https://img.shields.io/badge/%E6%97%A0%E5%A4%B4%E6%A8%A1%E6%8B%9F-passing-2ea44f.svg)](#一快速开始)
 [![Demo](https://img.shields.io/badge/3D%20Demo-Bevy%200.14-2ea44f.svg)](#一快速开始)
@@ -199,7 +199,7 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 
 ## 四、网络架构规划（未来部署上线）
 
-> **本节为未来线上部署的技术选型与架构蓝图**（尚未落地实现，属于 roadmap 级规划）。
+> **本节为未来线上部署的技术选型与架构蓝图**（部分已在 ServerCode 落地，见 [五、服务端进度](#五服务端进度servercode)）。
 > Cute Of Duty 的玩法底座决定它的网络层形态：**长 TTK + 元素反应 + 撤离式搜打撤**，
 > 天然适合 TCP 服务器权威的可靠同步模型，而非毫秒级瞬时反应的 UDP 快节奏同步。
 
@@ -258,10 +258,49 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 
 ---
 
-## 五、版本历史
+## 五、服务端进度（ServerCode）
+
+> 自 **0.6.0** 起，项目由「单 crate + feature 门控 Bevy Demo」重构为 **Cargo Workspace 物理分离**：
+> `ServerCode`（服务端权威模拟 + TCP 网络层）与 `HostCode`（客户端表现层）。
+> 横切红线：**服务端算、客户端显示**——任何"应该算什么"（血量、背包、CD、战局、归属判定、
+> 模型身份）必须服务端权威；客户端只求快照 + 画。
+
+### 5.1 服务端模块与职责
+
+| 模块 | 职责 | 关键文件 |
+|---|---|---|
+| `engine` | 权威游戏循环（60Hz 固定 Tick）+ 确定性双缓冲快照 | `double_buffer.rs` / `pre_explosion_cache.rs` |
+| `entity` | 自研 ECS：实体 = 组件容器 | `mod.rs`（`EntityType` 等） |
+| `combat` | 战斗判定：射击 / 手雷 / 技能 / 区域 / 战斗者 | `shooter.rs`（相机射线）+ `range.rs`（靶）+ `grenade.rs`/`skill.rs`/`zone.rs`/`combatant.rs` |
+| `damage` | 伤害结算流水线 | `packet.rs` / `resolver.rs` / `effect.rs` |
+| `element` | 元素反应系统 | `mod.rs` |
+| `map` | 纯数据地图定义（训练场 + 草坪四区） | `training/` + `lawn/`（spawn / engage / search / extract / perimeter） |
+| `model` | **模型文件放服务端**（易变化资源） | `mod.rs`（`ModelPreset` 经快照下发客户端） |
+| `net` | TCP 网络层：AOI / 会话 / 广播 / 协议 | `aoi.rs` / `session.rs` / `broadcaster.rs` / `protocol.rs` |
+| `config` / `operator` / `player` / `equipment` / `gamemode` / `hal` | 配置 / 干员 / 档案 / 装备 / 模式 / 时钟 | 各自 `mod.rs` |
+
+### 5.2 当前进度
+
+- 服务器权威模拟 + TCP 网络层已落地（`net/`：AOI 兴趣区域剔除、会话管理、状态广播、协议编解码）。
+- **射击场射线检测系统完成**：目标实体可被射击、命中计分、自动往返移动；
+  `combat/range.rs` 新增 `RangeTarget`，`entity` 新增 `EntityType::Target`，
+  `model` 新增 `ModelPreset::AimTarget`，`combat/shooter.rs` 展开射线判定到目标。
+- `cargo test --offline` **全绿**（81 个用例通过，含本次新增 6 个）。
+- 与 HostCode **彻底解耦**：ServerCode **不依赖 bevy**，分离不受渲染层升级影响。
+- 构建产物 `cod_server.exe`（服务端）+ `cod1.exe`（客户端），由 workspace 一次并行编译产出。
+
+### 5.3 运行
+
+- 服务端：`cargo run --bin cod_server`（默认 `cargo build` 已并行产出）
+- 客户端（表现层）：`HostCode` 消费服务端权威快照
+
+---
+
+## 六、版本历史
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 0.6.0 | 2026-09-25 | **双 crate workspace + 服务端落地**：重构为 `ServerCode`（服务端权威模拟 + TCP 网络层，含 AOI/会话/广播/协议）与 `HostCode`（客户端表现层），Model 文件归服务端并经快照下发；射击场射线检测系统完成（目标可射击/命中计分/自动往返）；`cargo test` 81 用例全绿；bevy 因底层稳定性问题由 0.19 回退至 0.14（详见「已知坑」底层冻结红线） |
 | 0.3.2 | 2026-09-22 | **搜打撤**：物资箱重塑为体素栅格木箱（四角立柱 + 四面通板 + 平顶盖）并接入统一交互菜单（站点优先于拾取，F 必开箱不误拾，弃用自建触发）；对局仓库/背包拖拽选装落地并打通 Tab 背包；核心差异化补「与热门友商 FPS 对比」定位表；Demo 操作方式改为「按键组 × 触发环境」矩阵排版（A/B 环境列为玩法环境预留，当前标 `—`） |
 | 0.3.1 | 2026-09-21 | **渲染内存泄漏定向修复 + README 翻新**：修复 `damage_popup_system` 相机缺失时弹字永久存活的确定性泄漏；新增 `effect_guard.rs`（五类高频特效硬性存活上限兜底）；收敛特效密度/寿命（命中粒子 5→3、爆炸碎块 10→4 等）；新增 `debug_tracer.rs`（每 5s 实体/资产采样，供定位残余增长） |
 | 0.3.0 | 2026-09-20 | **反屎山扁平化重构**：`config/` 并入 `src/config/`（YAML `include_str!` 嵌入 + 运行时覆盖，单一事实来源）；全部 >500 行上帝文件拆成语义化子模块（`damage`→packet/resolver/effect，`map/training`→分区分文件，`demo` 的 `inventory`/`menu`/`hud`/`combat`→面板目录，`model`→operator_models 等）；`common.rs`→`frontend.rs`；新增 [CONTRIBUTING.md（反屎山公约）](CONTRIBUTING.md) 与目录结构表格 |
@@ -273,7 +312,7 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 
 ---
 
-## 六、文档
+## 七、文档
 
 * **项目规范**
   * [贡献指南（反屎山公约：600 行上限 / 无循环依赖 / 语义化命名）](CONTRIBUTING.md)
@@ -284,14 +323,16 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 
 ---
 
-## 七、开发环境说明与已知坑
+## 八、开发环境说明与已知坑
 
-1. 首次 `cargo run --features demo` 需要 20+ 分钟（Bevy/wgpu 全量编译），请耐心等待；
-   不带 feature 的命令不编译 bevy，秒级完成。建议保持 `Cargo.lock` 以获得与开发一致的依赖版本。
-2. dev profile 已按 Bevy 官方建议把依赖设为 O3（否则试玩帧率明显下降），游戏代码本身保持 O1
-   以加快增量编译——不要改 `[profile.dev.package."*"]`。
-3. **CI**：`.github/workflows/rust.yml` 在 push / PR 到 `main` 时自动跑 `cargo build` + `cargo test`
-   （不带 demo feature，验证核心库；提交前本地跑一遍同样命令可提前发现问题）。
+1. 项目为 **Cargo Workspace**：`HostCode`（客户端表现层）+ `ServerCode`（服务端权威模拟 + 网络层）。
+   `cargo build` 会并行编译出 `cod1.exe` 与 `cod_server.exe`；ServerCode **不依赖 bevy**，核心模拟秒级增量迭代。
+2. 编译一律走 **`tools/cargo-wrap.exe`**：把 cargo/rustc 归入「Rust 编译器」作业以便任务管理器折叠，
+   并把并行度钳制为 **`-j4`**（防 CPU / 进程数爆炸）。并行度用环境变量 `CARGO_WRAP_JOBS` 覆盖。
+3. **编译缓存禁用以省磁盘**：`target/` 与 `tools/cargo-wrap/target/` 不入库；多轮构建会累积较大
+   二进制（release 且 LTO 时每份可达数百 MB～GB），需定期 `cargo clean` 释放空间。
+4. **CI**：`.github/workflows/rust.yml` 在 push / PR 到 `main` 时自动跑 `cargo build` + `cargo test`
+   （提交前本地跑一遍同样命令可提前发现问题）。
 
 ### 已知问题（试玩实测）
 
@@ -308,30 +349,43 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
     每 5s 打印各类特效实体存活数与 `Mesh`/`Material` 资产表容量）。
 - 自动化试玩提示：若用外部自动化驱动本 Demo，winit 可能拦截合成鼠标事件，可用系统级 `mouse_event` 绕过。
 
+### 已知坑（开发 / 部署实测）
+
+- **底层冻结红线（2026-09-25 起生效）**：在 bevy 及其大版本依赖（wgpu / naga / winit / glam 等）出稳定
+  版本之前，**不要更新底层**。曾把 bevy 升到 0.19 又因大量 API 变动与稳定性问题回退到 0.14
+  （本机离线缓存 0.14.2，`cargo check --offline` 通过；渲染代码用 0.14 的
+  `MaterialMeshBundle` / `PbrBundle` / `DirectionalLightBundle` / `Camera3dBundle`、
+  `Time::elapsed_seconds()`）。ServerCode 不依赖 bevy，回退不影响服务端分离。
+- **Windows debug 构建 Bevy 0.19 可能产出 >2GB 可执行文件，报 `os error 193`（无效 Win32 程序）**：
+  用 release 构建或优化 dev profile 规避。
+- **release 构建偶发 `os error 3`（路径找不到）**：编译 bevy crate 写 `.fingerprint` 时失败，非代码错误，
+  疑似 target 残留 + LTO / `codegen-units=1` 重负载；重试会触发整树重建（约 40 分钟），必要时先 `cargo clean`。
+- **ServerCode 遗留 dead_code 告警**：`combat/shooter.rs` 的 `Vec3Helper::dot` 暂未被调用，属无碍告警，
+  后续接入近战/命中反馈时可复用。
+- **历史遗留（0.5 单 crate 架构，已随重构隔离到 `legacy/0.1-0.5` 分支）**：返回主菜单时曾崩溃/连带销毁窗口、
+  进场即现 `B0004` 层级损坏洪水，根因系聚合根 / 层级挂接与 teardown 方案冲突，已在新架构中改用
+  服务端权威 + 客户端快照模式规避。
+
 ---
 
-## 八、目录结构
+## 九、目录结构
 
 ```
 CuteOfDutyAlpha/
-├── Cargo.toml / Cargo.lock     # 包清单（核心库 + cod1 bin；bevy 为 feature 门控的可选依赖）
-├── CuteOfDuty_Demo.exe         # 预编译 3D Demo，双击即玩
-├── CONTRIBUTING.md             # ⚠️ 反屎山公约（贡献前必读）
-├── README.md                   # 本档案（交接文档）
-├── .github/workflows/rust.yml  # CI：push/PR 到 main 跑 cargo build + cargo test
-├── .agents/skills/             # AI 协作工作流文档（美术创作 / 地图验收）
-├── assets/                     # 美术资源：characters / environment / fonts / ui / weapons
-├── tools/                      # 开发辅助脚本（PowerShell：图标生成、窗口截图、UI 测试等）
-├── src/
-│   ├── lib.rs                  # 核心库入口（11 个核心模块，见表1）
-│   ├── main.rs                 # cod1 入口：默认无头模拟；--features demo 时为 3D Demo
-│   ├── config/                 # 配置加载器 + element_reactions.yaml（单一事实来源）
-│   ├── damage/ element/ engine/ entity/ equipment/ gamemode/ hal/ operator/ player/
-│   ├── map/                    # 纯数据地图定义（map/training/ 为训练场分区分文件）
-│   ├── demo/                   # 3D Demo（feature "demo"）：组装层 + 面板化子目录
-│   └── model/                  # 干员模型与动作（feature "demo"）
-└── target/                     # 构建产物（git 忽略）
+├── Cargo.toml / Cargo.lock       # Cargo Workspace 根（虚拟 manifest，声明 HostCode + ServerCode 成员）
+├── CONTRIBUTING.md               # ⚠️ 反屎山公约（贡献前必读）
+├── README.md                     # 本档案（交接文档）
+├── .github/workflows/rust.yml    # CI：push/PR 到 main 跑 cargo build + cargo test
+├── .agents/skills/               # AI 协作工作流文档（美术创作 / 地图验收）
+├── tools/                        # cargo-wrap（编译封装，产物不入库）+ PowerShell 辅助脚本
+├── HostCode/                     # 客户端表现层（launcher 模块：动态装载 bevy_dylib + 渲染/快照消费）
+└── ServerCode/                   # 服务端权威模拟 + TCP 网络层（详见「五、服务端进度」）
+    ├── lib.rs / main.rs          # 核心库 + cod_server 入口
+    ├── config/                   # 配置加载器 + element_reactions.yaml（单一事实来源）
+    ├── engine/ entity/ combat/ damage/ element/ map/ model/ net/
+    ├── operator/ player/ equipment/ gamemode/ hal/
+    └── (构建产物 target/ 已 git 忽略)
 ```
 
-> 一位开发者接手前，只需要读三份：**本 README（概览）** → **架构表 1/2** → **CONTRIBUTING.md（公约）**。
+> 一位开发者接手前，只需要读三份：**本 README（概览）** → **服务端进度与架构表** → **CONTRIBUTING.md（公约）**。
 > 核心业务模块保持 ≤ 2 层深度、每个 `.rs` ≤ 600 行、禁止 `utils.rs` 之类的语义化空壳——这些是硬约束，不是建议。
