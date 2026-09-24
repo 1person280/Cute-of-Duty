@@ -1,0 +1,31 @@
+[package]
+name = "cute_of_duty_server"
+version = "0.6.0"
+edition = "2021"
+license = "GPL-3.0-with-linking-exception"
+authors = ["B站@3493264141322312", "Kimi AI Collaborator"]
+description = "服务器权威模拟 + TCP 网络层（Cute Of Duty 服务端；服务端算、客户端显示）"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9"
+serde_json = "1.0"
+crossbeam-queue = "0.3"
+rand = { version = "0.8", features = ["std_rng"] }
+rand_pcg = "0.3"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+tokio = { version = "1.35", features = ["rt-multi-thread", "time", "macros", "net", "io-util", "sync"] }
+blake3 = "1.5"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[lib]
+name = "cute_of_duty_server"
+# 源码直接置于包根（目录不嵌套 src/，Code 已含「代码」之义），此处显式声明路径
+path = "lib.rs"
+
+[[bin]]
+name = "cod_server"
+path = "main.rs"

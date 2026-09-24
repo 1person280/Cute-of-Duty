@@ -1,0 +1,29 @@
+[package]
+name = "cute_of_duty_host"
+version = "0.6.0"
+edition = "2021"
+license = "GPL-3.0-with-linking-exception"
+authors = ["B站@3493264141322312", "Kimi AI Collaborator"]
+description = "Cute Of Duty 客户端（渲染表现层：消费服务端权威快照，用本地稳定资源绘制）"
+
+[dependencies]
+# 仅引入服务端 `net::protocol` 的线格式类型用于反序列化服务端结果，
+# 不调用任何服务端模拟逻辑——即「服务端算、客户端显示」。
+cute_of_duty_server = { path = "../ServerCode" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.35", features = ["rt-multi-thread", "time", "macros", "net", "io-util", "rt"] }
+# 渲染表现层：本地稳定冷资源（体素几何/配色）绘制服务端快照驱动的画面。
+# 0.14 版本（回退决策）：弃用 0.19 的 Mesh3d/MeshMaterial3d 组件系，回归 0.14 的
+# MaterialMeshBundle/PbrBundle 官方入口，离线可编译（本地缓存 0.14.2）。
+#
+# 注意：不启用 dynamic_linking（bevy_dylib.dll 动态装载）。实测本机 MinGW(GNU)
+# 工具链下 bevy_dylib 链接报 `export ordinal too large: 242786` —— Windows PE 导出
+# 序数 16 位上限 65535，而 bevy 导出的全部符号约 24 万超出该硬限制。此路需 MSVC
+# 工具链才能走通，故按预案回退为静态链接；launcher 模块收敛目标不受影响。
+bevy = { version = "0.14" }
+
+[[bin]]
+name = "cod1"
+# 源码直接置于包根（不嵌套 src/，Code 已含「代码」之义），显式声明入口
+path = "main.rs"

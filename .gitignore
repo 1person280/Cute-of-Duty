@@ -1,6 +1,9 @@
 # Rust 构建产物
 /target/
 
+# cargo-wrap 工具构建产物（禁用编译缓存以省磁盘）
+/tools/cargo-wrap/target/
+
 # 本机 IDE / 编辑器
 .idea/
 .vscode/
