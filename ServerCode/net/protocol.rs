@@ -7,6 +7,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::element::EntityElementState;
+use crate::equipment::{EquipmentElement, EquipmentTier, EquipmentType};
 use crate::model::ModelPreset;
 
 /// 权威快照中的单个实体条目。
@@ -83,8 +84,43 @@ pub enum ClientMessage {
     Connect { profile: String },
     /// 单帧输入意图
     Input { player: PlayerInput },
+    /// 背包 CRUD 意图（服务端权威结算后经 Event 回执播报）
+    Inventory { action: InventoryAction },
+    /// 仓库选装确认：上报本局携带清单（服务端存档于会话热副本）
+    Loadout { carried: Vec<String> },
+    /// 由仓库确认进入训练场
+    StartTraining,
+    /// 请求撤离（服务端按玩家到撤离点距离做权威判定）
+    ExtractRequest,
+    /// 切换当前干员（服务端按名册索引裁决元素亲和/技能；快照 `operator_id` 跟随更新）
+    SwitchOperator { operator_id: u32 },
+    /// 延迟探测：seq 原样回显于 `ServerMessage::Pong`
+    Ping { seq: u64 },
     /// 主动断开
     Disconnect,
+}
+
+/// 背包 CRUD 动作（客户端只上报意图，元素/数值/上限全部由服务端裁决）。
+///
+/// 设计动机（Why）：锻造装备的元素（随机/可指定）、背包上限、货币增减校验
+/// 都属于"应该算什么"的服务端权威责任；客户端绝不携带结算结果，只给参数。
+/// 线格式仍为 JSON（`serde_json`），与快照/事件共用一条 TCP 通道。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub enum InventoryAction {
+    /// 锻造一件装备。元素由服务端按等级规则生成：1 级无元素、2-6 级真随机可指定、
+    /// 7-9 级真随机不可指定。
+    Craft {
+        name: String,
+        eq_type: EquipmentType,
+        tier: EquipmentTier,
+        base_value: u32,
+        /// 博弈区指定元素（成本翻倍）；非博弈区传 `None` 由服务端裁决
+        specified_element: Option<EquipmentElement>,
+    },
+    /// 丢弃背包第 `index` 件，回收对应装备实例与格位。
+    Discard { index: usize },
+    /// 货币增减（软/硬通货/赛季代币，负数表示扣除；余额不足时服务端拒绝）。
+    AdjustCurrency { soft: i64, hard: i64, season: i64 },
 }
 
 /// 单向事件（用于 HUD 播报：击杀/受击/拾取/区域通告）。
@@ -112,6 +148,10 @@ pub enum ServerMessage {
     Snapshot { seq: u64, entries: Vec<EntitySnapshot> },
     /// 瞬时事件（击杀/受击/拾取/通告），与快照独立、各自按序下发
     Event { kind: EventKind },
+    /// 延迟探测回显（客户端据此计算到服务器往返延迟）
+    Pong { seq: u64 },
+    /// 撤离成功：客户端据此从训练场回主界面
+    ReturnToMenu,
 }
 
 /// 便于在测试与 `broadcaster` 之外手工构造快照条目（字段较多，给默认值）。
@@ -151,5 +191,39 @@ impl ServerMessage {
             .expect("ServerMessage 序列化不应失败");
         line.push('\n');
         line
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 新玩法流程变体（选装/进场/撤离/延迟）的 JSON 往返，保证双端契约不脱节。
+    #[test]
+    fn gameplay_flow_variants_roundtrip() {
+        let cases: Vec<ClientMessage> = vec![
+            ClientMessage::Loadout {
+                carried: vec!["医疗包".into(), "弹药".into()],
+            },
+            ClientMessage::StartTraining,
+            ClientMessage::ExtractRequest,
+            ClientMessage::SwitchOperator { operator_id: 2 },
+            ClientMessage::Ping { seq: 7 },
+        ];
+        for msg in &cases {
+            let js = serde_json::to_string(msg).unwrap();
+            let back: ClientMessage = serde_json::from_str(&js).unwrap();
+            assert_eq!(&back, msg, "ClientMessage 往返应一致: {js}");
+        }
+
+        let server_cases: Vec<ServerMessage> = vec![
+            ServerMessage::Pong { seq: 7 },
+            ServerMessage::ReturnToMenu,
+        ];
+        for msg in &server_cases {
+            let line = msg.to_line();
+            let back: ServerMessage = serde_json::from_str(line.trim_end()).unwrap();
+            assert_eq!(&back, msg, "ServerMessage 往返应一致: {line:?}");
+        }
     }
 }

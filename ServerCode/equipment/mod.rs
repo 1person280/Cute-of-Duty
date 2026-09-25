@@ -372,6 +372,17 @@ impl EquipmentSystem {
         registry.get(&id).cloned()
     }
 
+    /// 移除装备（丢弃/上架成交/守卫失败回滚）。
+    ///
+    /// 语义（Why）：装备实例是全局注册表内的热数据；背包丢弃或 CRUD 守卫回滚时
+    /// 需从注册表移除该实例，同时反馈原值供调用方核对（不存在时给出明确错误）。
+    pub fn remove_equipment(&self, id: u64) -> Result<Equipment, EquipmentError> {
+        let mut registry = self.equipment_registry.write().unwrap();
+        registry
+            .remove(&id)
+            .ok_or(EquipmentError::EquipmentNotFound)
+    }
+
     /// 获取交易记录数量
     pub fn trade_count(&self) -> usize {
         self.trade_history.read().unwrap().len()

@@ -17,7 +17,7 @@ use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 
-use crate::net::protocol::{ClientMessage, PlayerInput, ServerMessage};
+use crate::net::protocol::{ClientMessage, InventoryAction, PlayerInput, ServerMessage};
 
 /// 客户端连接向服务端权威主循环投递的事件。
 #[derive(Debug)]
@@ -26,6 +26,18 @@ pub enum NetCommand {
     Connect { conn_id: u64, name: String },
     /// 单帧玩家输入意图
     Input { conn_id: u64, player: PlayerInput },
+    /// 背包 CRUD 意图（由权威主循环经 inventory 服务结算）
+    Inventory { conn_id: u64, action: InventoryAction },
+    /// 仓库选装确认（携带清单存会话热副本）
+    Loadout { conn_id: u64, carried: Vec<String> },
+    /// 进入训练场
+    StartTraining { conn_id: u64 },
+    /// 请求撤离（权威距离判定）
+    ExtractRequest { conn_id: u64 },
+    /// 切换干员（权威写回战斗组件索引）
+    SwitchOperator { conn_id: u64, operator_id: u32 },
+    /// 延迟探测（原样回显 Pong）
+    Ping { conn_id: u64, seq: u64 },
     /// 连接断开（主动 Disconnect 或对端关闭/异常）
     Disconnect { conn_id: u64 },
 }
@@ -157,6 +169,24 @@ async fn read_loop(mut reader: OwnedReadHalf, conn_id: u64, rt: Arc<NetRuntime>)
                     }
                     ClientMessage::Input { player } => {
                         let _ = rt.cmd_tx.send(NetCommand::Input { conn_id, player });
+                    }
+                    ClientMessage::Inventory { action } => {
+                        let _ = rt.cmd_tx.send(NetCommand::Inventory { conn_id, action });
+                    }
+                    ClientMessage::Loadout { carried } => {
+                        let _ = rt.cmd_tx.send(NetCommand::Loadout { conn_id, carried });
+                    }
+                    ClientMessage::StartTraining => {
+                        let _ = rt.cmd_tx.send(NetCommand::StartTraining { conn_id });
+                    }
+                    ClientMessage::ExtractRequest => {
+                        let _ = rt.cmd_tx.send(NetCommand::ExtractRequest { conn_id });
+                    }
+                    ClientMessage::SwitchOperator { operator_id } => {
+                        let _ = rt.cmd_tx.send(NetCommand::SwitchOperator { conn_id, operator_id });
+                    }
+                    ClientMessage::Ping { seq } => {
+                        let _ = rt.cmd_tx.send(NetCommand::Ping { conn_id, seq });
                     }
                     ClientMessage::Disconnect => {
                         let _ = rt.cmd_tx.send(NetCommand::Disconnect { conn_id });

@@ -198,6 +198,18 @@ pub fn spawn_player(world: &mut World, position: Vec3, operator_idx: usize) -> E
     world.spawn(entity)
 }
 
+/// 权威切换玩家干员：改写战斗组件里的名册索引（决定弹道数值/技能/元素亲和）。
+///
+/// 设计动机：切换干员属于“应该算什么”的服务端权威责任，客户端只上报所选索引；
+/// 此处按名册长度对越界索引进裁切，确保非法输入不 panic。快照 `operator_id` 随
+/// `Combatant.operator_idx` 自动更新，客户端据此渲染干员面板高亮。
+pub fn switch_operator(world: &mut World, eid: EntityId, operator_id: u32) {
+    let Some(entity) = world.get_entity_mut(eid) else { return };
+    let Some(cb) = entity.get_component_mut::<Combatant>() else { return };
+    let roster_len = crate::operator::roster().len().max(1) as u32;
+    cb.operator_idx = (operator_id % roster_len) as usize;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

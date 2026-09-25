@@ -21,3 +21,12 @@ Thumbs.db
 *.zip
 check_out.txt
 smoke_out.log
+
+# 服务端运行时数据（profiles 存档等，不入库）
+/ServerCode/data/
+
+# 旧版引用素材目录（1.6GB，仅供开发对照，不入库）
+/_ref/
+
+# 客户端临时检查输出
+/HostCode/check*.txt
