@@ -10,7 +10,10 @@ pub(crate) mod menu_behaviour;
 pub(crate) mod menu_main;
 pub(crate) mod mode_panel;
 
-pub(crate) use arsenal::{arsenal_interaction, ensure_overlay};
+pub(crate) use arsenal::{
+    arsenal_drag_system, arsenal_interaction, ensure_overlay, ArsenalDrag, ArsenalSelection,
+    ArsenalVisible,
+};
 pub(crate) use game_settings::{
     GameSettings, settings_apply_ambient, settings_apply_fov,
 };

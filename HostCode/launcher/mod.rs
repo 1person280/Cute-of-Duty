@@ -40,6 +40,9 @@ pub fn run(addr: &str) {
         .init_resource::<crate::menu::GameSettings>()
         .init_resource::<crate::menu::SelectedMode>()
         .init_resource::<crate::menu::SelectedCategory>()
+        .init_resource::<crate::menu::ArsenalVisible>()
+        .init_resource::<crate::menu::ArsenalSelection>()
+        .init_resource::<crate::menu::ArsenalDrag>()
         .init_state::<AppState>()
         // bevy 0.14 必须显式启用 state-scoped 清理：`init_state` 只注册状态机与 OnEnter/OnExit，
         // 不会自动把 `clear_state_scoped_entities` 挂到 StateTransition。缺这一步则所有
@@ -88,6 +91,7 @@ pub fn run(addr: &str) {
                 crate::menu::main_menu_style,
                 crate::menu::main_menu_loadout,
                 crate::menu::ensure_overlay,
+                crate::menu::arsenal_drag_system,
                 crate::menu::arsenal_interaction,
             )
                 .chain()

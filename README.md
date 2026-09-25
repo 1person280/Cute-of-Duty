@@ -8,7 +8,7 @@
 配置文件表驱动的全部玩法规则 · 单一事实来源
 
 [![License](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.6.0--%E9%9B%99%20crate%20workspace-blue.svg)](#六版本历史)
+[![Version](https://img.shields.io/badge/Version-0.6.0-SnapShot-2-blue.svg)](#六版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
 [![Headless](https://img.shields.io/badge/%E6%97%A0%E5%A4%B4%E6%A8%A1%E6%8B%9F-passing-2ea44f.svg)](#一快速开始)
 [![Demo](https://img.shields.io/badge/3D%20Demo-Bevy%200.14-2ea44f.svg)](#一快速开始)
@@ -78,6 +78,7 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 | 快捷道具 | 3 / 4 | 快捷使用恢复品 / 战术品（按住打开轮盘，点轮盘中心撤销） | — | — |
 | 关闭 / 取消 | Esc | 关闭背包 / 功能台 / 取消持雷 / 无 UI 时释放鼠标 | — | — |
 | 暂停 | / 或 ~ | 暂停菜单（返回游戏 / 设置 / 回主界面） | — | — |
+| 延迟面板 | CapsLock | 显示/隐藏到服务器的通信延迟列表（逐玩家毫秒） | — | — |
 
 > **越肩瞄准（SpringArm 相机架构，参考原神弓手瞄准模式）**
 > - 相机层级：脚底 Pivot（TopLevel，不随模型旋转）→ ShoulderPivot（Yaw）→ PitchPivot（Pitch）→ SpringArm（右肩偏移 + 后方距离）→ Camera；
@@ -102,15 +103,50 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 
 #### 与热门友商 FPS 的差异化定位
 
-| 维度 | Cute Of Duty | CS:GO / CS2 | Valorant | APEX Legends | 逃离塔科夫 |
-|---|---|---|---|---|---|
-| 装备经济 | **反护航**：等级越高风险越高（1 级新手舱 → 2–6 级指定元素 → 7–9 级真随机），转售/给予重置元素 | 回合局内经济（买枪起甲，击杀省） | 技能 + 局内经济（每回合攒钱买武器） | 落地拾取制（无购买） | 局外持久仓库 + 局内搜刮撤离 |
-| 元素玩法 | **互斥生态**：火/冰/电/毒非堆强，护甲与武器互斥、同源协同、环境修正全由配置表驱动 | 无元素系统，纯枪械胜率 | 固定特工技能（元素近似"角色定位"） | 英雄技能 + 传说护甲 | 弹种/护甲分级，无元素互斥 |
-| 对该玩法的调整成本 | **零 bevy + 配置表驱动**：改平衡只动 YAML/数据结构，`cargo test` 秒级验证 | 需改引擎局内逻辑 | 需改技能数值包 | 需改英雄数值包 | 需改数值 + 掉落表 |
-| 撤离目标 | 核心循环之一 | 无撤离，回合胜率 | 无撤离，回合胜率 | 无撤离，大逃杀 | 核心循环（战利品带出） |
+##### 技术对比（引擎 / 开源 / 可 Mod / 平衡调整成本 / 架构）
+
+> 核心命题：**源码是否开放、Mod 是否可做、改平衡要动代码还是动数据、核心逻辑与渲染是否分离**。
+
+| 游戏 / 技术栈 | 源码开源 | 可 Mod / 社区内容 | 平衡调整成本 | 核心与渲染架构 |
+|---|---|---|---|---|
+| **Cute Of Duty**（Rust + Bevy 0.14） | ✅ 全开源 GPL-3.0-with-linking-exception | ✅ **配置表驱动**：改玩法 = 改 YAML，社区即可做平衡 Mod | **核心零 bevy + 改表即生效**，`cargo test` 秒级验证 | **服务端权威 + 核心逻辑与服务端物理分离**：核心零 bevy、可无头确定性模拟，渲染为客户端表现层 |
+| **CS:GO / CS2**（Source 2） | ❌ 闭源 | ✅ 创意工坊（地图/皮肤） | 官方平衡，改引擎/服务器逻辑 | 引擎一体，无逻辑分离 |
+| **Valorant**（Unreal 魔改自研） | ❌ 闭源 | ❌ 官方严格管控 | 官方改技能数值包 | 引擎一体，无逻辑分离 |
+| **Overwatch 2**（自研引擎） | ❌ 闭源 | ❌ | 官方改英雄平衡 | 引擎一体，无逻辑分离 |
+| **Apex Legends**（Source 魔改） | ❌ 闭源 | ❌ | 官方改英雄数值包 | 引擎一体，无逻辑分离 |
+| **PUBG**（Unreal Engine） | ❌ 闭源 | ❌ | 官方数值调整 | 引擎一体，无逻辑分离 |
+| **Fortnite**（Unreal Engine 5） | ❌ 闭源 | ✅ UEFN / 创意模式 | 官方 + 创意模式创作者 | 引擎一体，无逻辑分离 |
+| **Call of Duty（Warzone）**（自研 IW 系） | ❌ 闭源 | ❌ | 官方平衡补丁 | 引擎一体，无逻辑分离 |
+| **Rainbow Six Siege**（自研引擎） | ❌ 闭源 | ❌ | 官方平衡干员 | 引擎一体，无逻辑分离 |
+| **Destiny 2**（Tiger 引擎） | ❌ 闭源 | ❌ | 官方季度平衡 | 引擎一体，无逻辑分离 |
+| **Battlefield**（Frostbite） | ❌ 闭源 | ❌ | 官方平衡补丁 | 引擎一体，无逻辑分离 |
+| **Halo Infinite**（Slipspace） | ❌ 闭源 | ✅ Forge 自定义模式 | 官方 + 社区 Forge | 引擎一体，无逻辑分离 |
+| **逃离塔科夫**（Unity） | ❌ 闭源 | ❌ | 官方改数值 + 掉落表，需重进服 | 引擎一体，无逻辑分离 |
+
+##### 商业化对比（经济 / 技能元素 / 撤离循环 / 付费模式）
+
+> 核心命题：**装备经济是护航还是反护航、技能元素是否可配置化、有无撤离式长线循环、付费是否影响游戏性**。
+> Cute Of Duty 的商业化定位是 **无影响月卡制**——自愿订阅支持开发，**对玩法/数值/胜负零影响**，不做数值售卖、不开箱抽卡、无 P2W。
+
+| 游戏 | 装备经济 | 技能 / 元素系统 | 撤离式循环 | 付费模式 |
+|---|---|---|---|---|
+| **Cute Of Duty** | **反护航**：1级新手舱→2–6级指定元素(成本翻倍)→7–9级真随机，转售/给予重置元素；局内 + 局外 | **元素互斥生态**：火/冰/电/毒非堆强，护甲/武器互斥、同源协同、环境修正，配置表驱动 | ✅ **核心循环**「搜→打→撤」 | **无影响月卡制**：自愿订阅支持开发，对玩法零影响，非数值售卖/开箱 |
+| **CS:GO / CS2** | 回合局内经济（买枪起甲，击杀省） | 无元素，纯枪械胜率 | ❌ | 买断 + 饰品开箱 |
+| **Valorant** | 回合局内经济（每回合攒钱买武器） | 固定特工技能（元素近似"角色定位"） | ❌ | F2P + 内购 |
+| **Overwatch 2** | 无购买，直接选角 | 英雄技能 + 职责体系 | ❌ | F2P + 通行证/皮肤 |
+| **Apex Legends** | 落地拾取制大逃杀 | 传说技能 + 传说护甲 | ❌ | F2P + 内购 |
+| **PUBG** | 落地拾取制大逃杀 | 无元素系统 | ❌ | 买断后转 F2P |
+| **Fortnite** | 大逃杀拾取 + 建筑资源 | 无元素（基建制，章节技能） | ❌ | F2P + 皮肤 |
+| **Call of Duty（Warzone）** | 局外枪匠配装 + 局内拾取 | 连杀奖励，无元素互斥 | ❌ | 买断 + F2P 内购 |
+| **Rainbow Six Siege** | 局外解锁干员 | 干员道具（战术配置） | ❌ | 买断 + 内购 |
+| **Destiny 2** | 局外装备/技能池 + 局内掉落 | 职业技能 + 元素属性 | ❌（副本/幽灵撤离） | F2P + 资料片 |
+| **Battlefield** | 兵种装备制，局内重生部署 | 兵种能力，无元素互斥 | ❌ | 买断 |
+| **Halo Infinite** | 拾取制（武器架） | 能量护盾 + 装备 | ❌ | F2P（多人）+ 战役买断 |
+| **逃离塔科夫** | **局外持久仓库 + 局内搜刮**，死亡装备丢失 | 弹药/护甲分级，无元素互斥 | ✅ **核心循环**「搜→打→撤」 | 买断 |
 
 > 定位差异一句话：**在塔科夫式「搜→打→撤」长线收益循环里，用反转风险的等级曲线取代纯拼枪/纯拼装**，
-> 并把全部平衡规则下沉到配置表，让"改玩法"从改代码变成改数据。
+> 通过**配置表驱动**让"改玩法"从改代码变成改数据，并以**核心零 bevy + 全开源**换取社区 Mod 与秒级验证，
+> 商业化上坚持**无影响月卡制**——对玩法/数值/胜负零影响。
 
 ---
 
@@ -138,37 +174,47 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
    默认 `cargo build`/`cargo test` 永远不编译 bevy；需要渲染的资源（Resource trait 等）
    由 Demo 侧 newtype 包装（如 `ElementalSystem`）。
 
-### 目录结构总览（表1 · Src 内部核心模块）
+### 目录结构总览（客户端结构 · HostCode）
 
-> 公开符号全部经各目录 `mod.rs` 薄壳重导出；**核心业务模块深度 ≤ 2 层**（`src/module/file.rs`）。
-> 扁平化/拆分规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+> 动态装载 bevy 0.14 的客户端表现层，**只吃快照 + 画**（服务端算、客户端显示）。
+> 模块深度 ≤ 2 层（`module/file.rs`），扁平化/拆分规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-| 模块名 | 核心职责 | 关键文件 / 结构体说明 |
+| 模块 | 职责 | 关键文件 |
 |---|---|---|
-| `config` | 配置加载与单一事实来源 | `mod.rs`（目录探测 + `include_str!` 嵌入默认 + 运行时覆盖）；`element_reactions.yaml`（随源码提交的元素反应表） |
-| `element` | 元素反应系统 | `ElementType` / `EntityElementState` / `ReactionResult`（元素/状态模型）；`ElementConfig`（YAML 反序列化目标）；`ElementSystem`（反应查询、互斥惩罚、协同增益、环境修正） |
-| `damage` | 伤害结算流水线 | `packet.rs`（`DamagePacket`/`Vec3` 纯数据）；`resolver.rs`（`DamageResolver` 结算 Step1–9）；`effect.rs`（燃烧/冰冻/中毒等 9 个副作用组件） |
-| `engine` | 游戏循环 | `GameLoop`（60Hz 固定 Tick 主时钟）；`TickConfig`；确定性双缓冲快照 + 重放验证 |
-| `entity` | 自研 ECS | 实体=组件容器；组件自治前作用；系统按固定顺序处理 |
-| `equipment` | 装备等级与元素规则（反护航经济核心） | 1 级新手保护舱；2-6 级可指定元素（成本翻倍）；7-9 级真随机混沌区；转售/给予重置元素 |
-| `gamemode` | 游戏模式 | `MatchConfig` / `MatchManager`：战术撤离（核心）、团队死斗（练习）、合约 |
-| `hal` | 硬件抽象层 | 单调时钟；中断消解为带时间戳的环形缓冲（零分配，`crossbeam-queue`） |
-| `map` | **纯数据地图定义**（零 bevy） | `MapLayout`；`training/`：`layout()` 组装出生准备室/CQB 大厅/射击馆/二层回廊（`building_shell.rs`/`spawn_room.rs`/`cqb_hall.rs`/`shooting_range.rs`/`second_floor.rs`） |
-| `operator` | 干员与武器档案（纯数据） | Q/E 技能归属干员（焦狸/霜吻/雷豹/毒蜨）；步枪数值集中于此 |
-| `player` | 玩家档案 | 信誉系统、赛季进度、统计数据 |
-| `demo` *(feature `"demo"` 门控)* | 3D FPS Demo | `mod.rs` 纯组装层；面板已扁平化：`frontend`(引导)/`components`/`menu/`(主菜单+加载+设置)/`pause`/`world`/`character`/`controller`/`camera`/`combat/`(武器/技能/手雷/爆炸/区域/反馈)/`targets`/`minimap`/`hud/`(血条/弹药/击杀播报/伤害跳字/闪烁)/`inventory/`(背包/交互菜单/物品轮盘/持握手雷)/`stations` |
-| `model` *(feature `"demo"` 门控)* | 干员模型与动作 | `operator_models.rs`（四名干员体素模型）；`operator_swap.rs`（模型置换）；`yanhu_action.rs`（动作系统）；`rig.rs`/`palette.rs`/`components.rs` |
+| `launcher` | 纯装配层：动态装载 bevy 0.14 + 装载渲染表现全套（相机 Rig / 体素绘制 / HUD / 小地图 / 背包 UI 绘制），只吃快照 + 画 | `mod.rs` |
+| `flow` | AppState 状态机（Loading / MainMenu / InGame）、加载屏、状态迁移 | `flow_state.rs` / `loading.rs` |
+| `net` | mpsc 后台线程消费服务端快照 + 上行 NetOut 命令通道 | `network.rs` |
+| `menu` | 主菜单 / 仓库·携带物资（拖拽 + Shift 选装）/ 模式 / 设置 / 加载 | `menu_main.rs` / `arsenal.rs` / `mode_panel.rs` / `game_settings.rs` |
+| `hud` | 血条 / 护甲量 / 弹药、技能 CD、小地图、击杀与通告、撤离提示 | `hud_vitals.rs` / `hud_minimap.rs` / `hud_skills.rs` / `hud_feed.rs`（语义化子文件） |
+| `world` | 训练场几何 / 材质 / 光照（服务端重画，客户端只摆） | `world_assets.rs` |
+| `shared` | 主题色板「无影响月卡制」、字体句柄 | `theme.rs` |
 
-### 目录结构总览（表2 · 外部资源与配置）
+### 目录结构总览（服务端结构 · ServerCode）
+
+> 服务端权威模拟 + TCP 网络层，**核心零 bevy**、可无头确定性模拟（详见「五、服务端进度」）。
+
+| 模块 | 职责 |
+|---|---|
+| `engine` | 权威 60Hz 固定 Tick + 确定性双缓冲快照 |
+| `entity` | 自研 ECS（实体 = 组件容器） |
+| `combat` | 射击 / 手雷 / 技能 / 区域 / 干员切换·战斗判定（`shooter.rs` / `range.rs` / `skill.rs` / `zone.rs` / `switch_operator`） |
+| `damage` | 伤害结算流水线（packet / resolver / effect） |
+| `element` | 元素反应系统 |
+| `map` | 纯数据地图（`map::training::layout()` 直接渲染完整 CQB 室内训练场） |
+| `model` | 模型文件（易变化资源）经快照下发客户端 |
+| `net` | TCP 网络层（AOI / 会话 / 广播 / 协议：Loadout / StartTraining / ExtractRequest / Ping） |
+| `config` / `operator` / `player` / `equipment` / `gamemode` / `hal` | 配置 / 干员 / 档案 / 装备 / 模式 / 时钟 |
+
+### 目录结构总览（表3 · 外部资源与配置）
 
 | 目录名 | 用途 | 文件格式 / 注意事项 |
 |---|---|---|
 | `assets/` | 美术资源（游戏内加载） | 子目录：`characters/` `environment/` `fonts/` `ui/` `weapons/`；`.jpg`/`.png`/`.ttf`（中文字体 `simhei.ttf`）+ `model/*.json`（体素模型） |
-| `src/config/` | **配置表（含加载器，与核心代码物理相邻）** | `element_reactions.yaml`：无头模拟与 3D Demo 共用；**单一事实来源**——默认值由 `include_str!` 编译期嵌入，运行时同路径文件作为设计师热改覆盖；改表需同步重编译默认或改同文件 |
+| `ServerCode/config/` | **配置表（含加载器，与核心代码物理相邻）** | `element_reactions.yaml`：无头模拟与主机端共用；**单一事实来源**——默认值由 `include_str!` 编译期嵌入，运行时同路径文件作为设计师热改覆盖；改表需同步重编译默认或改同文件 |
 | `tools/` | 开发辅助脚本 | PowerShell（图标生成、窗口截图、UI 自动测试等） |
 | `.github/workflows/` | CI | `rust.yml`：push/PR 到 `main` 自动跑 `cargo build` + `cargo test`（不带 demo） |
 | `.agents/skills/` | AI 协作工作流文档 | 美术创作 / 地图验收等技能的说明文档 |
-| `CuteOfDuty_Demo.exe` | 预编译 3D Demo | 双击即玩；启动自动定位项目根目录（向上搜索 `src/config/element_reactions.yaml`）|
+| `CuteOfDuty_Demo.exe` | 预编译 3D Demo | 双击即玩；启动自动定位项目根目录（向上搜索 `ServerCode/config/element_reactions.yaml`）|
 
 ### 配置表
 
@@ -281,13 +327,19 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 
 ### 5.2 当前进度
 
+> 现状：**0.6-SnapShot-2**（架构仍为服务端权威 + 客户端表现层，核心零 bevy）。
+
 - 服务器权威模拟 + TCP 网络层已落地（`net/`：AOI 兴趣区域剔除、会话管理、状态广播、协议编解码）。
-- **射击场射线检测系统完成**：目标实体可被射击、命中计分、自动往返移动；
-  `combat/range.rs` 新增 `RangeTarget`，`entity` 新增 `EntityType::Target`，
-  `model` 新增 `ModelPreset::AimTarget`，`combat/shooter.rs` 展开射线判定到目标。
-- `cargo test --offline` **全绿**（81 个用例通过，含本次新增 6 个）。
+- **网络协议已落地**：`Loadout` / `StartTraining` / `ExtractRequest` / `Ping` 及 serde 用例；
+  `session.rs` 映射 4 个新 NetCommand 到对应处理。
+- **干员切换 `combat::switch_operator`**（四名干员档案）+ **撤离距离权威判定 `handle_extract`**。
+- `map::training::layout()` **直接渲染完整 CQB 室内训练场**（棋盘格地板 + 多材质 + 发光光源）。
+- 模型 `model/` 经快照下发 `ModelPreset` 到客户端（易变化资源归服务端）。
+- `cargo test --offline` **全绿（94 个用例通过）**。
 - 与 HostCode **彻底解耦**：ServerCode **不依赖 bevy**，分离不受渲染层升级影响。
 - 构建产物 `cod_server.exe`（服务端）+ `cod1.exe`（客户端），由 workspace 一次并行编译产出。
+- **待办（明示）**：仓库携带「带入进图后的生效结算」`apply_loadout` 属训练场后续，
+  当前加载仅存会话热副本（自带风险提示）。
 
 ### 5.3 运行
 
@@ -300,6 +352,7 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 0.6-Snapshot-2（Pre-Release） | 2026-09-25 | **仓库·携带物资 UI 100% 还原 0.3.2**（拖拽 + Shift 左键 + 已携带✓ + 容量计数 + 返回/开始游戏）；协议 `Loadout`/`StartTraining`/`ExtractRequest`/`Ping` 与干员切换、撤离判定落地；launcher 拆平级模块 + 扁平化清理；`cargo test` 94 用例全绿；**带仓库带入属于训练场后续**（`apply_loadout`，当前加载仅存会话热副本，自带风险提示） |
 | 0.6.0 | 2026-09-25 | **双 crate workspace + 服务端落地**：重构为 `ServerCode`（服务端权威模拟 + TCP 网络层，含 AOI/会话/广播/协议）与 `HostCode`（客户端表现层），Model 文件归服务端并经快照下发；射击场射线检测系统完成（目标可射击/命中计分/自动往返）；`cargo test` 81 用例全绿；bevy 因底层稳定性问题由 0.19 回退至 0.14（详见「已知坑」底层冻结红线） |
 | 0.3.2 | 2026-09-22 | **搜打撤**：物资箱重塑为体素栅格木箱（四角立柱 + 四面通板 + 平顶盖）并接入统一交互菜单（站点优先于拾取，F 必开箱不误拾，弃用自建触发）；对局仓库/背包拖拽选装落地并打通 Tab 背包；核心差异化补「与热门友商 FPS 对比」定位表；Demo 操作方式改为「按键组 × 触发环境」矩阵排版（A/B 环境列为玩法环境预留，当前标 `—`） |
 | 0.3.1 | 2026-09-21 | **渲染内存泄漏定向修复 + README 翻新**：修复 `damage_popup_system` 相机缺失时弹字永久存活的确定性泄漏；新增 `effect_guard.rs`（五类高频特效硬性存活上限兜底）；收敛特效密度/寿命（命中粒子 5→3、爆炸碎块 10→4 等）；新增 `debug_tracer.rs`（每 5s 实体/资产采样，供定位残余增长） |
