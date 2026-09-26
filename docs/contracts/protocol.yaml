@@ -1,0 +1,134 @@
+# =============================================================================
+# Cute Of Duty · 线格式契约（machine-readable contract）
+# =============================================================================
+# 状态：草案 v0.8.0 —— 【尚不是权威源】
+#   本文件目前是「手工整理的意图」，权威实现仍是 ServerCode/net/protocol.rs。
+#   权威源反转（YAML 为准、代码由 YAML 校验）是后续独立任务，见 docs/stop-doing.md。
+#
+# 版本规则（与 CONTRIBUTING 一致）：
+#   x+1 = 不兼容变更，必须附迁移指南（写入 docs/barek-history.md）
+#   y+1 = 加性兼容变更（只增字段/只增消息）
+#   z+1 = 仅兼容性修复，语义不变
+#
+# 变更纪律：
+#   1. 字段只增不减、语义不可改；删字段/改语义 = x+1。
+#   2. 每次改动必须同步 docs/barek-history.md 一条记录。
+#   3. L2 及以上模块（net / 契约层）的改动需 ≥2 名 reviewer，maintainer 必须参与。
+# =============================================================================
+
+contract: protocol
+version: 0.8.0
+status: draft
+owner_module: ServerCode/net
+authoritative_impl: ServerCode/net/protocol.rs
+compat:
+  previous: 0.7.0
+  breaking: true
+  migration_guide: docs/barek-history.md#080-snapshot-8--2026-09-26--战局内格位制物资未验证不计入发布
+
+# -----------------------------------------------------------------------------
+# 上行：客户端 → 服务端
+# -----------------------------------------------------------------------------
+uplink:
+  ClientMessage:
+    # TODO(核对): 下列 variant 清单只覆盖本次变更涉及项，需与 protocol.rs 全量对齐
+    variants:
+      - name: Input
+        fields:
+          - { name: player, type: PlayerInput, required: true }
+      - name: LootTransfer            # 0.8.0 新增（Additive→但因字段type变更整体为 breaking）
+        added_in: 0.8.0
+        fields:
+          - { name: target, type: u64,  required: true, doc: 容器实体 ID }
+          - { name: dir,    type: TransferDir, required: true, doc: 转移方向 }
+          - { name: index,  type: usize, required: true, doc: 活动侧的格位下标 0..12 }
+
+  PlayerInput:
+    fields:
+      - { name: seq,           type: u64,  doc: 自增序号，服务端据此丢弃乱序 }
+      - { name: move_forward,  type: bool }
+      - { name: move_backward, type: bool }
+      - { name: move_left,     type: bool }
+      - { name: move_right,    type: bool }
+      - { name: sprint,        type: bool }
+      - { name: aim,           type: bool, doc: 按住右键越肩瞄准 }
+      - { name: shoot,         type: bool }
+      - { name: reload,        type: bool }
+      - { name: skill_q,       type: bool }
+      - { name: skill_e,       type: bool }
+      - { name: weapon_slot,   type: "Option<u8>", doc: 0/1，与干员解耦 }
+      - name: use_slot         # 0.8.0 新增
+        type: "Option<u8>"
+        added_in: 0.8.0
+        doc: 背包格位下标；按 ItemCategory 语义由客户端轮盘决定，服务端按该格内容裁决效果
+      - { name: aim_yaw,   type: f32 }
+      - { name: aim_pitch, type: f32 }
+    removed_fields:                # 0.8.0 删除 —— 老客户端编译期即失败
+      - { name: use_medkit,  removed_in: 0.8.0, replaced_by: use_slot }
+      - { name: use_grenade, removed_in: 0.8.0, replaced_by: use_slot }
+
+# -----------------------------------------------------------------------------
+# 下行：服务端 → 客户端
+# -----------------------------------------------------------------------------
+downlink:
+  EntitySnapshot:
+    changed_in: 0.8.0
+    fields:
+      - { name: entity_id,   type: u64 }
+      - { name: hp,          type: f32 }
+      - { name: armor,       type: f32 }
+      - { name: skill_cd_q,  type: f32 }
+      - { name: skill_cd_e,  type: f32 }
+      - { name: operator_id, type: u32 }
+      - name: backpack               # 0.8.0 新增
+        type: "Option<Vec<Option<LootItem>>>"
+        added_in: 0.8.0
+        doc: 本人 12 格背包（4×3）；他人为 None（不入下行体积）
+      - name: container              # 0.8.0 新增
+        type: "Option<Vec<Option<LootItem>>>"
+        added_in: 0.8.0
+        doc: 物资箱 12 格容器内容；非容器实体为 None
+    # TODO(核对): 其余既有字段（位置/朝向/model_preset/interact 等）待与 protocol.rs 对齐后补全
+    removed_fields:
+      - { name: medkit,  removed_in: 0.8.0, replaced_by: backpack }
+      - { name: grenade, removed_in: 0.8.0, replaced_by: backpack }
+
+# -----------------------------------------------------------------------------
+# 共享值类型
+# -----------------------------------------------------------------------------
+types:
+  LootItem:
+    owner_module: ServerCode/items
+    fields:
+      - { name: label, type: String,     doc: 展示名（唯一文案来源，UI 与补给选项共用） }
+      - { name: kind,  type: PickupKind }
+  PickupKind:
+    owner_module: ServerCode/items
+    exposes:
+      - { fn: occupies_slot, returns: bool }
+      - { fn: category,      returns: "Option<ItemCategory>" }
+  ItemCategory:
+    owner_module: ServerCode/items
+    variants: [Consumable, Tactical]     # 3 = Consumable、4 = Tactical
+  TransferDir:
+    owner_module: ServerCode/items
+    variants: [Take, Put]                # Take: 容器→背包; Put: 背包→容器
+
+# -----------------------------------------------------------------------------
+# 常量（跨端必须一致，禁止各自硬编码副本）
+# -----------------------------------------------------------------------------
+constants:
+  BACKPACK_SLOTS:  12
+  CONTAINER_SLOTS: 12
+  GRID_COLS: 4
+  GRID_ROWS: 3
+  INTERACT_RANGE: 3.5
+
+# -----------------------------------------------------------------------------
+# 待办
+# -----------------------------------------------------------------------------
+todos:
+  - 与 ServerCode/net/protocol.rs 逐字段核对，补全所有 variant 与字段
+  - 反转权威源：由本 YAML 生成 Rust 类型或对 Rust 类型做一致性校验（CI 卡关）
+  - 补 docs/contracts/README.md 说明 yaml schema 与使用方式
+  - 与 docs/architecture/module-boundaries.md 第三节的 `?` 事件清单一并对齐
