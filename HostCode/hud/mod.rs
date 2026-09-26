@@ -31,7 +31,9 @@ pub(crate) use hud_item_wheel::{
     item_wheel_input, reset_item_wheel, update_item_wheel, ItemWheelState,
 };
 pub(crate) use hud_kill_counter::update_kill;
-pub(crate) use hud_loot_panel::{loot_panel_input, reset_loot_panel, sync_loot_panel, LootPanelState};
+pub(crate) use hud_loot_panel::{
+    loot_panel_drag, loot_panel_input, reset_loot_panel, sync_loot_panel, LootPanelState,
+};
 pub(crate) use hud_minimap::update_minimap;
 pub(crate) use hud_skills::{update_feed, update_skills};
 pub(crate) use hud_vitals::{update_vitals_bars, update_vitals_text};

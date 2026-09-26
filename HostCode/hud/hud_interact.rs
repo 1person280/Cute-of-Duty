@@ -8,8 +8,8 @@
 //! 还原老版形态（legacy `demo/inventory/interact_menu.rs`）：
 //! - **就近常显**：只要有目标进入 `INTERACT_RANGE` 就自动列出（不需先按 F，也不阻塞游玩）；
 //! - **滚轮翻页**：滚轮改高亮项（环绕），窗口 `scroll_start` 跟随，右侧滚动条示位置；
-//! - **F/回车确认**：拾取物 → 直接 `Take`；功能站点 → 转出二级选项面板；物资箱 → 打开
-//!   双向 4×3 格位面板（见 `hud_loot_panel`）。
+//! - **F/回车确认**：拾取物 → 直接 `Take`；干员台 → 转出二级选项面板；物资箱/补给台 →
+//!   打开双向 4×3 格位面板（见 `hud_loot_panel`，拖拽 / Shift+左键搬运）。
 //! - **二级面板 Esc**：返回就近列表。
 //!
 //! 门控：仅**二级面板 / 物资箱面板 / 径向轮盘**打开时冻结玩法输入；就近列表本身不冻结，
@@ -17,7 +17,7 @@
 
 use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
-use cute_of_duty_server::interact::{InteractChoice, InteractKind, SupplyKind, INTERACT_RANGE};
+use cute_of_duty_server::interact::{InteractChoice, InteractKind, INTERACT_RANGE};
 use cute_of_duty_server::map::StationKind;
 use cute_of_duty_server::net::protocol::ClientMessage;
 use cute_of_duty_server::operator::roster;
@@ -29,7 +29,7 @@ use crate::shared::operator_meta::meta;
 use crate::shared::theme;
 
 use super::hud_item_wheel::ItemWheelState;
-use super::hud_loot_panel::{open_loot_panel, LootPanelState};
+use super::hud_loot_panel::{open_loot_panel, open_supply_panel, LootPanelState};
 
 /// 列表可见行数（老版 `INTERACT_MENU_VISIBLE_ROWS` 的量级）。
 pub const INTERACT_VISIBLE_ROWS: usize = 5;
@@ -333,7 +333,9 @@ pub fn update_interact_entries(
 
 /// 键鼠输入：滚轮移高亮、F/回车确认；二级面板滚轮/确认/Esc 返回。
 ///
-/// 物资箱面板或径向轮盘打开时让位（由各自系统处理键鼠），避免 F/滚轮被重复消费。
+/// 物资箱面板或径向轮盘打开时让位（由各自系统处理键鼠），避免 F/滚轮被重复消费；
+/// 但 **Esc 关闭二级面板的优先级高于让位**——否则轮盘/物资箱一旦因异常残留 `open`，
+/// 二级面板将无法收起，`gameplay_input_active` 恒假，WASD/开火/3-4 全灭（见 A-1）。
 pub fn interact_input(
     keys: Res<ButtonInput<KeyCode>>,
     mut wheel: EventReader<MouseWheel>,
@@ -345,16 +347,18 @@ pub fn interact_input(
     let scroll: f32 = wheel.read().map(|e| e.y).sum();
     let step: i32 = if scroll > 0.0 { -1 } else if scroll < 0.0 { 1 } else { 0 };
 
+    // Esc 优先：无论轮盘/物资箱是否打开，二级面板都必须能收起，保证玩法输入可恢复。
+    if state.panel_open && keys.just_pressed(KeyCode::Escape) {
+        close_panel(&mut state);
+        return;
+    }
+
     if loot.open || wheel_state.open {
         return;
     }
 
-    // —— 二级选项面板：滚轮移高亮、F/回车确认、Esc 返回 ——
+    // —— 二级选项面板：滚轮移高亮、F/回车确认（Esc 关闭已在上方统一处理） ——
     if state.panel_open {
-        if keys.just_pressed(KeyCode::Escape) {
-            close_panel(&mut state);
-            return;
-        }
         let n = state.options.len();
         if n > 0 && step != 0 {
             state.option_selected =
@@ -439,15 +443,8 @@ fn confirm_entry(state: &mut InteractState, loot: &mut LootPanelState) {
             state.pending = Some((id, InteractAction::Interact(InteractChoice::Take)));
         }
         InteractKind::Station(StationKind::SupplyTable) => {
-            let options = [
-                SupplyKind::Ammo,
-                SupplyKind::Health,
-                SupplyKind::Armor,
-            ]
-            .iter()
-            .map(|k| supply_option(k.label(), *k))
-            .collect();
-            open_panel(state, id, title, options);
+            // 补给台不再走"二级选项菜单"：与物资箱统一为 4×3 格位面板（拖拽领取）。
+            open_supply_panel(loot, id);
         }
         InteractKind::Station(StationKind::OperatorDesk) => {
             let options = roster()
@@ -482,12 +479,4 @@ fn close_panel(state: &mut InteractState) {
     state.title.clear();
     state.options.clear();
     state.option_selected = 0;
-}
-
-/// 生成一项"补给台"菜单选项。
-fn supply_option(label: &str, kind: SupplyKind) -> InteractOption {
-    InteractOption {
-        label: label.to_string(),
-        action: InteractAction::Interact(InteractChoice::Supply { kind }),
-    }
 }

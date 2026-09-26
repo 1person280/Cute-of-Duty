@@ -147,6 +147,8 @@ pub fn run(addr: &str) {
                     crate::hud::update_interact_entries,
                     crate::hud::item_wheel_input,
                     crate::hud::loot_panel_input,
+                    // 格位面板鼠标搬运（拖拽 / Shift+左键）：与键盘后备同帧，先于交互输入。
+                    crate::hud::loot_panel_drag,
                     crate::hud::interact_input,
                     crate::hud::interact_menu_click,
                     crate::hud::interact_commit,
