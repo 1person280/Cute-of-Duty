@@ -23,6 +23,10 @@ pub struct HudRoot;
 #[derive(Component)]
 pub struct ExtractLabel;
 
+/// 进入撤离区后弹出的居中大字提示（默认隐藏，仅入区时闪烁显示）。
+#[derive(Component)]
+pub struct ExtractPrompt;
+
 /// 生成 HUD：左下 vitals、右上击杀、右下弹药/技能、左上小地图、居中准星、顶部撤离引导。
 pub fn spawn_hud(mut commands: Commands, fonts: Res<CjkFont>, ui: Res<UiAssets>, kills: Res<KillCount>) {
     if fonts.0.is_none() {
@@ -53,7 +57,7 @@ pub fn spawn_hud(mut commands: Commands, fonts: Res<CjkFont>, ui: Res<UiAssets>,
         });
 }
 
-/// 撤离引导：顶部中央，图标（可无）+ 距离/提示文本。
+/// 撤离引导：顶部中央，图标（可无）+ 距离/提示文本；另加一块入区后闪烁的居中大字提示。
 fn spawn_extract_label(p: &mut ChildBuilder, fonts: &CjkFont) {
     p.spawn((
         ExtractLabel,
@@ -74,13 +78,37 @@ fn spawn_extract_label(p: &mut ChildBuilder, fonts: &CjkFont) {
             flow::style(&fonts, 20.0, Color::srgb(1.0, 0.95, 0.6)),
         ));
     });
+
+    // 入区后的居中大字提示：默认隐藏，`update_extract` 按入区状态闪烁显示。
+    p.spawn((
+        ExtractPrompt,
+        NodeBundle {
+            style: Style {
+                position_type: PositionType::Absolute,
+                top: Val::Percent(60.0),
+                width: Val::Percent(100.0),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            visibility: Visibility::Hidden,
+            ..default()
+        },
+    ))
+    .with_children(|prompt| {
+        prompt.spawn(TextBundle::from_section(
+            "已到撤离区 · 按 Enter 撤离",
+            flow::style(&fonts, 38.0, Color::srgb(1.0, 0.9, 0.3)),
+        ));
+    });
 }
 
-/// 每帧刷新撤离引导（距离/进入提示）。共用本模块，避免跨模块再读一遍快照。
+/// 每帧刷新撤离引导（距离/进入提示）与入区闪烁大字。共用本模块，避免跨模块再读一遍快照。
 pub fn update_extract(
     snap: Res<SnapshotBuffer>,
     player: Res<LocalPlayer>,
+    time: Res<Time>,
     mut extract: Query<&mut Text, With<ExtractLabel>>,
+    mut prompt: Query<&mut Visibility, With<ExtractPrompt>>,
 ) {
     let snapshot = snap
         .current
@@ -101,16 +129,26 @@ pub fn update_extract(
             format!("前往北端撤离区  距离 {dist:.0} m")
         };
     }
+
+    // 居中大字：仅入区时显示，并按 0.5s 节拍闪烁以强化提示。
+    if let Ok(mut vis) = prompt.get_single_mut() {
+        let blink = (time.elapsed_seconds() * 2.0) as u32 % 2 == 0;
+        *vis = if in_zone && blink {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+    }
 }
 
-/// InGame 内按 Enter 发起撤离请求（是否成功由服务端裁决）。
+/// InGame 内按 Enter / F 发起撤离请求（是否成功由服务端裁决）。
 pub fn extract_interaction(
     keys: Res<ButtonInput<KeyCode>>,
     out: Res<NetOut>,
     snap: Res<SnapshotBuffer>,
     player: Res<LocalPlayer>,
 ) {
-    if !keys.just_pressed(KeyCode::Enter) {
+    if !(keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::KeyF)) {
         return;
     }
     let Some(e) = snap

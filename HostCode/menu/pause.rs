@@ -5,9 +5,11 @@
 //! 刻意不做成 `States`：从暂停回 InGame 若走状态切换会再次触发 `OnEnter(InGame)`
 //! 重建 HUD，因此暂停只是 `InGame` 内的一枚资源门控，只有"返回主界面"才切状态。
 //! 移植自 0.3.2 `demo/pause.rs`（主面板「返回游戏 / 游戏设置 / 返回主界面」+ 设置子面板
-//! ＋开源鸣谢），并按本架构去掉鼠标锁定 / 轮盘与站点面板门控等不存在的依赖。
+//! ＋开源鸣谢），并按本架构去掉轮盘与站点面板门控等不存在的依赖；鼠标锁定见
+//! [`cursor_lock_system`]（游戏内锁定供自由视角，暂停/菜单态释放供点按）。
 
 use bevy::prelude::*;
+use bevy::window::{CursorGrabMode, PrimaryWindow};
 
 use crate::flow::flow_state::{self as flow, AppState, CjkFont};
 use super::game_settings::{
@@ -293,6 +295,26 @@ pub fn pause_menu_interaction(
     if adjusted {
         for (value, mut text) in value_texts.iter_mut() {
             text.sections[0].value = setting_label(&settings, value.0);
+        }
+    }
+}
+
+/// 游戏内锁定鼠标（隐藏光标并锁定到窗口中心，供 [`crate::world::mouse_look_system`]
+/// 读鼠标位移做自由视角）；暂停浮层或主菜单打开时释放，让光标回到可点按状态。
+///
+/// 设计动机（Why）：鼠标锁定是「游戏内输入模态」的表现层开关，与暂停同属一套门控
+/// —— 因此放在本模块，随 `pause_closed` 一并翻转，避免散落到相机系统里重复判态。
+pub fn cursor_lock_system(
+    state: Res<State<AppState>>,
+    pause: Res<PauseMenu>,
+    mut windows: Query<&mut Window, With<PrimaryWindow>>,
+) {
+    let lock = *state.get() == AppState::InGame && *pause == PauseMenu::Closed;
+    for mut window in &mut windows {
+        let grab = if lock { CursorGrabMode::Locked } else { CursorGrabMode::None };
+        if window.cursor.grab_mode != grab {
+            window.cursor.grab_mode = grab;
+            window.cursor.visible = !lock;
         }
     }
 }

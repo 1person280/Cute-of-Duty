@@ -8,7 +8,7 @@
 配置文件表驱动的全部玩法规则 · 单一事实来源
 
 [![License](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.6.0-SnapShot-3-blue.svg)](#六版本历史)
+[![Version](https://img.shields.io/badge/Version-0.6.0-SnapShot-4-blue.svg)](#六版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
 [![Headless](https://img.shields.io/badge/%E6%97%A0%E5%A4%B4%E6%A8%A1%E6%8B%9F-passing-2ea44f.svg)](#一快速开始)
 [![Demo](https://img.shields.io/badge/3D%20Demo-Bevy%200.14-2ea44f.svg)](#一快速开始)
@@ -360,6 +360,7 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 0.6-Snapshot-4（Pre-Release） | 2026-09-26 | **鼠标自由视角 + 第三人称环绕相机 + 服务端确定性移动结算 + 撤离可用**：视角改由鼠标驱动（`AimRig` yaw/pitch），镜头改为**环绕相机**始终注视角色胸口（修「看不到自己角色」）；客户端每帧上报朝向与按键意图，服务端按每连接「最新意图」每固定 Tick 以 `速度 × dt` 确定结算（基础 5 m/s、疾跑 1.6×）；撤离区弹**居中闪烁大字**提示，Enter 或 F 均可发起（服务端按权威坐标裁决）；`cargo test` 94 用例全绿。**已知问题**：AOI 60m 视野受限、射击输入未接线 |
 | 0.6-Snapshot-3（Pre-Release） | 2026-09-26 | **训练场迁移至 0.3.2 `map::lawn` 露天搜打撤大场（1×1km）+ `~` 暂停菜单**：活动地图 / 靶机生成 / 出生点（z=470）/ 撤离点（`(0,-440)`，半径 12m）双端对齐；客户端只渲染**静态层**（棋盘格地板 + props + 发光件，靶与拾取物仍走快照）并复刻 0.3.2 原版光照；`~` 键暂停菜单完整移植（返回游戏 / 设置子面板 / 返回主界面，0.25s 防抖）并冻结本地输入与相机；客户端断线自动重连（每 2s）；`cargo test` 94 用例全绿。**已知问题**：第三人称缺鼠标自由视角、实测未能走到撤离点（见「已知问题」） |
 | 0.6-Snapshot-2（Pre-Release） | 2026-09-25 | **仓库·携带物资 UI 100% 还原 0.3.2**（拖拽 + Shift 左键 + 已携带✓ + 容量计数 + 返回/开始游戏）；协议 `Loadout`/`StartTraining`/`ExtractRequest`/`Ping` 与干员切换、撤离判定落地；launcher 拆平级模块 + 扁平化清理；`cargo test` 94 用例全绿；**带仓库带入属于训练场后续**（`apply_loadout`，当前加载仅存会话热副本，自带风险提示） |
 | 0.6-Snapshot-1（Pre-Release） | 2026-09-25 | **双 crate workspace + 服务端落地**：重构为 `ServerCode`（服务端权威模拟 + TCP 网络层，含 AOI/会话/广播/协议）与 `HostCode`（客户端表现层），Model 文件归服务端并经快照下发；射击场射线检测系统完成（目标可射击/命中计分/自动往返）；`cargo test` 81 用例全绿；bevy 因底层稳定性问题由 0.19 回退至 0.14（详见「已知坑」底层冻结红线） |
@@ -398,15 +399,17 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 
 ### 已知问题（试玩实测）
 
-- **0.6-Snapshot-3 实测（未修复，已登记）**：
-  - **第三人称视角不完整**：相机为越肩跟随，但朝向只由 WASD 位移方向平滑推导，**没有鼠标自由视角**，
-    静止时不能转头看周围。
-  - **无法移动到撤离点**：活动地图为 1×1km 露天大场，出生点 z=470、撤离点 z=-440（直线约 910m），
-    实测未能走到并触发撤离。
+- **0.6-Snapshot-4 实测（未修复，已登记）**：
   - **视野受限**：AOI 兴趣区域半径 60m，大场内远处靶机不进快照因而不可见；服务端未生成 lawn 的
     拾取物，场上暂无拾取物。
-  - **运行顺序**：必须先启动 `cod_server.exe` 再启动 `cod1.exe`（0.6-Snapshot-3 起客户端已能自动重连，
+  - **射击输入未接线**：客户端尚未上报开火 / 换弹 / 技能（`PlayerInput.shoot` 恒为 false），
+    本快照只覆盖相机与移动链路。
+  - **运行顺序**：必须先启动 `cod_server.exe` 再启动 `cod1.exe`（客户端已能自动重连，
     但服务端未起时不会进入训练场）。
+- ~~第三人称视角不完整（无鼠标自由视角 / 看不到自己角色）~~：0.6-Snapshot-4 已修复
+  （`AimRig` 鼠标视角 + 始终注视角色胸口的环绕相机）。
+- ~~无法移动到撤离点（910m 走不到 / 撤离不触发）~~：0.6-Snapshot-4 已修复
+  （服务端 `速度 × dt` 确定性结算 + 入区居中闪烁提示 + Enter / F 触发）。
 - ~~手雷爆炸内存飙升 / OOM~~：2026-09-05 已修复（爆炸/枪口特效网格与材质入池共享，不再逐发新建资产）。
 - ~~术能锁定后相机冻结~~：实为玩家初始 yaw 朝向问题（背对靶场），已修复（默认面向靶场出生）。
 - **渲染内存缓慢增长（已定向缓解，仍待长时间确认）**：长时间游玩（数分钟级）GPU 内存仍会缓慢累积，

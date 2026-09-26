@@ -61,13 +61,16 @@ pub fn run(addr: &str) {
                 (crate::world::init_world_assets, spawn_scene).chain(),
             ),
         )
-        // 全局常驻：快照对账、相机跟随、控制路由、延迟面板、设置应用，以及 HUD 贴图就绪。
-        // 相机跟随在暂停时冻结（`pause_closed`）：暂停期间不再响应 WASD 转向。
+        // 全局常驻：快照对账、鼠标视角、相机跟随、控制路由、延迟面板、设置应用，以及
+        // HUD 贴图就绪。整体 `.chain()`：保证「收快照 → 对账」「鼠标写入 AimRig → 相机读」
+        // 的先后关系（Res/ResMut 冲突下 bevy 默认不定序，显式串联才确定）。
+        // 鼠标视角与相机跟随在暂停时冻结（`pause_closed`）：暂停期间视角/朝向不再变化。
         .add_systems(
             Update,
             (
                 crate::net::receive_snapshots,
                 crate::net::apply_entities,
+                crate::world::mouse_look_system.run_if(crate::menu::pause_closed),
                 crate::world::follow_system.run_if(crate::menu::pause_closed),
                 crate::flow::route_control_messages,
                 crate::shared::refresh_ui_ready,
@@ -77,7 +80,10 @@ pub fn run(addr: &str) {
                 crate::net::panel_update,
                 crate::menu::settings_apply_fov,
                 crate::menu::settings_apply_ambient,
-            ),
+                // 光标锁定随状态/暂停翻转，需在各状态下都跑（自身判态，无 run_if）。
+                crate::menu::cursor_lock_system,
+            )
+                .chain(),
         )
         // Loading 屏惰性生成 + 进度刷新（仅 Loading 态）。
         .add_systems(

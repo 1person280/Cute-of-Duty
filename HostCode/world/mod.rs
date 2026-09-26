@@ -8,6 +8,6 @@ pub(crate) mod model;
 pub(crate) mod world_assets;
 pub(crate) mod world_scene;
 
-pub(crate) use camera::{follow_system, spawn_camera};
+pub(crate) use camera::{follow_system, mouse_look_system, spawn_camera};
 pub(crate) use world_assets::{WorldAssets, init_world_assets, refresh_world_ready};
 pub(crate) use world_scene::spawn_world;

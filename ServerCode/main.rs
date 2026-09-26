@@ -32,6 +32,10 @@ const EXTRACTION_POINT: (f32, f32) = (0.0, -440.0);
 /// 判定"进入撤离区"的触发半径（米，平面距离，忽略 Y）。撤离光垫半边长 3m，取 12m 留余量。
 const EXTRACTION_RANGE: f32 = 12.0;
 
+/// 疾跑相对基础移速的倍率（`Entity.move_speed × 此值`）。1km 大场南北纵深 910m，
+/// 无疾跑靠基础步速横穿耗时过久，故给一个明确的冲刺档（沿 0.3.2 手感量级）。
+const SPRINT_MULT: f32 = 1.6;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
@@ -132,22 +136,35 @@ async fn serve_authoritative(
     let mut conn_profiles: HashMap<u64, PlayerProfile> = HashMap::new();
     // conn_id → 仓库选装携带清单（本局会话热副本：断开即弃，跨局冷数据走 conn_profiles）
     let mut conn_loadout: HashMap<u64, Vec<String>> = HashMap::new();
+    // conn_id → 该连接最近一次的输入意图。固定 Tick 玩法的关键（Why）：客户端按渲染帧
+    // 上报意图，频率与网络批处理都不可控；服务端只保留"最新意图"，每 Tick 结算一次
+    // （位移 = 速度 × dt），移速因而与客户端帧率/消息条数彻底解耦，天然确定性。
+    let mut conn_input: HashMap<u64, PlayerInput> = HashMap::new();
     // 全局装备 ID 分配器（跨连接唯一，供背包 Craft 裁决）
     let mut next_equipment_id: u64 = 1000;
 
     loop {
-        // 阶段1：消费本帧所有客户端输入意图（非阻塞清空队列）
+        // 阶段1：消费本帧所有客户端输入意图（非阻塞清空队列；Input 只存最新不立即结算）
         drain_commands(
             sim,
             rt,
             &mut conn_entity,
             &mut conn_profiles,
             &mut conn_loadout,
+            &mut conn_input,
             repo,
             equipment,
             &mut next_equipment_id,
             cmd_rx,
         );
+
+        // 阶段1.5：按最新意图推进所有玩家（位移/朝向/战斗），每 Tick 恰好一次。
+        // 与 dt 配套构成确定性结算：速度单位 m/s，位移 = 速度 × dt。
+        for (&conn_id, &eid) in conn_entity.iter() {
+            if let Some(input) = conn_input.get(&conn_id) {
+                apply_input(sim, eid, input, dt);
+            }
+        }
 
         // 阶段2：推进确定性模拟一个 Tick
         sim.tick(dt);
@@ -183,12 +200,14 @@ async fn serve_authoritative(
 /// 冷数据接入点（Why）：玩家档案属**冷数据**——连接期在 `conn_profiles` 持有热副本，
 /// 断开时经 `repo` 落盘（append-only，至少一次持久）。热数据（实体/血量/CD）仍走
 /// `sim.world`，绝不进仓库。
+#[allow(clippy::too_many_arguments)]
 fn drain_commands(
     sim: &mut GameLoop,
     rt: &Arc<NetRuntime>,
     conn_entity: &mut HashMap<u64, EntityId>,
     conn_profiles: &mut HashMap<u64, PlayerProfile>,
     conn_loadout: &mut HashMap<u64, Vec<String>>,
+    conn_input: &mut HashMap<u64, PlayerInput>,
     repo: &mut JsonLogRepo,
     equipment: &Arc<EquipmentSystem>,
     next_equipment_id: &mut u64,
@@ -242,9 +261,8 @@ fn drain_commands(
                 );
             }
             NetCommand::Input { conn_id, player } => {
-                if let Some(&eid) = conn_entity.get(&conn_id) {
-                    apply_input(sim, eid, &player);
-                }
+                // 只记录最新意图，实际结算在每 Tick 的「阶段1.5」统一进行（见 conn_input 注释）。
+                conn_input.insert(conn_id, player);
             }
             NetCommand::Inventory { conn_id, action } => {
                 apply_inventory_action(
@@ -295,6 +313,7 @@ fn drain_commands(
             }
             NetCommand::Disconnect { conn_id } => {
                 conn_loadout.remove(&conn_id);
+                conn_input.remove(&conn_id);
                 // 冷数据：先落盘档案（至少一次持久），再回收权威实体。
                 if let Some(profile) = conn_profiles.remove(&conn_id) {
                     if let Err(e) = repo.save(profile.player_id, &profile) {
@@ -437,26 +456,36 @@ fn currency_summary(profile: &PlayerProfile) -> String {
     format!("货币(软{}硬{}季{})", w.soft_currency, w.hard_currency, w.season_tokens)
 }
 
-/// 把客户端输入意图应用到权威实体（位移 + 朝向 + 战斗意图）。
+/// 把客户端输入意图应用到权威实体（位移 + 朝向 + 战斗意图），每 Tick 调用一次。
 ///
 /// 服务器权威原则：最终位移由服务端按本节转速写回 `world`，再经快照回传，
 /// 客户端不做任何本地校订 → 天生免疫坐标篡改。战斗（开火/换弹/技能）也在此
 /// 经 `sim.apply_combat_input` 结算，命中/击杀由服务端定夺。
-fn apply_input(sim: &mut GameLoop, eid: EntityId, input: &PlayerInput) {
+///
+/// 轴系（与客户端 `AimRig` 同源）：视线水平分量 `(sinY, cosY)`，右向量
+/// `(-cosY, sinY)`；`W/S` 沿视线前后、`D/A` 沿右手左右。位移量 = `速度 × dt`
+/// （`dt` 为固定 Tick 步长），因此速度单位是 m/s、与消息频率无关。
+fn apply_input(sim: &mut GameLoop, eid: EntityId, input: &PlayerInput, dt: f32) {
+    let yaw = input.aim_yaw;
+    let (fx, fz) = (yaw.sin(), yaw.cos()); // 视线水平方向
+    let (rx, rz) = (-yaw.cos(), yaw.sin()); // 右手方向 = forward × Y
+
+    let mut mx = 0f32;
+    let mut mz = 0f32;
+    if input.move_forward { mx += fx; mz += fz; }
+    if input.move_backward { mx -= fx; mz -= fz; }
+    if input.move_right { mx += rx; mz += rz; }
+    if input.move_left { mx -= rx; mz -= rz; }
+
     // 位移 + 朝向：先写回权威实体
     {
         let Some(entity) = sim.world_mut().get_entity_mut(eid) else { return };
-        let mut dx = 0f32;
-        let mut dz = 0f32;
-        if input.move_forward { dz -= 1.0; }
-        if input.move_backward { dz += 1.0; }
-        if input.move_left { dx -= 1.0; }
-        if input.move_right { dx += 1.0; }
-        let step = entity.move_speed * 0.1f32; // 单个 Tick 的位移（60Hz）
-        if dx != 0.0 || dz != 0.0 {
-            let len = (dx * dx + dz * dz).sqrt();
-            entity.position.x += dx / len * step;
-            entity.position.z += dz / len * step;
+        let len = (mx * mx + mz * mz).sqrt();
+        if len > 1e-6 {
+            let speed = if input.sprint { entity.move_speed * SPRINT_MULT } else { entity.move_speed };
+            let step = speed * dt;
+            entity.position.x += mx / len * step;
+            entity.position.z += mz / len * step;
         }
         // 刷新战斗朝向（供本帧射线 / 技能方向）
         if let Some(cb) = entity.get_component_mut::<cute_of_duty_server::combat::Combatant>() {

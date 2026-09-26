@@ -42,6 +42,30 @@ pub struct LocalPlayer {
     pub entity_id: u64,
 }
 
+/// 本端视角姿态（鼠标自由视角的偏航/俯仰）。
+///
+/// 设计动机（Why）：这是**表现层 + 上行瞄准意图**的唯一载体——相机据此摆放，
+/// 上行输入据此把 `aim_yaw/aim_pitch` 报给服务端（弹道与移动轴系的权威输入）。
+/// 约定与服务端 `shooter::try_fire` 完全一致：方向 = `(sinY·cosP, sinP, cosY·cosP)`，
+/// 即 **pitch 为正 = 抬头**、yaw 为正按右手系绕 Y。默认 yaw=π 面向 -Z（北/撤离区），
+/// 与服务端出生朝向一致，保证进场后 W 即朝撤离点前进。
+#[derive(Resource)]
+pub struct AimRig {
+    /// 水平偏航（弧度）。
+    pub yaw: f32,
+    /// 俯仰（弧度，+ 抬头 / - 低头），由系统钳制在合理区间。
+    pub pitch: f32,
+}
+
+impl Default for AimRig {
+    fn default() -> Self {
+        Self {
+            yaw: std::f32::consts::PI,
+            pitch: 0.0,
+        }
+    }
+}
+
 /// 连接起点 → 握手完成耗时（含 TCP 三次握手 + 首轮往返），延迟面板首行。
 #[derive(Resource, Default)]
 pub struct ConnectLatency {
@@ -79,6 +103,7 @@ pub fn setup_global(mut commands: Commands, mut fonts: ResMut<Assets<Font>>) {
     commands.insert_resource(Announcements::default());
     commands.insert_resource(KillCount(0));
     commands.insert_resource(SeqCounter(0));
+    commands.insert_resource(AimRig::default());
     commands.insert_resource(crate::net::latency::LatencyShow(false));
     commands.insert_resource(crate::net::latency::PanelSpawned(false));
 }
