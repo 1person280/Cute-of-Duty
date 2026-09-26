@@ -9,6 +9,7 @@ pub(crate) mod game_settings;
 pub(crate) mod menu_behaviour;
 pub(crate) mod menu_main;
 pub(crate) mod mode_panel;
+pub(crate) mod pause;
 
 pub(crate) use arsenal::{
     arsenal_drag_system, arsenal_interaction, ensure_overlay, ArsenalDrag, ArsenalSelection,
@@ -22,3 +23,6 @@ pub(crate) use menu_behaviour::{
 };
 pub(crate) use menu_main::spawn_menu;
 pub(crate) use mode_panel::{SelectedCategory, SelectedMode};
+pub(crate) use pause::{
+    pause_closed, pause_menu_interaction, pause_toggle, teardown_pause, PauseMenu,
+};

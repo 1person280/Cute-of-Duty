@@ -27,9 +27,9 @@ use cute_of_duty_server::storage::{ColdRepo, JsonLogRepo};
 /// 服务端默认监听地址（本机回环；正式环境改为对外网卡并置于反向代理后）。
 const DEFAULT_ADDR: &str = "127.0.0.1:8888";
 
-/// 撤离点世界坐标（训练场北端射击馆区；经 map/training 改版后落在地图内的撤离位）。
-const EXTRACTION_POINT: (f32, f32) = (0.0, -13.0);
-/// 判定"进入撤离区"的触发半径（米，平面距离，忽略 Y）。
+/// 撤离点世界坐标（草坪训练场北端撤离光垫中心，与 `map::lawn::extract_zone` 一致）。
+const EXTRACTION_POINT: (f32, f32) = (0.0, -440.0);
+/// 判定"进入撤离区"的触发半径（米，平面距离，忽略 Y）。撤离光垫半边长 3m，取 12m 留余量。
 const EXTRACTION_RANGE: f32 = 12.0;
 
 #[tokio::main]
@@ -62,8 +62,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut sim = GameLoop::new(tick_config, element_system, equipment_system);
     sim.set_environment(EntityElementState::Normal);
 
-    // 进场即生成训练场实弹靶（服务端权威：靶位来自地图数据，命中计分由 combat 结算）
-    let training = cute_of_duty_server::map::training::layout();
+    // 进场即生成训练场实弹靶（服务端权威：靶位来自地图数据，命中计分由 combat 结算）。
+    // 活动地图 = 0.3.2 运行时使用的 `map::lawn`（1×1km 露天搜打撤大场）。
+    let training = cute_of_duty_server::map::lawn::layout();
     cute_of_duty_server::combat::range::spawn_range_targets(sim.world_mut(), &training.targets);
     info!("训练场已就绪：{} 个靶机进场", training.targets.len());
 
@@ -223,8 +224,8 @@ fn drain_commands(
                 }
 
                 // 热数据：为连接在权威世界创建玩家实体（挂战斗状态），并回握手帧。
-                // 出生点取训练场地图的 `player_spawn`，保证朝向射击馆（-Z）。
-                let spawn = cute_of_duty_server::map::training::layout().player_spawn;
+                // 出生点取活动地图（草坪训练场）的 `player_spawn`（南端 z=470，面向 -Z 北）。
+                let spawn = cute_of_duty_server::map::lawn::layout().player_spawn;
                 let eid = combat::spawn_player(
                     sim.world_mut(),
                     cute_of_duty_server::damage::Vec3::new(spawn[0], spawn[1], spawn[2]),

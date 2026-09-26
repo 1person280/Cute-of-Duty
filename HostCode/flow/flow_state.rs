@@ -12,9 +12,9 @@ use cute_of_duty_server::net::protocol::{EventKind, ServerMessage};
 
 use crate::net::network::{ClientInbound, ControlBuffer};
 
-/// 撤离点世界坐标（训练场北端射击馆区；与服务端 `main::EXTRACTION_POINT` 保持一致，
-/// 均为地图内坐标，保证玩家可物理到达）。
-pub const EXTRACTION_POINT: (f32, f32) = (0.0, -13.0);
+/// 撤离点世界坐标（草坪训练场北端撤离光垫中心；与服务端 `main::EXTRACTION_POINT`
+/// 保持一致，均为地图内坐标，保证玩家可物理到达）。
+pub const EXTRACTION_POINT: (f32, f32) = (0.0, -440.0);
 /// 判定"进入撤离区"的触发半径（平面距离，忽略 Y）。
 pub const EXTRACTION_RANGE: f32 = 12.0;
 /// 加载兜底时长：握手未达也不让玩家卡死在加载屏（如服务器未启动）。

@@ -43,6 +43,8 @@ pub fn run(addr: &str) {
         .init_resource::<crate::menu::ArsenalVisible>()
         .init_resource::<crate::menu::ArsenalSelection>()
         .init_resource::<crate::menu::ArsenalDrag>()
+        // 暂停门控资源常驻（`pause_closed` 运行条件与暂停系统都读它；默认 Closed）。
+        .init_resource::<crate::menu::PauseMenu>()
         .init_state::<AppState>()
         // bevy 0.14 必须显式启用 state-scoped 清理：`init_state` 只注册状态机与 OnEnter/OnExit，
         // 不会自动把 `clear_state_scoped_entities` 挂到 StateTransition。缺这一步则所有
@@ -60,12 +62,13 @@ pub fn run(addr: &str) {
             ),
         )
         // 全局常驻：快照对账、相机跟随、控制路由、延迟面板、设置应用，以及 HUD 贴图就绪。
+        // 相机跟随在暂停时冻结（`pause_closed`）：暂停期间不再响应 WASD 转向。
         .add_systems(
             Update,
             (
                 crate::net::receive_snapshots,
                 crate::net::apply_entities,
-                crate::world::follow_system,
+                crate::world::follow_system.run_if(crate::menu::pause_closed),
                 crate::flow::route_control_messages,
                 crate::shared::refresh_ui_ready,
                 crate::world::refresh_world_ready,
@@ -98,9 +101,14 @@ pub fn run(addr: &str) {
                 .run_if(in_state(AppState::MainMenu)),
         )
         .add_systems(OnEnter(AppState::InGame), crate::hud::spawn_hud)
+        // 离开训练场：兜底销毁暂停浮层（返回主界面 / 状态切换通用）。
+        .add_systems(OnExit(AppState::InGame), crate::menu::teardown_pause)
         .add_systems(
             Update,
             (
+                // 暂停开关与面板交互最先跑：同帧生效的暂停门控可立即冻结下方输入。
+                crate::menu::pause_toggle,
+                crate::menu::pause_menu_interaction,
                 crate::hud::update_extract,
                 crate::hud::extract_interaction,
                 crate::hud::update_vitals,
@@ -109,8 +117,9 @@ pub fn run(addr: &str) {
                 crate::hud::update_feed,
                 crate::hud::update_kill,
                 crate::hud::operator_highlight,
-                crate::hud::operator_input,
-                crate::net::input_system,
+                // 玩法意图输入在暂停时冻结（不上报移动 / 不切干员）。
+                crate::hud::operator_input.run_if(crate::menu::pause_closed),
+                crate::net::input_system.run_if(crate::menu::pause_closed),
             )
                 .chain()
                 .run_if(in_state(AppState::InGame)),

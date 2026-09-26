@@ -1,10 +1,13 @@
-//! 静态世界生成：完整 CQB 室内训练场 + 光照
+//! 静态世界生成：完整草坪训练场（1×1km 露天搜打撤大场）+ 光照
 //!
 //! 设计动机（服务器权威边界）：环境是「不易变」的稳定内容，正应由客户端承载。
-//! 这里复用服务端 `map::training::layout()` 的**纯数据**（不触碰任何服务端模拟逻辑），
+//! 这里复用服务端 `map::lawn::layout()` 的**纯数据**（不触碰任何服务端模拟逻辑），
 //! 把它翻译成本地 bevy 静态 mesh —— 只渲染**不变**的部分（地板 / 静态 props / 发光件）。
 //! 一切**会动/会变**的东西（靶、拾取物、玩家、敌人）仍由服务端经快照下发、
 //! `snapshot.rs` 负责绘制，本模块绝不重复生成，避免双份实体。
+//!
+//! 活动地图选择：0.3.2 稳定版运行时渲染的即 `map::lawn`（南端出生、北端撤离信标），
+//! 本模块按其原版光照参数（主光 8000 + 补光 1500 + 四角点光 80000/60m）复刻观感。
 
 use bevy::prelude::*;
 use bevy::pbr::NotShadowCaster;
@@ -14,7 +17,7 @@ use cute_of_duty_server::map::{
 
 use super::world_assets::WorldAssets;
 
-/// 场景主光照（室内暖色定向光 + 两盏角部点光提亮）。
+/// 场景主光照（主平行光 + 补光 + 四角点光，参数对齐 0.3.2 `demo/world.rs`）。
 ///
 /// bevy 0.14：定向光用 `DirectionalLightBundle`，阴影开关是 `shadows_enabled`。
 pub fn spawn_world(
@@ -23,31 +26,48 @@ pub fn spawn_world(
     materials: &mut ResMut<Assets<StandardMaterial>>,
     world_assets: &WorldAssets,
 ) {
-    // 主平行光
+    // 主平行光（0.3.2 数值：8000 lux，硬阴影）
     commands.spawn(DirectionalLightBundle {
         directional_light: DirectionalLight {
-            illuminance: 12_000.0,
+            illuminance: 8_000.0,
             shadows_enabled: true,
             shadow_depth_bias: 0.02,
+            shadow_normal_bias: 0.6,
             ..default()
         },
         transform: Transform::from_rotation(Quat::from_euler(
             EulerRot::XYZ,
-            -std::f32::consts::FRAC_PI_2 * 0.55,
-            0.45,
+            -0.8,
+            0.5,
             0.0,
         )),
         ..default()
     });
 
-    // 角部点光：室内补光，沿用 0.3.2 的思路（灯光是稳定环境，客户端可直接渲染）。
-    let corner = map::training::layout().half_extent;
-    for pos in [(corner, 2.6, corner), (corner, 2.6, -corner), (-corner, 2.6, corner), (-corner, 2.6, -corner)] {
+    // 补光（无阴影，压低阴影死黑，保持旧版露天观感）
+    commands.spawn(DirectionalLightBundle {
+        directional_light: DirectionalLight {
+            illuminance: 1_500.0,
+            shadows_enabled: false,
+            ..default()
+        },
+        transform: Transform::from_rotation(Quat::from_euler(
+            EulerRot::XYZ,
+            -0.3,
+            -1.5,
+            0.0,
+        )),
+        ..default()
+    });
+
+    // 角部点光：随活动地图（1×1km 草坪场）的四角布置（0.3.2 数值 80000/60m）。
+    let corner = map::lawn::HALF;
+    for pos in [(corner, 2.5, corner), (-corner, 2.5, corner), (corner, 2.5, -corner), (-corner, 2.5, -corner)] {
         commands.spawn(PointLightBundle {
             point_light: PointLight {
-                intensity: 60_000.0,
-                color: Color::srgb(0.92, 0.88, 0.8),
-                range: 42.0,
+                intensity: 80_000.0,
+                color: Color::srgb(0.9, 0.85, 0.75),
+                range: 60.0,
                 shadows_enabled: false,
                 ..default()
             },
@@ -56,15 +76,15 @@ pub fn spawn_world(
         });
     }
 
-    // 完整训练场（静态部分：地板 + props + glows）
-    spawn_map_layout(&map::training::layout(), commands, meshes, materials, world_assets);
+    // 完整草坪训练场（静态部分：地板 + props + glows）
+    spawn_map_layout(&map::lawn::layout(), commands, meshes, materials, world_assets);
 }
 
 /// 通用地图渲染器：把任意 `MapLayout` 的静态层落地为 bevy 实体。
 ///
 /// 为什么只渲染这三层：`targets`/`pickups` 与玩家一样是**服务端权威的动态实体**，
 /// 会经快照进入 `snapshot.rs` 对账；若这里再画一遍会出现双份。`stations` 仅登记
-/// 交互位，其桌面几何已在 `props` 里，改坐标只动 `map/training/*`。
+/// 交互位，其桌面几何已在 `props` 里，改坐标只动 `map/lawn/*`。
 fn spawn_map_layout(
     layout: &MapLayout,
     commands: &mut Commands,

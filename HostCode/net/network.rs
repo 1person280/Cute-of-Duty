@@ -86,15 +86,21 @@ pub struct ControlBuffer(
 #[derive(Resource, Clone)]
 pub struct NetOut(pub std::sync::mpsc::Sender<ClientMessage>);
 
-/// 后台网络拉取循环：连接、转发上行、把下行分路推入通道。
+/// 重连间隔：连接失败/掉线后等待多久再试（避免忙轮询，也给用户留出启服务端的时间）。
+const RECONNECT_INTERVAL: Duration = Duration::from_secs(2);
+
+/// 后台网络拉取循环：连接、转发上行、把下行分路推入通道，**断线自动重连**。
 ///
-/// 连接失败或意外断线时打印原因后继续（不 panic），渲染层仍能展示空场景，
-/// 便于与本机服务端分开排查。
+/// 设计动机（Why）：客户端与服务端是两个独立进程，玩家先开客户端是常见操作。若首次连接
+/// 失败就永久退出，画面会停在没有本人实体的空场景里（相机无处跟随、WASD 无处上报），
+/// 玩家只会看到"无法移动"。因此这里改为无限重连：失败后打印原因、`RECONNECT_INTERVAL`
+/// 后重试；重连成功会再收一次握手，`route_control_messages` 以新 `assigned_id` 覆盖本人
+/// 实体（幂等），渲染层无需特殊处理。
 pub fn run_pull_loop(
     addr: &str,
     snapshot_tx: mpsc::Sender<Vec<EntitySnapshot>>,
     control_tx: mpsc::Sender<ClientInbound>,
-    up_rx: mpsc::Receiver<ClientMessage>,
+    mut up_rx: mpsc::Receiver<ClientMessage>,
 ) {
     let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
         Ok(rt) => rt,
@@ -104,40 +110,56 @@ pub fn run_pull_loop(
         }
     };
 
-    if let Err(e) = rt.block_on(async move {
-        let start = Instant::now();
-        let mut session = Session::connect(addr).await?;
-        println!("已连接服务器，等待快照灌入场景...");
-
+    rt.block_on(async move {
         loop {
-            // 1) 转发 bevy 侧排队的上行意图（移动/选装/进场/撤离/延迟探测）
-            while let Ok(msg) = up_rx.try_recv() {
-                session.send(&msg).await?;
+            // 阶段1：建连（失败则等待后重试；不 panic、不退出线程）。
+            let start = Instant::now();
+            let mut session = match Session::connect(addr).await {
+                Ok(session) => session,
+                Err(e) => {
+                    eprintln!("[网络] {e}（{RECONNECT_INTERVAL:?} 后重试；请确认已先启动 cod_server.exe）");
+                    tokio::time::sleep(RECONNECT_INTERVAL).await;
+                    continue;
+                }
+            };
+            println!("已连接服务器 {addr}，等待快照灌入场景...");
+
+            // 阶段2：会话循环；任何收发错误都退到外层重连（而非终止线程）。
+            loop {
+                // 1) 转发 bevy 侧排队的上行意图（移动/选装/进场/撤离/延迟探测）
+                while let Ok(msg) = up_rx.try_recv() {
+                    if let Err(e) = session.send(&msg).await {
+                        eprintln!("[网络] {e}");
+                        break;
+                    }
+                }
+
+                // 2) 接收一行下行并按类型分路
+                match session.recv().await {
+                    Ok(ServerMessage::Snapshot { entries, .. }) => {
+                        let _ = snapshot_tx.send(entries);
+                    }
+                    Ok(ServerMessage::Handshake { assigned_id, .. }) => {
+                        let connect_ms = start.elapsed().as_secs_f32() * 1000.0;
+                        let _ = control_tx.send(ClientInbound::Connected {
+                            assigned_id,
+                            connect_ms,
+                        });
+                    }
+                    Ok(other) => {
+                        let _ = control_tx.send(ClientInbound::Server(other));
+                    }
+                    Err(e) => {
+                        eprintln!("[网络] {e}（{RECONNECT_INTERVAL:?} 后重连）");
+                        break;
+                    }
+                }
+
+                // 避免忙轮询
+                std::thread::sleep(Duration::from_millis(1));
             }
 
-            // 2) 接收一行下行并按类型分路
-            match session.recv().await? {
-                ServerMessage::Snapshot { entries, .. } => {
-                    let _ = snapshot_tx.send(entries);
-                }
-                ServerMessage::Handshake { assigned_id, .. } => {
-                    let connect_ms = start.elapsed().as_secs_f32() * 1000.0;
-                    let _ = control_tx.send(ClientInbound::Connected {
-                        assigned_id,
-                        connect_ms,
-                    });
-                }
-                other => {
-                    let _ = control_tx.send(ClientInbound::Server(other));
-                }
-            }
-
-            // 避免忙轮询
-            std::thread::sleep(Duration::from_millis(1));
+            tokio::time::sleep(RECONNECT_INTERVAL).await;
         }
-        #[allow(unreachable_code)]
-        Ok::<(), String>(())
-    }) {
-        eprintln!("[网络] {e}");
-    }
+    });
 }
