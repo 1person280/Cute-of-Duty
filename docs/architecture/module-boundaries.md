@@ -87,7 +87,7 @@
 | `combat` | 战斗：命中/弹道/技能/手雷 | 战斗意图与结算结果 | `CombatIntent`、`use_item_at` | Event 回执 | L1 |
 | `damage` | 伤害管线（packet → resolver → effect） | 伤害结算中间态 | 纯函数 + 事件 | 消费伤害包 | L1 |
 | `gamemode` | 玩法模式规则 | 模式状态 | 模式查询 | 无 | L0 |
-| `interact` | 站点/拾取交互与结算（`settle`、`InteractChoice`） | 交互目标与结算 | `INTERACT_RANGE`、`SupplyKind` | Event 回执 | **L1→L2 待定** |
+| `interact` | 站点/拾取交互与结算（`settle`、`InteractChoice`） | 交互目标与结算 | `INTERACT_RANGE`、`SupplyKind` | Event 回执 | **L1→L2 待定**（定级前按 L2 流程，见 [CONTRIBUTING 第九节](../../CONTRIBUTING.md)） |
 | `net` | 协议线格式、会话、AOI、广播 | 连接会话 | `protocol`、`session`、`broadcaster` | 收发消息 | **L2（线格式）** |
 | `storage` | 冷数据持久化（json_log / cold_repo） | 落盘数据 | `thiserror` 错误类型 | 无 | L1 |
 | `hal` | 硬件抽象（平台相关） | 无 | Trait | 无 | L0 |
@@ -180,6 +180,10 @@
 - 表现代码去向：相机 → `world/camera.rs`；体素绘制 → `world`；HUD → `hud/*`；面板装配态 → `menu/*`。
 - 收官判据：`launcher/mod.rs` 不含任何组件/资源定义；仍超 600 行则按语义化子文件拆分，`mod.rs` 保持薄网关。
 
+**实测现状（2026-09-26 复核）**：`launcher/mod.rs` 已缩至 **147 行**，相机/世界/HUD/面板的**表现代码均已迁出**（改为委托 `world::*` / `hud::*` / `menu::*`）——"承载全部渲染表现"的前提**已不成立**。**残留 2 处未达标**（待 ADR 0003/0004 实施）：
+1. `use cute_of_duty_server::net::protocol::{ClientMessage, EntitySnapshot}` —— 跨 crate 直连服务端类型（违铁律 1 判据②）；
+2. `spawn_scene` 内 `insert_resource(CubeMesh / AmbientLight)` —— 定义资源（违 ADR 0004「launcher 禁定义组件/资源」）。
+
 详见 [ADR 0004 · 客户端表现层收敛](../adr/0004-client-layer-convergence.md)。
 
 ### 冲突 5 · `combat` 与 `items` 的编排位置
@@ -208,6 +212,8 @@
 > `hud` / `net` 的输入门控一律读 `ModalState::blocks_gameplay_input()`，**不得**各自拼 `&& !a.open && !b.open`。
 
 > ⚠️ 服务端的现有事件枚举清单与订阅关系图**待补**（见第三节 `?`）。本栏填完前，不得把现有直接调用改成事件。
+> **责任与时序**：该清单由**服务端 owner** 在解冻前补齐（第七节待补项）；补齐前"把现有调用改事件"冻结。
+> **已知豁免**：上表 4 个客户端模态事件已登记，不受此限。
 
 ---
 
@@ -245,6 +251,10 @@ L? — <依据>；破坏性变更流程…
 - [ ] `HostCode/hud/module.md`（依据 ADR 0004：禁 `use crate::menu::`）
 - [ ] 其余模块（见第三节/第四节表）
 - [ ] 服务端事件清单与订阅关系图（补第三节 `?` 列）
+
+**过渡纪律（当前 `module.md` 落地 = 0）**
+- 未补期间：任何触碰某模块的 PR，必须**同时**补该模块 `module.md`，否则不予合入（"碰到就补，不碰不堵"）。
+- `L2` 集合以本文件成熟度列为准；标注 `待定` 的模块（`interact`）定级前按 L2 流程处理。
 
 ---
 

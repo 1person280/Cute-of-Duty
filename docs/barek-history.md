@@ -24,6 +24,24 @@
 
 ---
 
+## [0.6-Snapshot-7] · 2026-09-26 · 架构边界体系落地 + 扁平化清理（**无玩法变更**）
+
+- **变更类型**：Refactor（规范修订 + 目录清理 + 冷数据路径修正；**不含任何玩法行为变更**）
+- **影响模块**：全仓库（规范层）、`ServerCode/storage`、`ServerCode/main.rs`、`HostCode/launcher`（删除空目录）
+- **兼容性**：**兼容** —— 无协议字段/语义变更，客户端与服务端无需同版本强绑
+  - **例外（数据布局，非线格式）**：**默认**冷数据目录由 `ServerCode/data/profiles/**profiles**/` 修正为
+    `ServerCode/data/profiles/`（原代码默认路径多嵌套一层，与其自述布局矛盾）。现存档案已随本快照迁移。
+- **迁移指南**：不适用（非 `x+1`）。**仅默认路径受影响**：仓库内现存档案已上移一格。
+  设了 `COD_DATA_DIR` 的用户**不受影响**（环境变量路径直通，未参与本次修正）。
+- **内容**：
+  - CONTRIBUTING 第六～十二章**逐条封闭 8 条边界漏洞**（判据/命名/契约层载体/L2 集合/铁律4/`module.md` 过渡态/版本号映射/事件清单责任）。
+  - 同步 `module-boundaries.md`（`interact` 定级、事件清单责任、过渡纪律；冲突 4 复核标注"前提已不成立"）。
+  - 目录清理：删空目录 `HostCode/render/`；修冷数据双重嵌套。
+- **验证**：`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server` **94 passed / 0 failed**
+- **关联**：CONTRIBUTING.md、[module-boundaries](architecture/module-boundaries.md)、[ADR 0001–0004](adr/)
+
+---
+
 ## [未发布] · 2026-09-26 · 模块化单体目标架构确立（文档先行，未改代码）
 
 - **变更类型**：Refactor（仅新增文档与规范，**未改任何代码**）

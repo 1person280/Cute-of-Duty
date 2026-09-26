@@ -27,6 +27,11 @@
 
 ## 二、目录规范（新增文件前必读）
 
+> ⚠️ **本节正文仍是旧的单 crate 布局（`src/` + `src/demo` + feature `demo`）**，
+> 与第六节起的 `HostCode` / `ServerCode` 双 crate 实际结构**不一致**。
+> **通用规则**（≤600 行 / 语义化命名 / 无循环依赖 / 禁 `common`·`utils` / `mod.rs` 只做网关 / 公开路径不变式）**继续有效**；
+> **目录与 feature 相关表述一律以第六节及之后为准。**
+
 ### 放哪里？
 
 - **核心业务逻辑** → `src/<模块>/`，遵循 `lib.rs` 里声明的 11 个核心模块划分。
@@ -114,10 +119,10 @@ cargo check --features demo     # 3D Demo 侧改动后必跑（bevy 已缓存，
 
 | # | 铁律 | 判定方式（Reviewer 怎么查） |
 |---|---|---|
-| 1 | **禁跨模块直接调用** | 搜 `use crate::<别的模块>::`。跨模块只允许 ①经 Trait（`XxxPort`）②经事件。**同层禁止横向调用**（如 `hud` 不许 `use crate::menu::*`）。 |
+| 1 | **禁跨模块直接调用** | **三层判据缺一不可**：①**同 crate 跨模块** —— 搜 `use crate::<别的模块>::`；②**跨 crate** —— `HostCode/Cargo.toml` 不得含 `cute_of_duty_server`，`grep -r "cute_of_duty_server" HostCode/` 须为空（见 [ADR 0003](docs/adr/0003-contract-crate.md)）；③**同层横向** —— 搜 `use crate::menu::` 于 `hud/`、`net/`，命中即违规。跨模块只允许 ①经 Trait（`XxxPort`）②经事件。 |
 | 2 | **数据所有权唯一** | 每份可变状态有且只有一个 owning 模块。他人只能持**快照/句柄**，不得持 `&mut`，不得回写。 |
 | 3 | **依赖无环 + 单向分层** | 只许 `表现层 → 契约层 → 领域层 → 基础设施层`。新增依赖前**必须**在 PR 里贴依赖图。 |
-| 4 | **接口先于实现** | 对外能力先写 `pub trait XxxPort`，再写实现；实现必须可替换、可 mock。 |
+| 4 | **接口先于实现** | **跨 crate / 跨进程**能力先写 `pub trait XxxPort`，再写实现；实现必须可替换、可 mock。**crate 内**模块间在 L0/L1 允许普通函数（如 `layout()`、`model_preset()`），但**升 L2 前必须先 Trait 化**（见第九节成熟度）。 |
 | 5 | **契约机器可读** | 跨模块/跨进程载荷必须在 `docs/contracts/*.yaml` 有定义；代码是契约的实现，不是定义。 |
 
 **分层归属**（新增文件前先想清楚它属于哪层）
@@ -125,11 +130,13 @@ cargo check --features demo     # 3D Demo 侧改动后必跑（bevy 已缓存，
 | 层 | 归属 | 硬性约束 |
 |---|---|---|
 | 表现层 | `HostCode/*` | 只准"读快照 + 出画"；**零玩法判定** |
-| 契约层 | `docs/contracts/` | 只增不减；改语义必须升版本 |
+| 契约层 | `ContractCode`（crate `cute_of_duty_contract`）+ `docs/contracts/*.yaml` | **物理载体是独立 crate**（线格式类型 + 跨域载荷 + 共享常量 + Port Trait），YAML 是其机器可读描述。`ContractCode` 不得依赖 `ServerCode`/`HostCode`，依赖只有 `serde`/`thiserror`（见 [ADR 0003](docs/adr/0003-contract-crate.md)）。只增不减；改语义必须升版本 |
 | 领域层 | `ServerCode/*`（除 net/config/storage/hal） | **零 bevy**；一切"应该算什么"的唯一权威 |
 | 基础设施层 | `ServerCode/{config,storage,hal,net}` | `config` 只读单例，**任何模块禁写** |
 
-**唯一的编排者**：`ServerCode/main.rs` 与 `HostCode/main.rs`。只有入口 binary 可以同时持有多个模块的句柄并把它们接起来；库内模块之间不许互相接线。
+**唯一的编排者**：服务端 `ServerCode/main.rs`；客户端装配者 `HostCode/launcher`（`HostCode/main.rs` 只是入口：做 `mod` 声明 + `launcher::run`，**不参与编排**）。只有它们可以同时持有多个模块的句柄并把它们接起来；库内模块之间不许互相接线。
+
+**编排者的唯一豁免**：`launcher` 允许 `use crate::hud::xxx_system` 等**引用各模块导出的系统函数**以执行 `add_systems` —— 这是装配者唯一被允许的跨模块动作；但**不得** `use crate::hud::<组件/资源类型>` 去自己写逻辑（见 [ADR 0004](docs/adr/0004-client-layer-convergence.md)）。
 
 ## 6.2 事件总线约定
 
@@ -138,6 +145,8 @@ cargo check --features demo     # 3D Demo 侧改动后必跑（bevy 已缓存，
 - **时序**：发布者**不等待**订阅者。需要回执的场景 → "事件 + 关联 ID"，**不得用返回值回传**。
 - **所有权**：载荷按值传递（`Clone` / `Arc`）；订阅者**不得回写**发布者数据。
 - **迁移纪律**：现有直接调用改事件**必须**先补齐事件清单与订阅关系图（见 module-boundaries 第六节），否则不许动。
+  **责任与时序**：事件清单由**服务端 owner** 在解冻前补齐（module-boundaries 第七节待补项）；补齐前"把现有调用改事件"冻结。
+  **已知豁免**：ADR 0004 已登记的 4 个客户端模态事件（`menu`/`hud` 的 `modal_opened`/`modal_closed`）不受此限——它们已有清单。
 
 ---
 
@@ -155,6 +164,17 @@ cargo check --features demo     # 3D Demo 侧改动后必跑（bevy 已缓存，
 - 悄悄改字段**语义**而不升 `x`（例如把 `use_medkit: bool` 直接复用成别的含义）；
 - 删字段却不写迁移指南；
 - 客户端/服务端协议版本不一致时仍声称"兼容"。
+
+## 7.1 发布号 与 协议版本 是两套号，不得混用
+
+| 号 | 形态 | 用途 | 驱动什么 |
+|---|---|---|---|
+| **发布号** | `<版本线>-Snapshot-<N>`（如 `0.6-Snapshot-7`） | 面向玩家的里程碑标记（GitHub Release / README 版本表） | **不驱动**兼容性，纯发布标记 |
+| **协议版本** | `x.y.z`（记录在 `docs/contracts/*.yaml` 的 `version`） | 线格式 / 契约兼容性 | `x+1`/`y+1`/`z+1` 规则 + BarekHistory 条目 |
+
+> `Snapshot-N` **不映射**到 `x.y.z`。改协议 → 动 `x.y.z` 并写 BarekHistory；改发布 → 只动发布号。
+> （历史遗留：README / barek-history 曾出现 `0.7-Snapshot-7` / `[0.8.0-Snapshot-8]` 的 WIP 号，
+> 那批快照**未发布且已被冻结**；正式发布线以 `0.6-Snapshot-N` 连续编号为准。）
 
 ---
 
@@ -189,6 +209,18 @@ cargo check --features demo     # 3D Demo 侧改动后必跑（bevy 已缓存，
 | L2 | 对外契约（被其它 crate / 线格式依赖） | 破坏性变更须迁移指南 + 契约同步 + `x+1` | **≥2 名 reviewer，maintainer 必须参与** |
 | L3 | 冻结 | **只允许加性变更，语义不可改** | 同 L2 |
 
+**`module.md` 过渡态（当前落地 0，必须带纪律）**
+
+> 实测：仓库现有 `module.md` 数量 = **0**。因此第九节不是"锦上添花"，必须带过渡纪律：
+> 1. **优先补**清单见 [module-boundaries 第七节](docs/architecture/module-boundaries.md)；
+> 2. **未补期间**：任何触碰某模块的 PR，必须**同时**补上该模块的 `module.md`，否则不予合入（"碰到就补，不碰不堵"）；
+> 3. 待清单全部勾掉后，本条降级为常规要求。
+
+**`L2` 集合以权威表为准（禁用"等"字兜底）**
+
+> L2 集合 = [module-boundaries 成熟度列](docs/architecture/module-boundaries.md) 中标记为 L2 的模块。
+> 标注为 `待定` 的模块（当前：`interact`）在**定级前按 L2 流程处理**（保守优先），避免"待定"成为免审通道。
+
 ---
 
 # 十、避坑清单（本项目已实际踩过）
@@ -211,7 +243,7 @@ cargo check --features demo     # 3D Demo 侧改动后必跑（bevy 已缓存，
 |---|---|---|
 | 缺陷修复、文档补全、测试补充 | ✅ 直接提 PR | — |
 | L0 / L1 模块内的重构与功能 | ✅ 提 PR | 需附依赖图与验证方式 |
-| **L2 模块（`net` / 契约 / 公共 Trait）改动** | ⚠️ **先开 Issue 对齐** | 必须附迁移指南，≥2 reviewer |
+| **L2 模块（`net` 线格式 / 契约层 `ContractCode` / 公共 Trait）改动** | ⚠️ **先开 Issue 对齐** | 必须附迁移指南，≥2 reviewer |
 | 新增顶层模块 / 把模块提取为独立 crate | ⚠️ **先开 Issue 对齐** | 必须先在 `module-boundaries.md` 定边界 |
 | 绕过 `stop-doing.md` 冻结项 | ❌ 直接关闭 | — |
 

@@ -6,8 +6,9 @@
 //! 契合底层冻结红线与磁盘空间限制，崩溃后"重放到最后一致点 + 至少一次持久"。
 //!
 //! 目录解析（Why）：仓库根目录**配置驱动**——优先读环境变量 `COD_DATA_DIR`，
-//! 否则回退到 workspace 根的 `ServerCode/data/profiles`（复用 `config::project_root`
-//! 逐级向上定位）。既满足"配置驱动动态切换"，又不引入配置文件类型负担。
+//! 否则回退到 workspace 根的 `ServerCode/data`（复用 `config::project_root`
+//! 逐级向上定位），玩家档案再由 `json_log` 落到其 `profiles/` 子目录。
+//! 既满足"配置驱动动态切换"，又不引入配置文件类型负担。
 
 use std::path::PathBuf;
 
@@ -20,13 +21,13 @@ pub use error::StorageError;
 pub use json_log::JsonLogRepo;
 
 /// 仓库根目录相对 workspace 根的路径（配置驱动默认值）。
-const DATA_DIR_REL: &str = "ServerCode/data/profiles";
+const DATA_DIR_REL: &str = "ServerCode/data";
 /// 环境变量覆盖：设置 `COD_DATA_DIR` 即可把冷数据迁到任意磁盘/目录。
 const ENV_DATA_DIR: &str = "COD_DATA_DIR";
 
 /// 解析冷数据仓库根目录。
 ///
-/// 优先级：`COD_DATA_DIR` 环境变量 > workspace 根下的 `ServerCode/data/profiles`。
+/// 优先级：`COD_DATA_DIR` 环境变量 > workspace 根下的 `ServerCode/data`。
 /// 解析失败（无法定位 workspace 根且未设环境变量）返回 `None`，由调用方决定兜底
 /// （如告警并禁用持久化，而非静默写错目录）。
 pub fn resolve_data_dir() -> Option<PathBuf> {
@@ -40,9 +41,9 @@ pub fn resolve_data_dir() -> Option<PathBuf> {
 
 /// 打开仓库的便捷入口：解析目录并 `JsonLogRepo::open`。
 pub fn open_repo() -> Result<JsonLogRepo, StorageError> {
-    // 解析失败时回退到当前目录下的 `data/profiles`，保证服务端总能启动，
-    // 并让告警归调用方（主循环）负责。
+    // 解析失败时回退到当前目录下的 `data`（档案再由 json_log 落到 data/profiles），
+    // 保证服务端总能启动，并让告警归调用方（主循环）负责。
     let dir = resolve_data_dir()
-        .unwrap_or_else(|| PathBuf::from("data").join("profiles"));
+        .unwrap_or_else(|| PathBuf::from("data"));
     JsonLogRepo::open(dir)
 }

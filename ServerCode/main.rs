@@ -94,7 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // 冷数据仓库（玩家档案/背包/货币/战绩——跨局需保存、重连要续回的数据）
-    // 配置驱动目录：环境变量 COD_DATA_DIR > workspace 根 ServerCode/data/profiles。
+    // 配置驱动目录：环境变量 COD_DATA_DIR > workspace 根 ServerCode/data（档案落其 profiles/ 子目录）。
     let mut repo = cute_of_duty_server::storage::open_repo()?;
     info!("冷数据仓库就绪: {}", repo_dir_display());
 
@@ -116,7 +116,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn repo_dir_display() -> String {
     cute_of_duty_server::storage::resolve_data_dir()
         .map(|p| p.display().to_string())
-        .unwrap_or_else(|| "<未解析，回退 data/profiles>".to_string())
+        .unwrap_or_else(|| "<未解析，回退 data>".to_string())
 }
 
 /// 服务器权威主循环：60Hz 固定 Tick + 输入消费 + 快照广播。
