@@ -155,7 +155,7 @@ type GhostQ<'w, 's> = Query<
 // ——— 工具 ———
 fn carried_index(sel: &ArsenalSelection, pool_idx: usize) -> Option<usize> {
     let name = MVP_ITEMS.get(pool_idx)?;
-    sel.0.iter().position(|it| it.as_str() == name)
+    sel.0.iter().position(|it| it.as_str() == *name)
 }
 
 /// 4 列网格容器样式（自动换行成 3 行）。
