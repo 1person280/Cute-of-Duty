@@ -17,6 +17,8 @@ use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 
+use crate::interact::InteractChoice;
+use crate::items::TransferDir;
 use crate::net::protocol::{ClientMessage, InventoryAction, PlayerInput, ServerMessage};
 
 /// 客户端连接向服务端权威主循环投递的事件。
@@ -36,6 +38,10 @@ pub enum NetCommand {
     ExtractRequest { conn_id: u64 },
     /// 切换干员（权威写回战斗组件索引）
     SwitchOperator { conn_id: u64, operator_id: u32 },
+    /// 交互意图（权威做距离校验与效果发放）
+    Interact { conn_id: u64, target: u64, choice: InteractChoice },
+    /// 物资箱逐格转移意图（权威做距离校验 + 格位裁决）
+    LootTransfer { conn_id: u64, target: u64, dir: TransferDir, index: usize },
     /// 延迟探测（原样回显 Pong）
     Ping { conn_id: u64, seq: u64 },
     /// 连接断开（主动 Disconnect 或对端关闭/异常）
@@ -186,6 +192,12 @@ async fn read_loop(mut reader: OwnedReadHalf, conn_id: u64, rt: Arc<NetRuntime>)
                     }
                     ClientMessage::SwitchOperator { operator_id } => {
                         let _ = rt.cmd_tx.send(NetCommand::SwitchOperator { conn_id, operator_id });
+                    }
+                    ClientMessage::Interact { target, choice } => {
+                        let _ = rt.cmd_tx.send(NetCommand::Interact { conn_id, target, choice });
+                    }
+                    ClientMessage::LootTransfer { target, dir, index } => {
+                        let _ = rt.cmd_tx.send(NetCommand::LootTransfer { conn_id, target, dir, index });
                     }
                     ClientMessage::Ping { seq } => {
                         let _ = rt.cmd_tx.send(NetCommand::Ping { conn_id, seq });

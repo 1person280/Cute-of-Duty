@@ -143,7 +143,10 @@ pub struct TargetSpec {
 }
 
 /// 拾取物类型（数据层枚举，渲染层映射为具体道具与颜色）
-#[derive(Clone, Copy, Debug)]
+///
+/// serde 派生说明（Why）：该枚举同时是快照契约里的"可交互语义"（见 `interact`），
+/// 故需可序列化；数值/元素随线格式下发，客户端只展示、不裁决。
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum PickupKind {
     Ammo { amount: i32 },
     Health { amount: f32 },
@@ -155,7 +158,7 @@ pub enum PickupKind {
 }
 
 /// 功能站点类型：玩家靠近按 F 打开交互面板
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum StationKind {
     /// 无限物资补给台
     SupplyTable,

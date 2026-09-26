@@ -61,11 +61,16 @@ pub(crate) fn supply_line() -> Vec<PickupSpec> {
     ]
 }
 
-/// 功能站点登记：补给台 + 干员切换台（demo 侧据此生成可交互站点）
+/// 出生点前方可交互物资箱的世界坐标（玩家自 [0,0,470] 面向 -z，箱子在其右前方 8m）。
+pub const CRATE_POS: [f32; 3] = [4.0, 0.45, 462.0];
+
+/// 功能站点登记：补给台 + 干员切换台 + 出生点物资箱（demo 侧据此生成可交互站点）
 pub(crate) fn stations() -> Vec<StationSpec> {
     vec![
         StationSpec { pos: [-5.0, 0.78, SUPPLY_LINE_Z], kind: StationKind::SupplyTable, label: "补给台" },
         StationSpec { pos: [5.0, 0.78, SUPPLY_LINE_Z], kind: StationKind::OperatorDesk, label: "干员切换台" },
+        // 出生点右前方的物资箱：落地可交互，开箱一次性发放弹药/医疗/护甲。
+        StationSpec { pos: CRATE_POS, kind: StationKind::SupplyCrate, label: "物资箱" },
     ]
 }
 

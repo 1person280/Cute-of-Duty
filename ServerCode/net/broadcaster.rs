@@ -21,9 +21,35 @@ pub fn build_snapshot(world: &World, seq: u64, observer: (f32, f32, f32)) -> Ser
         .iter()
         .map(|e| {
             // 战斗展示字段：玩家实体读权威 Combatant，其余实体无战斗态则占位
-            let (weapon_index, ammo, operator_id, skill_cd_q, skill_cd_e) = match e.get_component::<Combatant>() {
-                Some(cb) => (0u8, cb.ammo, cb.operator_idx as u32, cb.skill_q_cd, cb.skill_e_cd),
-                None => (0u8, -1, 0u32, 0.0, 0.0),
+            let (weapon_elements, active_slot, ammo, ammo_max, ammo_pool, reload_remaining, operator_id, skill_cd_q, skill_cd_e) =
+                match e.get_component::<Combatant>() {
+                    Some(cb) => (
+                        Some([cb.weapons[0].element, cb.weapons[1].element]),
+                        cb.active_slot as u8,
+                        cb.active().ammo,
+                        cb.active().max_ammo,
+                        cb.ammo_pool,
+                        cb.reload_timer,
+                        cb.operator_idx as u32,
+                        cb.skill_q_cd,
+                        cb.skill_e_cd,
+                    ),
+                    None => (None, 0u8, -1, -1, -1, 0.0, 0u32, 0.0, 0.0),
+                };
+            // 格位内容：玩家背包 / 物资箱容器（各自权威，客户端只画两个 4×3 网格）。
+            let backpack = e
+                .get_component::<crate::items::Backpack>()
+                .map(|bp| bp.slots.clone());
+            let container = e
+                .get_component::<crate::items::Container>()
+                .map(|ct| ct.slots.clone());
+            // 造型裁决：物资箱站点虽是 Station 实体，但语义上是"木箱"，覆盖为对应预设，
+            // 其余实体沿用按类型派生的默认造型（"这个实体长什么样"归服务端）。
+            let model_preset = match e.get_component::<crate::interact::Interactable>() {
+                Some(it) if it.kind == crate::interact::InteractKind::Station(crate::map::StationKind::SupplyCrate) => {
+                    crate::model::ModelPreset::SupplyCrate
+                }
+                _ => crate::model::ModelPreset::from_entity_type(e.entity_type),
             };
             EntitySnapshot {
                 entity_id: e.id.as_u64(),
@@ -32,14 +58,24 @@ pub fn build_snapshot(world: &World, seq: u64, observer: (f32, f32, f32)) -> Ser
                 z: e.position.z,
                 hp: e.hp,
                 is_alive: e.is_alive,
-                model_preset: crate::model::ModelPreset::from_entity_type(e.entity_type),
+                model_preset,
                 element_state: e.element_state.clone(),
                 armor: e.armor,
-                weapon_index,
+                weapon_elements,
+                active_slot,
                 ammo,
+                ammo_max,
+                ammo_pool,
+                reload_remaining,
                 operator_id,
                 skill_cd_q,
                 skill_cd_e,
+                // 可交互语义（拾取物/功能站点）；其余实体为 None。
+                interact: e
+                    .get_component::<crate::interact::Interactable>()
+                    .map(|it| it.info()),
+                backpack,
+                container,
             }
         })
         .collect();

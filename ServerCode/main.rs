@@ -19,6 +19,8 @@ use cute_of_duty_server::engine::{GameLoop, TickConfig};
 use cute_of_duty_server::entity::EntityId;
 use cute_of_duty_server::equipment::EquipmentSystem;
 use cute_of_duty_server::inventory;
+use cute_of_duty_server::items::{self, Backpack, Container, TransferDir, TransferResult};
+use cute_of_duty_server::map::PickupKind;
 use cute_of_duty_server::net::protocol::{EventKind, InventoryAction, PlayerInput, ServerMessage};
 use cute_of_duty_server::net::{self, NetCommand, NetRuntime};
 use cute_of_duty_server::player::PlayerProfile;
@@ -74,7 +76,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 活动地图 = 0.3.2 运行时使用的 `map::lawn`（1×1km 露天搜打撤大场）。
     let training = cute_of_duty_server::map::lawn::layout();
     cute_of_duty_server::combat::range::spawn_range_targets(sim.world_mut(), &training.targets);
-    info!("训练场已就绪：{} 个靶机进场", training.targets.len());
+    let (pickups, stations) =
+        cute_of_duty_server::interact::spawn_from_layout(sim.world_mut(), &training);
+    info!(
+        "训练场已就绪：{} 个靶机 / {} 个拾取物 / {} 个功能站点进场",
+        training.targets.len(),
+        pickups,
+        stations
+    );
 
     // 网络会话运行时
     let mut runtime = NetRuntime::new();
@@ -176,6 +185,8 @@ async fn serve_authoritative(
             input.reload = false;
             input.skill_q = false;
             input.skill_e = false;
+            input.weapon_slot = None;
+            input.use_slot = None;
         }
 
         // 阶段2：推进确定性模拟一个 Tick
@@ -277,12 +288,19 @@ fn drain_commands(
                 // 的同 Tick 输入覆盖，故按位「或」锁存，直到被某次 Tick 消费后清空（见阶段1.5），
                 // 保证单次按键既不因乱序丢失、也不被重复触发。
                 let slot = conn_input.entry(conn_id).or_default();
-                let (pending_reload, pending_q, pending_e) =
-                    (slot.reload, slot.skill_q, slot.skill_e);
+                let (pending_reload, pending_q, pending_e, pending_weapon, pending_use_slot) =
+                    (slot.reload, slot.skill_q, slot.skill_e, slot.weapon_slot, slot.use_slot);
                 *slot = player;
                 slot.reload |= pending_reload;
                 slot.skill_q |= pending_q;
                 slot.skill_e |= pending_e;
+                // 切枪 / 速用格位 Intent 均为"最新优先"：本帧无请求时保留同 Tick 更早一次的请求
+                if slot.weapon_slot.is_none() {
+                    slot.weapon_slot = pending_weapon;
+                }
+                if slot.use_slot.is_none() {
+                    slot.use_slot = pending_use_slot;
+                }
             }
             NetCommand::Inventory { conn_id, action } => {
                 apply_inventory_action(
@@ -326,6 +344,36 @@ fn drain_commands(
                 if let Some(&eid) = conn_entity.get(&conn_id) {
                     combat::switch_operator(sim.world_mut(), eid, operator_id);
                 }
+            }
+            NetCommand::Interact { conn_id, target, choice } => {
+                let Some(&eid) = conn_entity.get(&conn_id) else { continue };
+                // 权威结算（距离校验 + 效果发放），完成后按需销毁被消耗的拾取物/物资箱。
+                let (text, consumed) = cute_of_duty_server::interact::settle(
+                    sim.world_mut(),
+                    eid,
+                    EntityId::new(target),
+                    choice,
+                );
+                if consumed {
+                    sim.world_mut().despawn(EntityId::new(target));
+                }
+                rt.send_to(
+                    conn_id,
+                    ServerMessage::Event {
+                        kind: EventKind::Announce { text },
+                    },
+                );
+            }
+            NetCommand::LootTransfer { conn_id, target, dir, index } => {
+                let Some(&eid) = conn_entity.get(&conn_id) else { continue };
+                // 权威裁决格位转移（距离校验 + 格位移动 + 即时效果），回执经 Event 播报。
+                let text = handle_loot_transfer(sim, eid, EntityId::new(target), dir, index);
+                rt.send_to(
+                    conn_id,
+                    ServerMessage::Event {
+                        kind: EventKind::Announce { text },
+                    },
+                );
             }
             NetCommand::Ping { conn_id, seq } => {
                 // 延迟探测：原样回显，客户端据此算往返延迟
@@ -416,6 +464,56 @@ fn apply_inventory_action(
             kind: EventKind::Announce { text: reply },
         },
     );
+}
+
+/// 权威裁决一次物资箱逐格转移（`dir` 决定取出/放回），返回回执文本。
+///
+/// 服务端权威（Why）："这一格是什么、背包放不放得下、弹药入池还是武器换手"全部
+/// 属于应该算的服务端职责——客户端只上报"哪一格、哪个方向"，本函数做距离校验、
+/// 调 [`items::transfer`] 裁决格位，并对不占格的即时物品（弹药/武器）施加效果。
+fn handle_loot_transfer(
+    sim: &mut GameLoop,
+    player: EntityId,
+    target: EntityId,
+    dir: TransferDir,
+    index: usize,
+) -> String {
+    // 距离校验（与交互同口径：平面距离，忽略 Y）
+    let (Some(p), Some(t)) = (sim.world().get_entity(player), sim.world().get_entity(target)) else {
+        return "目标不存在".to_string();
+    };
+    let dx = t.position.x - p.position.x;
+    let dz = t.position.z - p.position.z;
+    if (dx * dx + dz * dz).sqrt() > cute_of_duty_server::interact::INTERACT_RANGE {
+        return "距离太远，无法取物".to_string();
+    }
+
+    // 两端同时可变：玩家背包 ↔ 物资箱容器（`with_pair_mut` 以安全手法做拆分借用）。
+    let result = sim.world_mut().with_pair_mut(player, target, |pe, te| {
+        match (pe.get_component_mut::<Backpack>(), te.get_component_mut::<Container>()) {
+            (Some(bp), Some(ct)) => Some(items::transfer(bp, ct, dir, index)),
+            _ => None,
+        }
+    });
+    let Some(result) = result else {
+        return "该目标不可取物".to_string();
+    };
+
+    match result {
+        None => "该目标不是物资箱".to_string(),
+        Some(TransferResult::Moved(text)) | Some(TransferResult::Rejected(text)) => text,
+        Some(TransferResult::Apply(kind, text)) => {
+            // 不占格物品：弹药直接入备弹池、武器装进当前手持槽（均由 combat 权威落点施加）。
+            match kind {
+                PickupKind::Ammo { amount } => combat::add_ammo_pool(sim.world_mut(), player, amount),
+                PickupKind::Weapon { element } => {
+                    combat::equip_weapon(sim.world_mut(), player, element)
+                }
+                _ => {}
+            }
+            text
+        }
+    }
 }
 
 /// 撤离请求的权威判定：读取玩家在权威世界的坐标，与撤离点做平面距离校验。
@@ -527,6 +625,8 @@ fn apply_input(sim: &mut GameLoop, eid: EntityId, input: &PlayerInput, dt: f32) 
             skill_e: input.skill_e,
             yaw: input.aim_yaw,
             pitch: input.aim_pitch,
+            weapon_slot: input.weapon_slot,
+            use_slot: input.use_slot,
         },
     );
 }

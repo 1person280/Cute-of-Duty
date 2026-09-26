@@ -33,6 +33,8 @@ pub enum ModelPreset {
     Obstacle,
     /// 训练靶（实弹靶机造型）
     AimTarget,
+    /// 功能站点（补给台/干员切换台/物资箱的矮台造型）
+    Station,
 }
 
 impl ModelPreset {
@@ -48,6 +50,7 @@ impl ModelPreset {
             EntityType::Loot => Self::SupplyCrate,
             EntityType::Obstacle => Self::Obstacle,
             EntityType::Target => Self::AimTarget,
+            EntityType::Station => Self::Station,
         }
     }
 }

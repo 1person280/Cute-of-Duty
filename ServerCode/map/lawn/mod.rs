@@ -207,14 +207,21 @@ mod tests {
         }
     }
 
-    /// 功能站点：两类各一，且踩在对应桌面的上沿
+    /// 功能站点：两类桌台各一（踩在桌面上沿）+ 出生点物资箱（落地）
     #[test]
     fn stations_cover_both_kinds_on_tables() {
         let l = layout();
-        assert_eq!(l.stations.len(), 2, "应有补给台与干员切换台两个站点");
+        assert!(l.stations.len() >= 3, "应有补给台/干员切换台/物资箱三类站点");
         assert!(l.stations.iter().any(|s| s.kind == StationKind::SupplyTable));
         assert!(l.stations.iter().any(|s| s.kind == StationKind::OperatorDesk));
+        assert!(l.stations.iter().any(|s| s.kind == StationKind::SupplyCrate), "缺出生点物资箱");
         for s in &l.stations {
+            // 物资箱落地摆放，不受"必须在桌面上"约束；其余桌台型站点须踩在桌面上沿。
+            if s.kind == StationKind::SupplyCrate {
+                assert!(s.pos[1] < 0.6, "物资箱应落地摆放: {:?}", s.pos);
+                assert!(s.pos[0].abs() <= HALF && s.pos[2].abs() <= HALF, "物资箱越界: {:?}", s.pos);
+                continue;
+            }
             assert!((0.5..=1.2).contains(&s.pos[1]), "站点交互位高度异常: {:?}", s.pos);
             let has_table = solid_props().iter().any(|p| {
                 p.pos[1] + p.aabb_half()[1] > 0.5

@@ -11,10 +11,17 @@ use crate::entity::{EntityId, EntityType, World};
 
 /// 尝试换弹：满足条件才开始，计时完成后由 `Combatant::on_tick` 补弹。
 pub fn try_reload(world: &mut World, eid: EntityId) {
+    let (ammo, max_ammo) = {
+        let Some(cb) = world.get_entity(eid).and_then(|e| e.get_component::<Combatant>()) else {
+            return;
+        };
+        let slot = cb.active();
+        (slot.ammo, slot.max_ammo)
+    };
     let Some(cb) = world.get_entity_mut(eid).and_then(|e| e.get_component_mut::<Combatant>()) else {
         return;
     };
-    if cb.reload_timer <= 0.0 && cb.ammo < cb.max_ammo && cb.ammo_pool > 0 {
+    if cb.reload_timer <= 0.0 && ammo < max_ammo && cb.ammo_pool > 0 {
         cb.reload_timer = RELOAD_TIME_SECS;
     }
 }
@@ -34,7 +41,7 @@ pub fn try_fire(
     pitch: f32,
     element: ElementType,
 ) {
-    // 阶段1：射手状态裁决（冷却 / 换弹 / 弹药），只改射手本身
+    // 阶段1：射手状态裁决（冷却 / 换弹 / 弹药），只改射手本身（作用于当前手持武器槽）
     let profile = crate::operator::rifle_profile(element);
     let (can_fire, origin_hit) = {
         let Some(cb) = world.get_entity_mut(eid).and_then(|e| e.get_component_mut::<Combatant>()) else {
@@ -44,15 +51,16 @@ pub fn try_fire(
             (false, Vec3::default())
         } else if cb.shoot_cooldown > 0.0 {
             (false, Vec3::default())
-        } else if cb.ammo <= 0 {
+        } else if cb.active().ammo <= 0 {
             // 打空自动换弹
             if cb.ammo_pool > 0 {
                 cb.reload_timer = RELOAD_TIME_SECS;
             }
             (false, Vec3::default())
         } else {
-            cb.ammo -= 1;
-            cb.shoot_cooldown = cb.fire_interval;
+            let interval = cb.fire_interval();
+            cb.active_mut().ammo -= 1;
+            cb.shoot_cooldown = interval;
             let o = Vec3::new(origin.x, origin.y + 1.5, origin.z);
             (true, o)
         }

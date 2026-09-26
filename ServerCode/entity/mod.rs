@@ -92,6 +92,8 @@ pub enum EntityType {
     Obstacle,
     /// 训练靶（实弹射击靶机）：可被射线命中并计分，填弹不致死
     Target,
+    /// 功能站点（补给台/干员切换台/物资箱）：静止不可破坏，靠近按 F 交互
+    Station,
 }
 
 impl Entity {
@@ -148,6 +150,31 @@ impl Entity {
     pub fn new_target(id: u64, position: Vec3) -> Self {
         let mut entity = Self::new(id, position);
         entity.entity_type = EntityType::Target;
+        entity.max_hp = f32::MAX;
+        entity.hp = f32::MAX;
+        entity.is_alive = true;
+        entity
+    }
+
+    /// 创建场上拾取物实体（弹药/医疗/护甲/手雷/武器）。
+    ///
+    /// 设计动机（Why）：拾取物的"是什么"（数值/元素）属于战局内容，由服务端权威裁决，
+    /// 故实体本身只固定类型与不可破坏性，具体语义挂在 `interact::Interactable` 组件上，
+    /// 由快照下发给客户端展示、由交互命令结算。
+    pub fn new_loot(id: u64, position: Vec3) -> Self {
+        let mut entity = Self::new(id, position);
+        entity.entity_type = EntityType::Loot;
+        // 拾取物不参与伤害结算（`shooter` 只认 AI/Target），血量取上限避免被误判死亡。
+        entity.max_hp = f32::MAX;
+        entity.hp = f32::MAX;
+        entity.is_alive = true;
+        entity
+    }
+
+    /// 创建功能站点实体（补给台/干员切换台/物资箱）：恒存活、不可移动，交互语义同样由组件承载。
+    pub fn new_station(id: u64, position: Vec3) -> Self {
+        let mut entity = Self::new(id, position);
+        entity.entity_type = EntityType::Station;
         entity.max_hp = f32::MAX;
         entity.hp = f32::MAX;
         entity.is_alive = true;
@@ -323,6 +350,30 @@ impl World {
     /// 实际实现应使用split_mut或unsafe代码，此处为简化版API。
     pub fn get_all_entities_mut(&mut self) -> std::collections::hash_map::ValuesMut<'_, EntityId, Entity> {
         self.entities.values_mut()
+    }
+
+    /// 同时对两个实体取得可变引用（如"背包 ↔ 物资箱"逐格转移）。
+    ///
+    /// 设计动机（Why）：逐格转移需要同时可变访问两个实体的组件，而 `get_entity_mut`
+    /// 只能逐个借用。此处以"暂存一端、借用另一端、再放回"的**纯安全**手法达成，
+    /// 避免 `unsafe` 裸指针；两端 ID 相同或无对应实体时返回 `None`（不改动世界）。
+    pub fn with_pair_mut<R>(
+        &mut self,
+        a: EntityId,
+        b: EntityId,
+        f: impl FnOnce(&mut Entity, &mut Entity) -> R,
+    ) -> Option<R> {
+        if a == b {
+            return None;
+        }
+        let mut first = self.entities.remove(&a)?;
+        let result = match self.entities.get_mut(&b) {
+            Some(second) => Some(f(&mut first, second)),
+            None => None,
+        };
+        // 无论闭包结果如何，先还原被暂存的实体，保持世界完整。
+        self.entities.insert(a, first);
+        result
     }
 
     /// 按ID排序遍历所有实体（确定性保证）

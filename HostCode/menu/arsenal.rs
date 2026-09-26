@@ -36,8 +36,16 @@ const ITEM_COLORS: [Color; 7] = [
     Color::srgb(0.40, 0.80, 0.42), // 毒素手雷·绿
 ];
 
-/// 背包容纳上限（0.3.2 参考版为 8 格；本阶段 7 类物资不溢出）。
-const LOADOUT_CAPACITY: usize = 8;
+/// 背包容纳上限（与服务端 4×3 背包格位同口径）。
+const LOADOUT_CAPACITY: usize = 12;
+
+/// 仓库 / 背包网格几何：4 列 × 3 行（对齐服务端 `BACKPACK_SLOTS` 的 4×3 形态）。
+const ARSENAL_COLS: usize = 4;
+const ARSENAL_ROWS: usize = 3;
+const ARSENAL_SLOTS: usize = ARSENAL_COLS * ARSENAL_ROWS;
+const CELL_W: f32 = 132.0;
+const CELL_H: f32 = 56.0;
+const CELL_GAP: f32 = 8.0;
 
 /// 浮层左上角偏移（相对屏幕）。
 const OVERLAY_OFFSET: f32 = 120.0;
@@ -146,9 +154,32 @@ type GhostQ<'w, 's> = Query<
 
 // ——— 工具 ———
 fn carried_index(sel: &ArsenalSelection, pool_idx: usize) -> Option<usize> {
-    sel.0
-        .iter()
-        .position(|it| it.as_str() == MVP_ITEMS[pool_idx])
+    let name = MVP_ITEMS.get(pool_idx)?;
+    sel.0.iter().position(|it| it.as_str() == name)
+}
+
+/// 4 列网格容器样式（自动换行成 3 行）。
+fn grid_style() -> Style {
+    Style {
+        width: Val::Px(ARSENAL_COLS as f32 * CELL_W + (ARSENAL_COLS - 1) as f32 * CELL_GAP),
+        flex_direction: FlexDirection::Row,
+        flex_wrap: FlexWrap::Wrap,
+        row_gap: Val::Px(CELL_GAP),
+        column_gap: Val::Px(CELL_GAP),
+        ..default()
+    }
+}
+
+/// 单个格位样式（内容居中）。
+fn cell_style() -> Style {
+    Style {
+        width: Val::Px(CELL_W),
+        height: Val::Px(CELL_H),
+        align_items: AlignItems::Center,
+        justify_content: JustifyContent::Center,
+        column_gap: Val::Px(6.0),
+        ..default()
+    }
 }
 
 fn pool_color(name: &str) -> Color {
@@ -204,7 +235,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                 ..default()
             })
             .with_children(|cols| {
-                // 左：仓库池（落区 = 取消携带）
+                // 左：仓库池（4×3 格位；落区 = 取消携带）
                 cols.spawn((
                     WarehouseZone,
                     Interaction::default(),
@@ -212,6 +243,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                         style: Style {
                             flex_direction: FlexDirection::Column,
                             row_gap: Val::Px(8.0),
+                            align_items: AlignItems::Center,
                             ..default()
                         },
                         ..default()
@@ -222,39 +254,51 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                         "仓库（物资池）",
                         flow::style(&fonts, 20.0, accent),
                     ));
-                    for (i, name) in MVP_ITEMS.iter().enumerate() {
-                        wa.spawn((
-                            ArsenalRow { index: i },
-                            Interaction::default(),
-                            NodeBundle {
-                                style: Style {
-                                    width: Val::Px(240.0),
-                                    height: Val::Px(40.0),
-                                    align_items: AlignItems::Center,
-                                    column_gap: Val::Px(8.0),
-                                    ..default()
-                                },
-                                background_color: Color::srgb(0.20, 0.22, 0.25).into(),
-                                ..default()
-                            },
-                        ))
-                        .with_children(|r| {
-                            r.spawn(TextBundle::from_section(
-                                name.to_string(),
-                                flow::style(&fonts, 22.0, ITEM_COLORS[i]),
-                            ));
-                            r.spawn((
-                                WhStatusText(i),
-                                TextBundle::from_section(
-                                    String::new(),
-                                    flow::style(&fonts, 20.0, Color::srgb(0.4, 0.85, 0.4)),
-                                ),
-                            ));
-                        });
-                    }
+                    wa.spawn(NodeBundle {
+                        style: grid_style(),
+                        ..default()
+                    })
+                    .with_children(|grid| {
+                        // 物资池按 4×3 铺格：有物资的格可拖拽，其余为空格位（不响应拖拽）。
+                        for i in 0..ARSENAL_SLOTS {
+                            match MVP_ITEMS.get(i) {
+                                Some(name) => {
+                                    grid.spawn((
+                                        ArsenalRow { index: i },
+                                        Interaction::default(),
+                                        NodeBundle {
+                                            style: cell_style(),
+                                            background_color: Color::srgb(0.20, 0.22, 0.25).into(),
+                                            ..default()
+                                        },
+                                    ))
+                                    .with_children(|r| {
+                                        r.spawn(TextBundle::from_section(
+                                            name.to_string(),
+                                            flow::style(&fonts, 18.0, ITEM_COLORS[i]),
+                                        ));
+                                        r.spawn((
+                                            WhStatusText(i),
+                                            TextBundle::from_section(
+                                                String::new(),
+                                                flow::style(&fonts, 15.0, Color::srgb(0.4, 0.85, 0.4)),
+                                            ),
+                                        ));
+                                    });
+                                }
+                                None => {
+                                    grid.spawn(NodeBundle {
+                                        style: cell_style(),
+                                        background_color: Color::srgb(0.13, 0.14, 0.17).into(),
+                                        ..default()
+                                    });
+                                }
+                            }
+                        }
+                    });
                 });
 
-                // 右：背包槽（落区 = 携带）
+                // 右：背包槽（4×3 格位；落区 = 携带）
                 cols.spawn((
                     BackpackZone,
                     Interaction::default(),
@@ -262,6 +306,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                         style: Style {
                             flex_direction: FlexDirection::Column,
                             row_gap: Val::Px(8.0),
+                            align_items: AlignItems::Center,
                             ..default()
                         },
                         ..default()
@@ -279,32 +324,32 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                             flow::style(&fonts, 16.0, theme::TEXT_DIM),
                         ),
                     ));
-                    for s in 0..LOADOUT_CAPACITY {
-                        bk.spawn((
-                            BackpackRow { index: s },
-                            Interaction::default(),
-                            NodeBundle {
-                                visibility: Visibility::Hidden,
-                                style: Style {
-                                    width: Val::Px(240.0),
-                                    height: Val::Px(40.0),
-                                    align_items: AlignItems::Center,
+                    bk.spawn(NodeBundle {
+                        style: grid_style(),
+                        ..default()
+                    })
+                    .with_children(|grid| {
+                        for s in 0..ARSENAL_SLOTS {
+                            grid.spawn((
+                                BackpackRow { index: s },
+                                Interaction::default(),
+                                NodeBundle {
+                                    style: cell_style(),
+                                    background_color: Color::srgb(0.20, 0.22, 0.25).into(),
                                     ..default()
                                 },
-                                background_color: Color::srgb(0.20, 0.22, 0.25).into(),
-                                ..default()
-                            },
-                        ))
-                        .with_children(|slot| {
-                            slot.spawn((
-                                CarriedSlotText(s),
-                                TextBundle::from_section(
-                                    "空".to_string(),
-                                    flow::style(&fonts, 22.0, Color::srgb(0.85, 0.85, 0.85)),
-                                ),
-                            ));
-                        });
-                    }
+                            ))
+                            .with_children(|slot| {
+                                slot.spawn((
+                                    CarriedSlotText(s),
+                                    TextBundle::from_section(
+                                        "空".to_string(),
+                                        flow::style(&fonts, 18.0, Color::srgb(0.85, 0.85, 0.85)),
+                                    ),
+                                ));
+                            });
+                        }
+                    });
                 });
             });
 
@@ -489,8 +534,9 @@ pub fn arsenal_drag_system(
         };
     }
     for (row, mut v, mut bg) in &mut bp_row {
+        // 4×3 网格格位恒显（空格位显示"空"），仅按是否携带改底色。
+        *v = Visibility::Visible;
         let on = sel.0.get(row.index).is_some();
-        *v = if on { Visibility::Visible } else { Visibility::Hidden };
         *bg = if on {
             Color::srgb(0.28, 0.40, 0.30).into()
         } else {

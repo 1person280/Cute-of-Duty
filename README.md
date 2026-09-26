@@ -8,7 +8,7 @@
 配置文件表驱动的全部玩法规则 · 单一事实来源
 
 [![License](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.6.0-SnapShot-6-blue.svg)](#六版本历史)
+[![Version](https://img.shields.io/badge/Version-0.7.0-SnapShot-7-blue.svg)](#六版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
 [![Headless](https://img.shields.io/badge/%E6%97%A0%E5%A4%B4%E6%A8%A1%E6%8B%9F-passing-2ea44f.svg)](#一快速开始)
 [![Demo](https://img.shields.io/badge/3D%20Demo-Bevy%200.14-2ea44f.svg)](#一快速开始)
@@ -72,10 +72,10 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 | 干员技能 | Q / E | 技能（点燃 DoT / 冰冻 / 位移冲刺 / 毒素领域） | — | — |
 | 越肩瞄准 | 鼠标右键（按住） | SpringArm 由右肩后方 6.5m 过渡到 2.4m（0.22s），FOV 收窄 28%，准星琥珀，移速降至 55% | — | — |
 | 射击 / 投掷 | 鼠标左键 | 射击（相机射线，靶心弱点 ×1.8）；持雷时改为投掷 | — | — |
-| 交互 | F | 呼出统一交互菜单（功能台 + 拾取物，站点优先）；滚轮选择，F 确认 | — | — |
+| 交互 | F | 呼出**居中交互面板**（功能台 + 拾取物 + 物资箱，站点优先）；滚轮翻页切换高亮，F/回车确认，Esc 关闭 | — | — |
 | 背包 | Tab | 打开背包（双武器 / 弹药池 / 补给品） | — | — |
 | 使用物品 | R（悬停背包物品） | 使用悬停的背包物品 | — | — |
-| 快捷道具 | 3 / 4 | 快捷使用恢复品 / 战术品（按住打开轮盘，点轮盘中心撤销） | — | — |
+| 快捷道具 | 3 / 4 | 3 使用医疗包（回血 +50）；4 投掷手雷（70 伤 / 5m 半径，按当前朝向）；库存由服务端权威下发 | — | — |
 | 关闭 / 取消 | Esc | 关闭背包 / 功能台 / 取消持雷 / 无 UI 时释放鼠标 | — | — |
 | 暂停 | / 或 ~ | 暂停菜单（返回游戏 / 设置 / 回主界面） | — | — |
 | 延迟面板 | CapsLock | 显示/隐藏到服务器的通信延迟列表（逐玩家毫秒） | — | — |
@@ -360,6 +360,7 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 0.7-Snapshot-7（Pre-Release） | 2026-09-26 | **老版本细节还原（UI + 地图交互 + 消耗品 + 武器解耦）**：①**小地图**改为**以玩家为中心的局部放大图**（半径 ≈60m AOI、约 1.47px/m）：罗盘条（24 刻度 / 四方位字 / 中央读数）保留，静态掩体·站点·拾取物随玩家**平移滚动重投影**，玩家恒居中、仅朝向菱形旋转（根治「只有玩家一点 + 起点看不到补给箱」的全图分辨率过低问题）；②新增**战术大地图**（M 键，600px 全景：搜打撤四段分区色带 + 边界线 + 入侵信标 + 全部掩体/目标/拾取物/站点 + 实时玩家定位点与朝向箭头）；③**HUD 面板图标化**（HP/ARMOR 数值条、Q/E 技能冷却盘、**[1]/[2] 双武器槽**（按当前槽元素名显示、当前槽高亮）+ 大字弹药 + `RELOADING`、3/4 消耗品计数槽）；④低血边缘红光 + 低弹闪红告警层；⑤**地图交互端到端落地**：服务端把 `map::lawn` 的拾取物 / 功能台 / **出生点物资箱**（新增 `EntityType::Station` / `ModelPreset::Station`·`SupplyCrate` / `interact::Interactable` 组件）落成权威实体，快照新增 `interact` 字段下发语义，客户端按语义配色渲染（弹药黄铜 / 医疗红白 / 护甲钢蓝 / 元素手雷·武器按元素上色 / 站点琥珀·青）；**按 F 弹出居中交互面板**（老版形态：平时不显示，F 呼出后滚轮翻页切换高亮（环绕 + 窗口跟随 + 滚动条 + 页码）、F/回车确认、Esc 关闭；选中站点转**二级选项面板**，面板内滚轮移高亮、F/Enter 确认、Esc 返回），面板打开时冻结玩法输入；选择经 `ClientMessage::Interact` 上行由服务端 `interact::settle` 做距离校验与效果发放；⑥**消耗品（3=医疗包 / 4=手雷）**：`Combatant` 新增 `medkit`/`grenade` 库存，3 使用医疗包回血（+50，钳制上限）、4 投掷手雷（70 伤 / 5m 半径）；医疗包 / 手雷拾取改为**入库存**（不再拾取即回血），快照新增 `medkit`/`grenade` 计数，HUD 3/4 槽显示剩余数（0 时压暗）；⑦**武器与干员彻底解耦**：武器拾取**装进当前手持槽**（覆盖并补满弹药，**不再切换同系干员**），1/2 切枪只改 `active_slot`、不改 `operator_idx`（技能组不变）；移除右下**干员切换卡**（避免与武器槽语义混淆），物资箱改用木箱造型；`cargo test` 101 用例全绿。**未做**：Tab 背包（快照暂无背包数据，需先扩协议） |
 | 0.6-Snapshot-6（Pre-Release） | 2026-09-26 | **第三人称越肩瞄准修复（标杆版本）**：根治「看不到本人角色 / 靶机」的根因——`net/snapshot.rs` 实体根节点此前只挂 `Transform` 而缺 `GlobalTransform`，而 bevy_transform 0.14 的 `propagate_transforms` 只从「无 Parent 且带 `GlobalTransform`」的根开始向下递归，导致所有快照实体的子级 `GlobalTransform` 恒为 identity、被画在世界原点且缩放松失（此前被误判为 AOI 60m 视野受限）；根节点改用 `SpatialBundle` 一次补齐 Transform / GlobalTransform / Visibility / InheritedVisibility / ViewVisibility。**越肩瞄准（右键）全套落地**：相机臂长 4.2→2.4m + 肩偏 0.65→1.0m 的 0.22s smoothstep 过渡、FOV 收窄 28%、准星常态白 / 瞄准琥珀；瞄准意图经 `PlayerInput.aim` 上行，服务端权威将移速压至 55%（防"瞄准中全速冲刺"）；同时修复客户端 `error[B0003]` 刷屏（bevy 0.14 单实体 `despawn()` 不维护父子关系 → 小地图 `Children` 每帧累积失效实体 ID，改用 `despawn_descendants()`；快照造型根改 `despawn_recursive()` 不再留孤儿子方块）；`cargo test` 94 用例全绿 |
 | 0.6-Snapshot-5（Pre-Release） | 2026-09-26 | **资源精简 + 渲染内存泄漏根治 + 射击链路还原 + 越肩第三人称**：客户端 assets 由 ~28MB 精简至 ~9.3MB（废弃 `environment/`、字体去嵌套为 `assets/simhei.ttf`、`ui/` 仅留 `gear_icon.png`、角色模型迁至 `ServerCode/assets/model/` 经快照下发）；定位并根治 `net/snapshot.rs` 实体材质重复创建导致的资产无限累积（`EntityMaterials` 按 `ModelPreset` 缓存）；延迟面板改由网络线程真 RTT 打点（不再把 Bevy 帧时间算进延迟）并前后端启用 `TCP_NODELAY`；还原射击链路（左键开火 / R 换弹 / Q·E 技能，服务端对边沿量锁存 + 消费后清空）；第三人称改越肩取景并修掉机位回世界原点的兜底 bug；`cargo test` 94 用例全绿 |
 | 0.6-Snapshot-4（Pre-Release） | 2026-09-26 | **鼠标自由视角 + 第三人称环绕相机 + 服务端确定性移动结算 + 撤离可用**：视角改由鼠标驱动（`AimRig` yaw/pitch），镜头改为**环绕相机**始终注视角色胸口（修「看不到自己角色」）；客户端每帧上报朝向与按键意图，服务端按每连接「最新意图」每固定 Tick 以 `速度 × dt` 确定结算（基础 5 m/s、疾跑 1.6×）；撤离区弹**居中闪烁大字**提示，Enter 或 F 均可发起（服务端按权威坐标裁决）；`cargo test` 94 用例全绿。**已知问题**：AOI 60m 视野受限、射击输入未接线 |
@@ -402,8 +403,9 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 ### 已知问题（试玩实测）
 
 - **0.6-Snapshot-4 实测（未修复，已登记）**：
-  - **视野受限**：AOI 兴趣区域半径 60m，大场内远处靶机不进快照因而不可见；服务端未生成 lawn 的
-    拾取物，场上暂无拾取物。
+  - **视野受限**：AOI 兴趣区域半径 60m，大场内远处靶机不进快照因而不可见。
+    场上物资（拾取物 / 功能台 / 出生点物资箱）已由服务端 `interact::spawn_from_layout`
+    按 `map::lawn` 落成权威实体并经快照下发（0.7-Snapshot-7 起），出生点即可见可交互。
   - **运行顺序**：必须先启动 `cod_server.exe` 再启动 `cod1.exe`（客户端已能自动重连，
     但服务端未起时不会进入训练场）。
 - ~~射击输入未接线（`PlayerInput.shoot` 恒为 false）~~：已修复（`net/pilot.rs` 接线

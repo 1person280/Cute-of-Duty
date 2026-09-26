@@ -6,8 +6,10 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::element::EntityElementState;
+use crate::element::{ElementType, EntityElementState};
 use crate::equipment::{EquipmentElement, EquipmentTier, EquipmentType};
+use crate::interact::{InteractChoice, InteractInfo};
+use crate::items::{LootItem, TransferDir};
 use crate::model::ModelPreset;
 
 /// 权威快照中的单个实体条目。
@@ -33,16 +35,32 @@ pub struct EntitySnapshot {
     pub element_state: EntityElementState,
     /// 当前护甲值（HUD 血条上方护甲条；服务端权威）
     pub armor: f32,
-    /// 当前手持武器槽位索引（HUD 武器槽；服务端权威）
-    pub weapon_index: u8,
+    /// 携带的两把武器元素（玩家：`[槽0, 槽1]`，各自决定武器名与弹道；非玩家：`None`）
+    pub weapon_elements: Option<[ElementType; 2]>,
+    /// 当前手持武器槽索引（1/2 → 0/1；HUD 高亮；非玩家置 0）
+    pub active_slot: u8,
     /// 当前武器剩余弹药（HUD 弹药数字；服务端权威；-1 表示非玩家实体无弹药）
     pub ammo: i32,
+    /// 当前弹夹容量（HUD 大字弹药分母 / 换弹进度；服务端权威；-1 表示无武器）
+    pub ammo_max: i32,
+    /// 备用弹药池剩余（HUD 备用弹药数字；服务端权威；-1 表示无）
+    pub ammo_pool: i32,
+    /// 换弹剩余时间（秒；>0 表示正在换弹，HUD 显示 `RELOADING`；0=未在换弹）
+    pub reload_remaining: f32,
     /// 干员编号（HUD 干员名；服务端权威）
     pub operator_id: u32,
     /// Q 技能剩余冷却（0=可用；HUD 技能冷却盘）
     pub skill_cd_q: f32,
     /// E 技能剩余冷却（0=可用；HUD 技能冷却盘）
     pub skill_cd_e: f32,
+    /// 可交互信息（`None` = 该实体不可交互）。拾取物/功能站点据此在客户端显示
+    /// `[F] 名称` 提示与交互菜单；语义与数值仍由服务端裁决。
+    pub interact: Option<InteractInfo>,
+    /// 玩家 4×3 背包格位内容（`None` = 非玩家实体）。3/4 号消耗品计数与物资箱面板
+    /// 均由此派生——客户端只画格位，不计算结果。
+    pub backpack: Option<Vec<Option<LootItem>>>,
+    /// 场景物资箱的 4×3 容器格位内容（`None` = 非物资箱实体）。逐格转移面板的左侧来源。
+    pub container: Option<Vec<Option<LootItem>>>,
 }
 
 /// 客户端→服务端的玩家意图输入。
@@ -77,6 +95,13 @@ pub struct PlayerInput {
     pub wheel_pick: i8,
     pub skill_q: bool,
     pub skill_e: bool,
+    /// 切枪请求（`Some(0)`/`Some(1)` = 切到 1/2 号武器槽；`None` = 本帧无切枪意图）。
+    /// 与 `reload`/`skill_*` 同为边沿量：客户端按下瞬间发一帧，服务端锁存并消费一次。
+    pub weapon_slot: Option<u8>,
+    /// 使用背包第 `slot` 格物品（边沿量，服务端锁存消费一次）。
+    /// 短按 3/4 = 该类首格的背包下标；长按径向轮盘 = 轮盘选中格的下标。
+    /// "这一格是什么、用了要扣多少/回多少血"均由服务端按格位内容裁决。
+    pub use_slot: Option<u8>,
 }
 
 /// 客户端→服务端上行消息。
@@ -96,6 +121,12 @@ pub enum ClientMessage {
     ExtractRequest,
     /// 切换当前干员（服务端按名册索引裁决元素亲和/技能；快照 `operator_id` 跟随更新）
     SwitchOperator { operator_id: u32 },
+    /// 交互意图：对 `target` 实体执行 `choice`（服务端做距离校验与效果发放）。
+    /// 客户端只上报"对谁、选了什么"，数值/元素/是否消耗全部由服务端裁决。
+    Interact { target: u64, choice: InteractChoice },
+    /// 物资箱逐格转移：把 `target` 容器第 `index` 格与玩家背包之间移动一件物品。
+    /// `dir` 决定方向（取出/放回）。是否成功、物品去向/即时效果全部由服务端裁决。
+    LootTransfer { target: u64, dir: TransferDir, index: usize },
     /// 延迟探测：seq 原样回显于 `ServerMessage::Pong`
     Ping { seq: u64 },
     /// 主动断开
@@ -170,11 +201,18 @@ impl EntitySnapshot {
             model_preset: crate::model::ModelPreset::OperativeFire,
             element_state: EntityElementState::Normal,
             armor: 0.0,
-            weapon_index: 0,
+            weapon_elements: None,
+            active_slot: 0,
             ammo: -1,
+            ammo_max: -1,
+            ammo_pool: -1,
+            reload_remaining: 0.0,
             operator_id: 0,
             skill_cd_q: 0.0,
             skill_cd_e: 0.0,
+            interact: None,
+            backpack: None,
+            container: None,
         }
     }
 }

@@ -10,7 +10,7 @@ use bevy::prelude::*;
 use cute_of_duty_server::model::ModelPreset;
 use cute_of_duty_server::net::protocol::EntitySnapshot;
 
-use crate::world::model::voxel_for;
+use crate::world::model::{tint_code, tint_colors, voxel_for};
 
 /// 已渲染实体的根标记：记住服务端实体 ID，供跨帧对账。
 #[derive(Component)]
@@ -24,41 +24,52 @@ pub struct CubeMesh {
     pub handle: Handle<Mesh>,
 }
 
-/// 造型材质缓存：每个 `ModelPreset` 只建一份主色/强调色材质。
+/// 造型材质缓存：每个 `(造型, 配色变体)` 只建一份主色/强调色材质。
 ///
 /// 设计动机（Why）：实体随 AOI 进出视野会被反复 `spawn_body`；若每次都对
 /// `Assets<StandardMaterial>` 调 `add`，材质资源会随实体增删**单调累积**（GPU 缓冲
 /// 永不释放），长时间游玩即内存涨到 GB、帧时间崩坏（表现为"延迟"飙升）。
 /// 造型身份是服务端权威且取值有限（`ModelPreset` 枚举），故按 preset 缓存句柄一次成型。
+///
+/// 缓存键带上 `tint`（拾取物/站点配色变体，见 `world::model::tint_code`）：同一 `SupplyCrate`
+/// 造型按语义（弹药/医疗/元素手雷…）取不同配色，仍只各建一份，不破坏"有限取值"前提。
 #[derive(Resource, Default)]
 pub struct EntityMaterials {
-    cache: HashMap<ModelPreset, (Handle<StandardMaterial>, Handle<StandardMaterial>)>,
+    cache: HashMap<(ModelPreset, u8), (Handle<StandardMaterial>, Handle<StandardMaterial>)>,
 }
 
 impl EntityMaterials {
-    /// 取某造型的（主色, 强调色）材质句柄；首次使用才创建，之后全场复用。
+    /// 取某造型（含配色变体）的（主色, 强调色）材质句柄；首次使用才创建，之后全场复用。
     fn handles_for(
         &mut self,
         materials: &mut Assets<StandardMaterial>,
         preset: ModelPreset,
+        tint: u8,
     ) -> (Handle<StandardMaterial>, Handle<StandardMaterial>) {
-        if let Some(pair) = self.cache.get(&preset) {
+        let key = (preset, tint);
+        if let Some(pair) = self.cache.get(&key) {
             return pair.clone();
         }
         let body = voxel_for(preset);
+        // tint != 0 时用语义配色覆盖 preset 默认色（拾取物/站点的战场识别色）。
+        let (primary_color, accent_color) = if tint == 0 {
+            (body.primary, body.accent)
+        } else {
+            tint_colors(tint)
+        };
         let primary = materials.add(StandardMaterial {
-            base_color: body.primary,
+            base_color: primary_color,
             perceptual_roughness: 0.7,
             ..default()
         });
         let accent = materials.add(StandardMaterial {
-            base_color: body.accent,
-            emissive: body.accent.into(),
+            base_color: accent_color,
+            emissive: accent_color.into(),
             perceptual_roughness: 0.6,
             ..default()
         });
         let pair = (primary, accent);
-        self.cache.insert(preset, pair.clone());
+        self.cache.insert(key, pair.clone());
         pair
     }
 }
@@ -157,8 +168,10 @@ fn spawn_body(
     entry: &EntitySnapshot,
 ) {
     let body = voxel_for(entry.model_preset);
+    // 配色变体由服务端下发的可交互语义折算（弹药/医疗/元素手雷/站点各一色）。
+    let tint = tint_code(entry.interact.as_ref().map(|i| &i.kind));
     // 材质按造型身份复用（见 `EntityMaterials`）：实体反复增删不再累积材质资源。
-    let (primary, accent) = entity_mats.handles_for(materials, entry.model_preset);
+    let (primary, accent) = entity_mats.handles_for(materials, entry.model_preset, tint);
 
     let mut root = commands.spawn((
         RenderedEntity { id: entry.entity_id },
