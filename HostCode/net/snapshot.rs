@@ -130,15 +130,25 @@ pub fn apply_entities(
     // 3) 销毁本地已有、但快照里已消失的实体（不留幽灵）
     for (entity, _, rendered) in query.iter() {
         if !present.contains(&rendered.id) {
-            commands.entity(entity).despawn();
+            // 必须**递归**销毁：造型根下挂着躯干/头部子方块，bevy 0.14 的 `despawn()`
+            // 是非递归的（`EntityCommands::despawn` 只删单个实体、且不动父子关系），
+            // 用它会把子方块留成"孤儿"——既永远停在旧坐标变成幽灵，又让父级引用悬空。
+            commands.entity(entity).despawn_recursive();
         }
     }
 }
 
 /// 依据模型身份生成一个体素造型（脚底对齐服务端坐标 y）。
 ///
-/// 注意（B0004 教训）：根实体会以 `with_children` 挂可渲染的 `Mesh3d` 子级，
-/// 父实体必须显式补 `Visibility::default()`，否则子级继承层级损坏（B0004 告警）。
+/// 关键约束（Why，第三人称"看不到自己角色"的根因）：根实体必须是**变换与可见性齐全**的
+/// 渲染层级根。bevy_transform 0.14 的 `propagate_transforms` 只从
+/// `(无 Parent、有 Children、`Transform`、`GlobalTransform`)` 的根开始向下递归
+/// （`bevy_transform-0.14.2/src/systems.rs`）；此前根只挂了 `Transform`，
+/// 缺 `GlobalTransform` 便不在递归起点里，子级的 `GlobalTransform` 永远停在
+/// `identity` —— 所有服务端实体（含本人角色、靶机）都被画在**世界原点**且缩放松失，
+/// 玩家在出生点自然"看不见自己、也看不见靶机"（此前被误判为 AOI 遮蔽）。
+/// 故此处用 `SpatialBundle` 一次性补齐 Transform / GlobalTransform /
+/// Visibility / InheritedVisibility / ViewVisibility。
 fn spawn_body(
     commands: &mut Commands,
     cube: &CubeMesh,
@@ -152,8 +162,10 @@ fn spawn_body(
 
     let mut root = commands.spawn((
         RenderedEntity { id: entry.entity_id },
-        Visibility::default(), // 父补可见性，预防 B0004 层级损坏
-        Transform::from_translation(Vec3::new(entry.x, entry.y, entry.z)),
+        SpatialBundle {
+            transform: Transform::from_translation(Vec3::new(entry.x, entry.y, entry.z)),
+            ..default()
+        },
     ));
 
     root.with_children(|p| {

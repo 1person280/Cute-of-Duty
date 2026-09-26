@@ -118,6 +118,7 @@ pub fn run(addr: &str) {
                 crate::hud::update_extract,
                 crate::hud::extract_interaction,
                 crate::hud::update_vitals,
+                crate::hud::update_crosshair,
                 crate::hud::update_minimap,
                 crate::hud::update_skills,
                 crate::hud::update_feed,

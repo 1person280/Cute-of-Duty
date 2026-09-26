@@ -23,3 +23,5 @@ pub const TEXT_DIM: Color = Color::srgb(0.58, 0.64, 0.72);
 pub const KILL_AMBER: Color = Color::srgb(0.95, 0.72, 0.25);
 /// 任务/导航提示金黄。
 pub const TASK_GOLD: Color = Color::srgb(1.00, 0.95, 0.60);
+/// UI 强调琥珀（美术色板「UI 强调」#FFCC40）：越肩瞄准态准星等高优先级提示用色。
+pub const ACCENT_AMBER: Color = Color::srgb(1.00, 0.80, 0.25);

@@ -60,6 +60,8 @@ pub struct PlayerInput {
     pub move_right: bool,
     pub jump: bool,
     pub sprint: bool,
+    /// 越肩瞄准（按住右键）：服务端据此把移速压到 `AIM_MULT` 倍，防止"瞄准中全速冲刺"。
+    pub aim: bool,
     // —— 朝向意图（服务端据此旋转权威实体并结算视线）——
     /// 俯仰角（弧度，+ 上 - 下）
     pub aim_pitch: f32,

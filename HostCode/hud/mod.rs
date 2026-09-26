@@ -12,6 +12,7 @@ pub(crate) mod hud_skills;
 pub(crate) mod hud_vitals;
 
 pub(crate) use hud_root::{extract_interaction, spawn_hud, update_extract};
+pub(crate) use hud_crosshair::update_crosshair;
 pub(crate) use hud_kill_counter::update_kill;
 pub(crate) use hud_minimap::update_minimap;
 pub(crate) use hud_operator_panel::{operator_highlight, operator_input};

@@ -25,13 +25,27 @@ use crate::menu::GameSettings;
 use crate::net::snapshot::SnapshotBuffer;
 
 /// 第三人称越肩镜头标记（每帧由 `follow_system` 重写世界变换；`game_settings` 据此改 FOV）。
+///
+/// `aim_blend` 为越肩瞄准的过渡进度（0 = 常态取景，1 = 瞄准取景），由 `follow_system`
+/// 按时间朝目标值收敛后写入；投影侧（`settings_apply_fov`）读它同步收窄 FOV，
+/// 从而**全工程只有一处写 `Projection`**，避免两系统同帧争用同一组件的调度冲突。
 #[derive(Component)]
-pub struct ChaseCamera;
+pub struct ChaseCamera {
+    pub aim_blend: f32,
+}
 
 /// 镜头到角色的臂长（米，旧版 `ARM_LEN_NORMAL` 的收敛值）。
 const CAMERA_DIST: f32 = 4.2;
 /// 越肩机位的右肩水平偏移（米）：镜头右移后角色落于画面偏左，形成越肩观感。
 const SHOULDER_OFFSET: f32 = 0.65;
+/// 瞄准时的臂长（米，镜头贴近右肩，旧版 `ARM_LEN_AIM`）。
+const AIM_DIST: f32 = 2.4;
+/// 瞄准时的右肩偏移（米）：比常态更外扩，避免贴脸时角色糊住画面。
+const AIM_SHOULDER: f32 = 1.0;
+/// 常态 ↔ 瞄准取景的过渡时长（秒，smoothstep），沿 0.3.2 手感。
+const AIM_BLEND_SECS: f32 = 0.22;
+/// 瞄准时 FOV 收窄比例（28%），由投影侧读取（见 [`ChaseCamera::aim_blend`]）。
+pub const AIM_FOV_NARROW: f32 = 0.28;
 /// 视线锚点高度（角色肩颈处；角色整体高约 2.67m，取肩部保证全身在框）。
 const PIVOT_Y: f32 = 1.55;
 /// 俯仰限位：抬头不高于 +0.55（约 31°）、低头不低于 -0.75（约 -43°），
@@ -57,7 +71,7 @@ const MAX_FRAME_DELTA: f32 = 200.0;
 pub fn spawn_camera(commands: &mut Commands) {
     let look = Vec3::new(0.0, PIVOT_Y, 0.0);
     commands.spawn((
-        ChaseCamera,
+        ChaseCamera { aim_blend: 0.0 },
         Camera3dBundle {
             transform: Transform::from_translation(look + Vec3::new(0.0, 0.0, CAMERA_DIST))
                 .looking_at(look, Vec3::Y),
@@ -72,9 +86,13 @@ pub fn spawn_camera(commands: &mut Commands) {
 /// （`menu::pause::cursor_lock_system` 保证）时才有意义——菜单态鼠标用于点按 UI。
 pub fn mouse_look_system(
     mut motion: EventReader<MouseMotion>,
+    mouse: Res<ButtonInput<MouseButton>>,
     settings: Res<GameSettings>,
     mut rig: ResMut<AimRig>,
 ) {
+    // 瞄准态由右键按住决定（相机取景过渡 + 上行 `aim` 意图同源，见 `net::input_system`）。
+    rig.aiming = mouse.pressed(MouseButton::Right);
+
     let mut delta = Vec2::ZERO;
     for ev in motion.read() {
         delta += ev.delta;
@@ -96,10 +114,11 @@ pub fn mouse_look_system(
 /// 注意：本人实体若**暂时**不在本帧快照（AOI/对账间隙），直接保持上一帧机位而非退回世界原点——
 /// 否则镜头会瞬移到 (0,0,0)，表现为"看不见自己、场景乱飘"。
 pub fn follow_system(
-    mut query: Query<(&mut Transform, &ChaseCamera)>,
+    mut query: Query<(&mut Transform, &mut ChaseCamera)>,
     snap: Res<SnapshotBuffer>,
     player: Res<LocalPlayer>,
     rig: Res<AimRig>,
+    time: Res<Time>,
 ) {
     let center = if player.entity_id != 0 {
         match snap
@@ -124,11 +143,22 @@ pub fn follow_system(
     let right = Vec3::new(-rig.yaw.cos(), 0.0, rig.yaw.sin());
 
     let anchor = center + Vec3::Y * PIVOT_Y;
-    let mut cam_pos = anchor + right * SHOULDER_OFFSET - dir * CAMERA_DIST;
-    if cam_pos.y < MIN_CAM_Y {
-        cam_pos.y = MIN_CAM_Y;
-    }
-    for (mut tf, _) in &mut query {
+
+    // 越肩瞄准过渡：`aim_blend` 按「dt / 过渡时长」朝目标推进（帧率无关），
+    // 再取 smoothstep 缓动，使收臂 / 收 FOV 起步与收尾都不生硬。
+    let target = if rig.aiming { 1.0 } else { 0.0 };
+    let step = time.delta_seconds() / AIM_BLEND_SECS;
+    for (mut tf, mut cam) in &mut query {
+        cam.aim_blend = (cam.aim_blend + (target - cam.aim_blend).clamp(-step, step)).clamp(0.0, 1.0);
+        let b = cam.aim_blend;
+        let eased = b * b * (3.0 - 2.0 * b);
+
+        let dist = CAMERA_DIST + (AIM_DIST - CAMERA_DIST) * eased;
+        let shoulder = SHOULDER_OFFSET + (AIM_SHOULDER - SHOULDER_OFFSET) * eased;
+        let mut cam_pos = anchor + right * shoulder - dir * dist;
+        if cam_pos.y < MIN_CAM_Y {
+            cam_pos.y = MIN_CAM_Y;
+        }
         tf.translation = cam_pos;
         // 沿视线**平行**注视（不回看角色）：角色因此稳定落在画面偏左，形成越肩第三人称观感。
         tf.look_at(cam_pos + dir, Vec3::Y);

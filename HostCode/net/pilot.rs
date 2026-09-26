@@ -33,6 +33,8 @@ pub fn input_system(
     input.move_left = keys.pressed(KeyCode::KeyA);
     input.move_right = keys.pressed(KeyCode::KeyD);
     input.sprint = keys.pressed(KeyCode::ShiftLeft);
+    // 越肩瞄准（按住右键）：既是相机取景切换，也是"压低移速换精度"的权威意图。
+    input.aim = mouse.pressed(MouseButton::Right);
     // 战斗意图：扳机为持续量（按住连发由服务端冷却节拍），换弹/技能为边沿量（按下即脉冲）。
     input.shoot = mouse.pressed(MouseButton::Left);
     input.reload = keys.just_pressed(KeyCode::KeyR);

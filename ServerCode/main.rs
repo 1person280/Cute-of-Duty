@@ -36,6 +36,10 @@ const EXTRACTION_RANGE: f32 = 12.0;
 /// 无疾跑靠基础步速横穿耗时过久，故给一个明确的冲刺档（沿 0.3.2 手感量级）。
 const SPRINT_MULT: f32 = 1.6;
 
+/// 越肩瞄准时的移速倍率（`速度 × 此值`）。瞄准是"用机动性换精度"的博弈位：
+/// 按住右键即从常态 5 m/s 降到 2.75 m/s，与旧版手感一致。
+const AIM_MULT: f32 = 0.55;
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
@@ -498,7 +502,11 @@ fn apply_input(sim: &mut GameLoop, eid: EntityId, input: &PlayerInput, dt: f32) 
         let Some(entity) = sim.world_mut().get_entity_mut(eid) else { return };
         let len = (mx * mx + mz * mz).sqrt();
         if len > 1e-6 {
-            let speed = if input.sprint { entity.move_speed * SPRINT_MULT } else { entity.move_speed };
+            let mut speed = if input.sprint { entity.move_speed * SPRINT_MULT } else { entity.move_speed };
+            // 瞄准优先于疾跑压制移速：按住右键即进入"慢走精度档"（见 `AIM_MULT`）。
+            if input.aim {
+                speed *= AIM_MULT;
+            }
             let step = speed * dt;
             entity.position.x += mx / len * step;
             entity.position.z += mz / len * step;

@@ -53,6 +53,8 @@ pub struct AimRig {
     pub yaw: f32,
     /// 俯仰（弧度，+ 抬头 / - 低头），由系统钳制在合理区间。
     pub pitch: f32,
+    /// 是否按住越肩瞄准（右键）：相机据此收臂收 FOV，上行输入据此报 `aim` 意图。
+    pub aiming: bool,
 }
 
 impl Default for AimRig {
@@ -60,6 +62,7 @@ impl Default for AimRig {
         Self {
             yaw: std::f32::consts::PI,
             pitch: 0.0,
+            aiming: false,
         }
     }
 }

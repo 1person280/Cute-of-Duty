@@ -8,7 +8,7 @@
 配置文件表驱动的全部玩法规则 · 单一事实来源
 
 [![License](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.6.0-SnapShot-5-blue.svg)](#六版本历史)
+[![Version](https://img.shields.io/badge/Version-0.6.0-SnapShot-6-blue.svg)](#六版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
 [![Headless](https://img.shields.io/badge/%E6%97%A0%E5%A4%B4%E6%A8%A1%E6%8B%9F-passing-2ea44f.svg)](#一快速开始)
 [![Demo](https://img.shields.io/badge/3D%20Demo-Bevy%200.14-2ea44f.svg)](#一快速开始)
@@ -327,7 +327,7 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 
 ### 5.2 当前进度
 
-> 现状：**0.6-SnapShot-3**（架构仍为服务端权威 + 客户端表现层，核心零 bevy）。
+> 现状：**0.6-SnapShot-6**（架构仍为服务端权威 + 客户端表现层，核心零 bevy）。
 
 - 服务器权威模拟 + TCP 网络层已落地（`net/`：AOI 兴趣区域剔除、会话管理、状态广播、协议编解码）。
 - **网络协议已落地**：`Loadout` / `StartTraining` / `ExtractRequest` / `Ping` 及 serde 用例；
@@ -345,9 +345,9 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 - `cargo test --offline` **全绿（94 个用例通过）**。
 - 与 HostCode **彻底解耦**：ServerCode **不依赖 bevy**，分离不受渲染层升级影响。
 - 构建产物 `cod_server.exe`（服务端）+ `cod1.exe`（客户端），由 workspace 一次并行编译产出。
-- **待办（明示）**：① 第三人称视角仅由 WASD 位移推导朝向，缺鼠标自由视角；
-  ② 从出生点到撤离点约 910m，实测未能走到/触发撤离；③ 仓库携带「带入进图后的生效结算」
-  `apply_loadout` 属训练场后续，当前加载仅存会话热副本（自带风险提示）。
+- **待办（明示）**：① 服务端未生成 lawn 的拾取物，大场内暂无拾取物；
+  ② 仓库携带「带入进图后的生效结算」`apply_loadout` 属训练场后续，
+  当前加载仅存会话热副本（自带风险提示）。
 
 ### 5.3 运行
 
@@ -360,6 +360,7 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 0.6-Snapshot-6（Pre-Release） | 2026-09-26 | **第三人称越肩瞄准修复（标杆版本）**：根治「看不到本人角色 / 靶机」的根因——`net/snapshot.rs` 实体根节点此前只挂 `Transform` 而缺 `GlobalTransform`，而 bevy_transform 0.14 的 `propagate_transforms` 只从「无 Parent 且带 `GlobalTransform`」的根开始向下递归，导致所有快照实体的子级 `GlobalTransform` 恒为 identity、被画在世界原点且缩放松失（此前被误判为 AOI 60m 视野受限）；根节点改用 `SpatialBundle` 一次补齐 Transform / GlobalTransform / Visibility / InheritedVisibility / ViewVisibility。**越肩瞄准（右键）全套落地**：相机臂长 4.2→2.4m + 肩偏 0.65→1.0m 的 0.22s smoothstep 过渡、FOV 收窄 28%、准星常态白 / 瞄准琥珀；瞄准意图经 `PlayerInput.aim` 上行，服务端权威将移速压至 55%（防"瞄准中全速冲刺"）；同时修复客户端 `error[B0003]` 刷屏（bevy 0.14 单实体 `despawn()` 不维护父子关系 → 小地图 `Children` 每帧累积失效实体 ID，改用 `despawn_descendants()`；快照造型根改 `despawn_recursive()` 不再留孤儿子方块）；`cargo test` 94 用例全绿 |
 | 0.6-Snapshot-5（Pre-Release） | 2026-09-26 | **资源精简 + 渲染内存泄漏根治 + 射击链路还原 + 越肩第三人称**：客户端 assets 由 ~28MB 精简至 ~9.3MB（废弃 `environment/`、字体去嵌套为 `assets/simhei.ttf`、`ui/` 仅留 `gear_icon.png`、角色模型迁至 `ServerCode/assets/model/` 经快照下发）；定位并根治 `net/snapshot.rs` 实体材质重复创建导致的资产无限累积（`EntityMaterials` 按 `ModelPreset` 缓存）；延迟面板改由网络线程真 RTT 打点（不再把 Bevy 帧时间算进延迟）并前后端启用 `TCP_NODELAY`；还原射击链路（左键开火 / R 换弹 / Q·E 技能，服务端对边沿量锁存 + 消费后清空）；第三人称改越肩取景并修掉机位回世界原点的兜底 bug；`cargo test` 94 用例全绿 |
 | 0.6-Snapshot-4（Pre-Release） | 2026-09-26 | **鼠标自由视角 + 第三人称环绕相机 + 服务端确定性移动结算 + 撤离可用**：视角改由鼠标驱动（`AimRig` yaw/pitch），镜头改为**环绕相机**始终注视角色胸口（修「看不到自己角色」）；客户端每帧上报朝向与按键意图，服务端按每连接「最新意图」每固定 Tick 以 `速度 × dt` 确定结算（基础 5 m/s、疾跑 1.6×）；撤离区弹**居中闪烁大字**提示，Enter 或 F 均可发起（服务端按权威坐标裁决）；`cargo test` 94 用例全绿。**已知问题**：AOI 60m 视野受限、射击输入未接线 |
 | 0.6-Snapshot-3（Pre-Release） | 2026-09-26 | **训练场迁移至 0.3.2 `map::lawn` 露天搜打撤大场（1×1km）+ `~` 暂停菜单**：活动地图 / 靶机生成 / 出生点（z=470）/ 撤离点（`(0,-440)`，半径 12m）双端对齐；客户端只渲染**静态层**（棋盘格地板 + props + 发光件，靶与拾取物仍走快照）并复刻 0.3.2 原版光照；`~` 键暂停菜单完整移植（返回游戏 / 设置子面板 / 返回主界面，0.25s 防抖）并冻结本地输入与相机；客户端断线自动重连（每 2s）；`cargo test` 94 用例全绿。**已知问题**：第三人称缺鼠标自由视角、实测未能走到撤离点（见「已知问题」） |
@@ -408,9 +409,12 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 - ~~射击输入未接线（`PlayerInput.shoot` 恒为 false）~~：已修复（`net/pilot.rs` 接线
   左键开火 / R 换弹 / Q·E 技能；服务端 `main.rs` 对换弹与技能等边沿量做锁存 + 消费后清空，
   避免同 Tick 覆盖丢失或重复触发）。
-- ~~第三人称视角不完整（无鼠标自由视角 / 看不到自己角色）~~：0.6-Snapshot-4 起改为
-  越肩取景（右肩 +0.65m、后方 4.2m、沿视线平行注视），并修掉「本人实体暂不在本帧快照时
-  机位瞬移回世界原点」的兜底 bug；**观感仍待玩家实测确认**。
+- ~~第三人称视角不完整（无鼠标自由视角 / 看不到自己角色）~~：0.6-Snapshot-6 已根治。
+  根因是快照实体根节点缺 `GlobalTransform`（bevy_transform 0.14 的 `propagate_transforms`
+  只从「无 Parent 且带 `GlobalTransform`」的根向下递归），子级世界变换恒为 identity →
+  所有实体被画在世界原点且缩放松失；改用 `SpatialBundle` 后本人角色与靶机均正常显示于服务端坐标。
+  同时落地越肩瞄准：右键按住 → 相机 0.22s smoothstep 由 4.2m/肩偏 0.65 收到 2.4m/肩偏 1.0，
+  FOV 收窄 28%，准星转琥珀，服务端权威将移速压至 55%；**观感仍待玩家实测确认**。
 - ~~客户端 assets 臃肿（约 28MB）与渲染内存单调增长~~：已修复 —— assets 瘦身至
   ~9.3MB（废弃 `environment/`、字体去嵌套为 `assets/simhei.ttf`、`ui/` 仅留 `gear_icon.png`、
   角色模型改由服务端 `ServerCode/assets/model/` 下发）；内存增长根因系

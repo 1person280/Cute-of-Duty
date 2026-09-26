@@ -1,4 +1,4 @@
-﻿//! 游玩设置：`GameSettings` 资源 + 设置行 UI + 应用系统。
+//! 游玩设置：`GameSettings` 资源 + 设置行 UI + 应用系统。
 //!
 //! 设计动机（Why）：设置项是可调的表现层参数（灵敏度 / 视野 / 环境亮度）。期间只把
 //! FOV 真实作用到本端相机投影、把环境亮度写入世界 `AmbientLight` —— 它们不触碰任何
@@ -7,7 +7,7 @@
 
 use bevy::prelude::*;
 
-use crate::world::camera::ChaseCamera;
+use crate::world::camera::{ChaseCamera, AIM_FOV_NARROW};
 use crate::flow::flow_state::{self as flow, CjkFont};
 use super::menu_main::{menu_accent, MenuButton};
 
@@ -229,16 +229,22 @@ pub fn apply_setting_step(settings: &mut GameSettings, kind: SettingKind, delta:
     }
 }
 
-/// 把设置 FOV 幂等应用到轨道相机投影。
+/// 把设置 FOV（叠加越肩瞄准收窄）幂等应用到轨道相机投影。
 ///
 /// 不做 is_changed 短路：重建相机（返回主菜单再进游戏）会回到默认 FOV，每帧幂等
 /// 应用才能让设置在重建后保持一致。
+///
+/// 设计动机（Why）：越肩瞄准的 FOV 收窄**必须**复用本系统作为唯一写入点——若在
+/// `world::follow_system` 里另开一处 `&mut Projection`，两系统同帧争用同一组件会在
+/// 调度期触发 B0001 冲突 panic。故此处读相机自己维护的 `aim_blend` 过渡进度来缩放 FOV。
 pub fn settings_apply_fov(
     settings: Res<GameSettings>,
-    mut cameras: Query<&mut Projection, With<ChaseCamera>>,
+    mut cameras: Query<(&mut Projection, &ChaseCamera)>,
 ) {
-    let target = settings.fov_deg.to_radians();
-    for mut projection in &mut cameras {
+    for (mut projection, camera) in &mut cameras {
+        let blend = camera.aim_blend;
+        let eased = blend * blend * (3.0 - 2.0 * blend);
+        let target = settings.fov_deg.to_radians() * (1.0 - AIM_FOV_NARROW * eased);
         if let Projection::Perspective(perspective) = &mut *projection {
             if perspective.fov != target {
                 perspective.fov = target;

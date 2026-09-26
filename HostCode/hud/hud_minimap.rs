@@ -77,21 +77,25 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
 }
 
 /// 每帧重建小地图点：清空旧点 → 读快照 → 相对本人投影画点。
-#[allow(clippy::type_complexity)]
+///
+/// 清空用 [`DespawnRecursiveExt::despawn_descendants`]（一次性掏空容器 `Children`），
+/// **不能**逐个 `commands.entity(dot).despawn()`：bevy 0.14 的单实体 `despawn` 不维护父子
+/// 关系，被杀的点仍留在 `MinimapLayer` 的 `Children` 列表里；每帧一轮就会累积成百上千个
+/// 失效实体 ID，待递归销毁 HUD 树时逐个 `World::despawn` 命中不存在实体，刷屏
+/// `error[B0003]`（`bevy_ecs-0.14.2/src/world/mod.rs`）。`despawn_descendants` 以
+/// `mem::take` 摘走整份列表，既不残留失效 ID、也无需逐点排队。
 pub fn update_minimap(
     mut commands: Commands,
     snap: Res<SnapshotBuffer>,
     player: Res<LocalPlayer>,
-    old_dots: Query<Entity, With<MinimapDot>>,
     layer: Query<Entity, With<MinimapLayer>>,
 ) {
-    // 清空上一帧的色点。
-    for e in &old_dots {
-        commands.entity(e).despawn();
-    }
     let Ok(container) = layer.get_single() else {
         return;
     };
+
+    // 清空上一帧的色点（连同容器 Children 一并摘走，见函数文档）。
+    commands.entity(container).despawn_descendants();
 
     // 本人中心（含本人投影之后，若本人消失则整图无中心，仅显示原点污点）。
     let me = snap.current.iter().find(|e| e.entity_id == player.entity_id);
