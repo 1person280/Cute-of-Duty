@@ -8,7 +8,7 @@
 配置文件表驱动的全部玩法规则 · 单一事实来源
 
 [![License](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-0.6.0-SnapShot-4-blue.svg)](#六版本历史)
+[![Version](https://img.shields.io/badge/Version-0.6.0-SnapShot-5-blue.svg)](#六版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
 [![Headless](https://img.shields.io/badge/%E6%97%A0%E5%A4%B4%E6%A8%A1%E6%8B%9F-passing-2ea44f.svg)](#一快速开始)
 [![Demo](https://img.shields.io/badge/3D%20Demo-Bevy%200.14-2ea44f.svg)](#一快速开始)
@@ -186,7 +186,7 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 | `net` | mpsc 后台线程消费服务端快照 + 上行 NetOut 命令通道 | `network.rs` |
 | `menu` | 主菜单 / 仓库·携带物资（拖拽 + Shift 选装）/ 模式 / 设置 / 加载 | `menu_main.rs` / `arsenal.rs` / `mode_panel.rs` / `game_settings.rs` |
 | `hud` | 血条 / 护甲量 / 弹药、技能 CD、小地图、击杀与通告、撤离提示 | `hud_vitals.rs` / `hud_minimap.rs` / `hud_skills.rs` / `hud_feed.rs`（语义化子文件） |
-| `world` | 训练场几何 / 材质 / 光照（服务端重画，客户端只摆） | `world_assets.rs` |
+| `world` | 训练场几何 / 材质 / 光照（服务端重画，客户端只摆） | `world_scene.rs` / `camera.rs` / `model.rs` |
 | `shared` | 主题色板「无影响月卡制」、字体句柄 | `theme.rs` |
 
 ### 目录结构总览（服务端结构 · ServerCode）
@@ -360,6 +360,7 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 0.6-Snapshot-5（Pre-Release） | 2026-09-26 | **资源精简 + 渲染内存泄漏根治 + 射击链路还原 + 越肩第三人称**：客户端 assets 由 ~28MB 精简至 ~9.3MB（废弃 `environment/`、字体去嵌套为 `assets/simhei.ttf`、`ui/` 仅留 `gear_icon.png`、角色模型迁至 `ServerCode/assets/model/` 经快照下发）；定位并根治 `net/snapshot.rs` 实体材质重复创建导致的资产无限累积（`EntityMaterials` 按 `ModelPreset` 缓存）；延迟面板改由网络线程真 RTT 打点（不再把 Bevy 帧时间算进延迟）并前后端启用 `TCP_NODELAY`；还原射击链路（左键开火 / R 换弹 / Q·E 技能，服务端对边沿量锁存 + 消费后清空）；第三人称改越肩取景并修掉机位回世界原点的兜底 bug；`cargo test` 94 用例全绿 |
 | 0.6-Snapshot-4（Pre-Release） | 2026-09-26 | **鼠标自由视角 + 第三人称环绕相机 + 服务端确定性移动结算 + 撤离可用**：视角改由鼠标驱动（`AimRig` yaw/pitch），镜头改为**环绕相机**始终注视角色胸口（修「看不到自己角色」）；客户端每帧上报朝向与按键意图，服务端按每连接「最新意图」每固定 Tick 以 `速度 × dt` 确定结算（基础 5 m/s、疾跑 1.6×）；撤离区弹**居中闪烁大字**提示，Enter 或 F 均可发起（服务端按权威坐标裁决）；`cargo test` 94 用例全绿。**已知问题**：AOI 60m 视野受限、射击输入未接线 |
 | 0.6-Snapshot-3（Pre-Release） | 2026-09-26 | **训练场迁移至 0.3.2 `map::lawn` 露天搜打撤大场（1×1km）+ `~` 暂停菜单**：活动地图 / 靶机生成 / 出生点（z=470）/ 撤离点（`(0,-440)`，半径 12m）双端对齐；客户端只渲染**静态层**（棋盘格地板 + props + 发光件，靶与拾取物仍走快照）并复刻 0.3.2 原版光照；`~` 键暂停菜单完整移植（返回游戏 / 设置子面板 / 返回主界面，0.25s 防抖）并冻结本地输入与相机；客户端断线自动重连（每 2s）；`cargo test` 94 用例全绿。**已知问题**：第三人称缺鼠标自由视角、实测未能走到撤离点（见「已知问题」） |
 | 0.6-Snapshot-2（Pre-Release） | 2026-09-25 | **仓库·携带物资 UI 100% 还原 0.3.2**（拖拽 + Shift 左键 + 已携带✓ + 容量计数 + 返回/开始游戏）；协议 `Loadout`/`StartTraining`/`ExtractRequest`/`Ping` 与干员切换、撤离判定落地；launcher 拆平级模块 + 扁平化清理；`cargo test` 94 用例全绿；**带仓库带入属于训练场后续**（`apply_loadout`，当前加载仅存会话热副本，自带风险提示） |
@@ -402,12 +403,19 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 - **0.6-Snapshot-4 实测（未修复，已登记）**：
   - **视野受限**：AOI 兴趣区域半径 60m，大场内远处靶机不进快照因而不可见；服务端未生成 lawn 的
     拾取物，场上暂无拾取物。
-  - **射击输入未接线**：客户端尚未上报开火 / 换弹 / 技能（`PlayerInput.shoot` 恒为 false），
-    本快照只覆盖相机与移动链路。
   - **运行顺序**：必须先启动 `cod_server.exe` 再启动 `cod1.exe`（客户端已能自动重连，
     但服务端未起时不会进入训练场）。
-- ~~第三人称视角不完整（无鼠标自由视角 / 看不到自己角色）~~：0.6-Snapshot-4 已修复
-  （`AimRig` 鼠标视角 + 始终注视角色胸口的环绕相机）。
+- ~~射击输入未接线（`PlayerInput.shoot` 恒为 false）~~：已修复（`net/pilot.rs` 接线
+  左键开火 / R 换弹 / Q·E 技能；服务端 `main.rs` 对换弹与技能等边沿量做锁存 + 消费后清空，
+  避免同 Tick 覆盖丢失或重复触发）。
+- ~~第三人称视角不完整（无鼠标自由视角 / 看不到自己角色）~~：0.6-Snapshot-4 起改为
+  越肩取景（右肩 +0.65m、后方 4.2m、沿视线平行注视），并修掉「本人实体暂不在本帧快照时
+  机位瞬移回世界原点」的兜底 bug；**观感仍待玩家实测确认**。
+- ~~客户端 assets 臃肿（约 28MB）与渲染内存单调增长~~：已修复 —— assets 瘦身至
+  ~9.3MB（废弃 `environment/`、字体去嵌套为 `assets/simhei.ttf`、`ui/` 仅留 `gear_icon.png`、
+  角色模型改由服务端 `ServerCode/assets/model/` 下发）；内存增长根因系
+  `net/snapshot.rs` 每次 spawn 都对 `Assets<StandardMaterial>` 新建两份材质，实体随 AOI
+  进出反复 spawn 致材质资产无限累积，现以 `EntityMaterials` 按 `ModelPreset` 缓存句柄根治。
 - ~~无法移动到撤离点（910m 走不到 / 撤离不触发）~~：0.6-Snapshot-4 已修复
   （服务端 `速度 × dt` 确定性结算 + 入区居中闪烁提示 + Enter / F 触发）。
 - ~~手雷爆炸内存飙升 / OOM~~：2026-09-05 已修复（爆炸/枪口特效网格与材质入池共享，不再逐发新建资产）。
@@ -420,7 +428,9 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
   - 收敛高频特效的生成密度与寿命（命中粒子 5→3、爆炸碎块 10→4、曳光/枪口/爆闪寿命收短等），
     减少 Bevy 每帧反复 spawn/despawn 造成的渲染 batch 抖动。
   - 定位其余增长点时，可用内置诊断采样（`cargo run --features demo` 游玩后看日志，`debug_tracer.rs`
-    每 5s 打印各类特效实体存活数与 `Mesh`/`Material` 资产表容量）。
+    每 5s 打印各类特效实体存活数与 `Mesh`/`Material` 资产表容量）；
+  - 后续补充定位到**实体材质重复创建**这一确定性泄漏点（见上「assets 臃肿与渲染内存单调增长」），
+    已用 `EntityMaterials` 缓存根治，尚待长时间游玩复验是否仍有残余增长。
 - 自动化试玩提示：若用外部自动化驱动本 Demo，winit 可能拦截合成鼠标事件，可用系统级 `mouse_event` 绕过。
 
 ### 已知坑（开发 / 部署实测）

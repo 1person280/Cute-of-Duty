@@ -1,17 +1,14 @@
-﻿//! HUD 左下 vitals：血条 / 护甲条 / 弹药 / 武器槽 / 干员名
+//! HUD 左下 vitals：血条 / 护甲条 / 弹药 / 武器槽 / 干员名
 //!
-//! 设计动机：Vitals 只读权威快照中本人条目。血量条那栏底图可用 `assets/ui/health_bar.jpg`
-//! 做铺垫（贴图就绪才挂），其上叠加**过程化**红色填充条（宽度随 `hp%`），保证即便贴图
-//! 路径失效也照样显示血条数值质感——图片锦上添花，数值永远可靠。
+//! 设计动机：Vitals 只读权威快照中本人条目。血条那栏底图贴图已废弃（旧版 1920² 概念美术
+//! 与体素低模方向相悖），改为**过程化**红/蓝填充条（宽度随 `hp%`/护甲比），永不依赖贴图。
 
 use bevy::prelude::*;
 
 use crate::flow::flow_state::{self as flow, CjkFont, LocalPlayer};
-use super::hud_root::optional_image;
 use crate::shared::operator_meta::meta;
 use crate::net::snapshot::SnapshotBuffer;
 use crate::shared::theme;
-use crate::shared::ui_assets::UiAssets;
 
 /// 血条填充（宽度按 hp% 更新）。
 #[derive(Component)]
@@ -30,7 +27,7 @@ pub struct OperatorName;
 pub struct ItemSlotText;
 
 /// 装配 vitals 面板（左下角，旧版样式：HP 180×22、护盾 140×10、深色半透明底）。
-pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont, ui: &UiAssets) {
+pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     // 左下 vitals 容器（绝对定位，深蓝半透明底）
     p.spawn(NodeBundle {
         style: Style {
@@ -55,7 +52,7 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont, ui: &UiAssets) {
             },
             ..default()
         });
-        optional_image(&mut avatar_row, ui, ui.avatar.clone(), Val::Px(44.0), Val::Px(44.0));
+        // 头像底图贴图已废弃（旧版 1920² 概念美术），干员名照常出画。
         avatar_row.with_children(|a| {
             a.spawn((
                 OperatorName,
@@ -77,7 +74,7 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont, ui: &UiAssets) {
             background_color: Color::srgb(0.15, 0.13, 0.13).into(),
             ..default()
         });
-        optional_image(&mut hp, ui, ui.health_bar.clone(), Val::Px(180.0), Val::Px(22.0));
+        // 血条底图贴图已废弃：底色 + 过程化填充出画；旧版 180×22 尺寸不变。
         hp.with_children(|h| {
             h.spawn((
                 HealthFill,

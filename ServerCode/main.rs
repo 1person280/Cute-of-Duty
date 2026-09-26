@@ -166,6 +166,14 @@ async fn serve_authoritative(
             }
         }
 
+        // 阶段1.6：清空已消费的边沿量（换弹/技能），避免同一次按键在后续 Tick 被重复触发。
+        // 扳机（shoot）是持续量，按住即持续开火，故不在此清空。
+        for input in conn_input.values_mut() {
+            input.reload = false;
+            input.skill_q = false;
+            input.skill_e = false;
+        }
+
         // 阶段2：推进确定性模拟一个 Tick
         sim.tick(dt);
 
@@ -261,8 +269,16 @@ fn drain_commands(
                 );
             }
             NetCommand::Input { conn_id, player } => {
-                // 只记录最新意图，实际结算在每 Tick 的「阶段1.5」统一进行（见 conn_input 注释）。
-                conn_input.insert(conn_id, player);
+                // 连续量（移动/朝向）只记最新；边沿量（换弹/技能）在一个 Tick 内可能被更晚
+                // 的同 Tick 输入覆盖，故按位「或」锁存，直到被某次 Tick 消费后清空（见阶段1.5），
+                // 保证单次按键既不因乱序丢失、也不被重复触发。
+                let slot = conn_input.entry(conn_id).or_default();
+                let (pending_reload, pending_q, pending_e) =
+                    (slot.reload, slot.skill_q, slot.skill_e);
+                *slot = player;
+                slot.reload |= pending_reload;
+                slot.skill_q |= pending_q;
+                slot.skill_e |= pending_e;
             }
             NetCommand::Inventory { conn_id, action } => {
                 apply_inventory_action(

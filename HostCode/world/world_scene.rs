@@ -15,8 +15,6 @@ use cute_of_duty_server::map::{
     self, GlowKind, GlowSpec, MapLayout, MaterialKind, Prop, Shape,
 };
 
-use super::world_assets::WorldAssets;
-
 /// 场景主光照（主平行光 + 补光 + 四角点光，参数对齐 0.3.2 `demo/world.rs`）。
 ///
 /// bevy 0.14：定向光用 `DirectionalLightBundle`，阴影开关是 `shadows_enabled`。
@@ -24,7 +22,6 @@ pub fn spawn_world(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
-    world_assets: &WorldAssets,
 ) {
     // 主平行光（0.3.2 数值：8000 lux，硬阴影）
     commands.spawn(DirectionalLightBundle {
@@ -77,7 +74,7 @@ pub fn spawn_world(
     }
 
     // 完整草坪训练场（静态部分：地板 + props + glows）
-    spawn_map_layout(&map::lawn::layout(), commands, meshes, materials, world_assets);
+    spawn_map_layout(&map::lawn::layout(), commands, meshes, materials);
 }
 
 /// 通用地图渲染器：把任意 `MapLayout` 的静态层落地为 bevy 实体。
@@ -90,12 +87,11 @@ fn spawn_map_layout(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
-    world_assets: &WorldAssets,
 ) {
     spawn_floor(layout, commands, meshes, materials);
 
     // 语义材质回收：一种料只建一份 GPU 缓冲，核显上避免累积 OOM（0.3.2 教训）。
-    let mats = MapMaterials::new(materials, world_assets);
+    let mats = MapMaterials::new(materials);
     // 共享网格池：同尺寸的方块/圆柱只建一次 mesh。
     let mut pool = MeshPool::default();
     for prop in &layout.props {
@@ -153,18 +149,18 @@ struct MapMaterials {
 }
 
 impl MapMaterials {
-    fn new(materials: &mut ResMut<Assets<StandardMaterial>>, world: &WorldAssets) -> Self {
+    fn new(materials: &mut ResMut<Assets<StandardMaterial>>) -> Self {
         Self {
-            // 墙面/结构 ← factory_bg 概念图；掩体/装甲 ← cover_obstacle；锈蚀金属 ← loot_crate。
-            // 底色仍保留：贴图未就绪时材质照常出彩色低模，绝不因贴图缺失而裸白/透明。
-            concrete: mat_textured(materials, CONCRETE, world.wall.clone()),
-            rust: mat_textured(materials, RUST, world.crate_tex.clone()),
-            steel: mat_textured(materials, STEEL, world.cover.clone()),
+            // 全部走稳定色板：客户端不再挂概念美术原图（1920²~2560×1440 贴图既撑爆显存，
+            // 又与本项目"体素低模"美术方向相悖），仅以底色出画。
+            concrete: mat_voxel(materials, CONCRETE),
+            rust: mat_voxel(materials, RUST),
+            steel: mat_voxel(materials, STEEL),
             target_red: mat_voxel(materials, TARGET_RED),
             target_white: mat_voxel(materials, TARGET_WHITE),
             paint_white: mat_voxel(materials, PAINT_WHITE),
-            dark: mat_textured(materials, DARK, world.cover.clone()),
-            pipe: mat_textured(materials, PIPE, world.doorway.clone()),
+            dark: mat_voxel(materials, DARK),
+            pipe: mat_voxel(materials, PIPE),
             warn_yellow: mat_voxel(materials, WARN_YELLOW),
             warn_orange: mat_voxel(materials, WARN_ORANGE),
             warn_red: mat_voxel(materials, WARN_RED),
@@ -284,24 +280,6 @@ fn mat_voxel(materials: &mut ResMut<Assets<StandardMaterial>>, color: Color) -> 
         base_color: color,
         metallic: 0.0,
         perceptual_roughness: 0.9,
-        ..default()
-    })
-}
-
-/// 贴图材质：底色打底 + `base_color_texture` 盖贴图，微金属/中等粗糙做 PBR 打磨。
-///
-/// `handle` 为 `None` 时退化为纯底色（贴图未就绪/缺失也不崩），纹理随异步就绪自动生效。
-fn mat_textured(
-    materials: &mut ResMut<Assets<StandardMaterial>>,
-    color: Color,
-    texture: Option<Handle<Image>>,
-) -> Handle<StandardMaterial> {
-    materials.add(StandardMaterial {
-        base_color: color,
-        base_color_texture: texture,
-        // 结构件带轻微金属感；粗糙拉高避免镜面刺眼，贴近旧版低模哑光观感。
-        metallic: 0.12,
-        perceptual_roughness: 0.72,
         ..default()
     })
 }

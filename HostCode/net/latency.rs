@@ -1,18 +1,14 @@
-﻿//! CapsLock 通信延迟面板（含 TCP 三次握手的往返指标）
+//! CapsLock 通信延迟面板（含 TCP 三次握手的往返指标）
 //!
 //! 设计动机：玩家开启大写锁定即希望看到自己到服务器的通信质量。本面板持续驻留
 //! （不做状态限定，随时可看），仅在 CapsLock 打开时可见。延迟指标分两类：
 //! - `ConnectLatency`：连接起点 → 握手完成（含 TCP 三次握手 + 首轮往返），握手中一次性测得；
-//! - `LiveLatency`：常态 Ping/Pong 往返，面板可见期间每 ~1s 测一次。
+//! - `LiveLatency`：常态 Ping/Pong 往返，由**网络线程**每 ~1s 探测一次并打点。
 //! 当前仅显示 `test` 玩家一行（其余玩家接入后再扩展）。
 
-use std::time::Instant;
-
 use bevy::prelude::*;
-use cute_of_duty_server::net::protocol::ClientMessage;
 
-use crate::flow::flow_state::{self as flow, CjkFont, ConnectLatency, LiveLatency, SeqCounter};
-use super::network::NetOut;
+use crate::flow::flow_state::{self as flow, CjkFont, ConnectLatency, LiveLatency};
 
 /// 面板可见性开关（CapsLock 切换）。
 #[derive(Resource, Default)]
@@ -29,9 +25,6 @@ pub struct LatencyText;
 /// 面板是否已生成（避免每帧重复 spawn 时重复建文本）。
 #[derive(Resource, Default)]
 pub struct PanelSpawned(pub bool);
-
-/// 每 ~1s 的 Ping 探测间隔。
-const PING_INTERVAL_SECS: f32 = 1.0;
 
 /// 生成永久延迟面板（字体就绪且尚未生成时执行一次；不随状态销毁）。
 pub fn spawn_panel(mut commands: Commands, fonts: Res<CjkFont>, spawned: Res<PanelSpawned>) {
@@ -69,17 +62,16 @@ pub fn caps_toggle(keys: Res<ButtonInput<KeyCode>>, mut show: ResMut<LatencyShow
     }
 }
 
-/// 同步面板显隐、定时 Ping 探测并刷新延迟文本（只显示 `test` 玩家一行）。
+/// 同步面板显隐并刷新延迟文本（只显示 `test` 玩家一行）。
+///
+/// 探测由网络线程承担（见 `run_pull_loop`）——RTT 只在网络线程打点，不含 Bevy 帧时间，
+/// 因此即便客户端掉帧，面板显示的仍是真实链路往返。
 pub fn panel_update(
     show: Res<LatencyShow>,
-    out: Res<NetOut>,
-    mut seq: ResMut<SeqCounter>,
-    mut live: ResMut<LiveLatency>,
     connect: Res<ConnectLatency>,
+    live: Res<LiveLatency>,
     mut panelq: Query<&mut Visibility, With<LatencyPanel>>,
     mut text_q: Query<&mut Text, With<LatencyText>>,
-    mut timer: Local<f32>,
-    time: Res<Time>,
 ) {
     // 1) 显隐跟随 CapsLock
     if let Ok(mut visibility) = panelq.get_single_mut() {
@@ -90,16 +82,7 @@ pub fn panel_update(
         };
     }
 
-    // 2) 可见期间每 ~1s 探测一次常态 RTT
-    *timer += time.delta_seconds();
-    if show.0 && *timer >= PING_INTERVAL_SECS {
-        *timer = 0.0;
-        seq.0 += 1;
-        let _ = out.0.send(ClientMessage::Ping { seq: seq.0 });
-        live.pending = Some(Instant::now());
-    }
-
-    // 3) 刷新文本内容（连接含握手 + 常态 RTT）
+    // 2) 刷新文本内容（连接含握手 + 常态 RTT）
     if let Ok(mut text) = text_q.get_single_mut() {
         text.sections[0].value = format!(
             "test   连接(含握手) {:.1} ms    RTT {:.1} ms",

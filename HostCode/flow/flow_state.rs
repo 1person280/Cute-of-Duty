@@ -5,8 +5,6 @@
 //! 延迟书签、通告、中文字体、上行序号），消费 `ControlBuffer` 里的下行控制消息，
 //! 并把状态机推向正确的一环。
 
-use std::time::Instant;
-
 use bevy::prelude::*;
 use cute_of_duty_server::net::protocol::{EventKind, ServerMessage};
 
@@ -72,11 +70,10 @@ pub struct ConnectLatency {
     pub ms: f32,
 }
 
-/// 常态 Ping/Pong 往返延迟（`pending` 记录已发出 Ping 的时间，收到 Pong 折现）。
+/// 常态 Ping/Pong 往返延迟（毫秒；由网络线程测量后经 `ClientInbound::Rtt` 灌入）。
 #[derive(Resource, Default)]
 pub struct LiveLatency {
     pub rtt_ms: f32,
-    pub pending: Option<Instant>,
 }
 
 /// 服务端 `Event::Announce` 通告队列（HUD/菜单滚动展示）。
@@ -94,7 +91,7 @@ pub struct SeqCounter(pub u64);
 
 /// 初始化全局资源与中文字体（Startup；UI 系统在句柄就绪前会自担跳过本帧）。
 pub fn setup_global(mut commands: Commands, mut fonts: ResMut<Assets<Font>>) {
-    if let Ok(font) = Font::try_from_bytes(include_bytes!("../assets/fonts/simhei.ttf").to_vec()) {
+    if let Ok(font) = Font::try_from_bytes(include_bytes!("../assets/simhei.ttf").to_vec()) {
         commands.insert_resource(CjkFont(Some(fonts.add(font))));
     }
     commands.insert_resource(LocalPlayer::default());
@@ -117,7 +114,7 @@ pub fn style(fonts: &CjkFont, size: f32, color: Color) -> TextStyle {
     }
 }
 
-/// 路由下行控制消息：握手 → 记握延迟并进入主菜单；Pong → 折现 RTT；
+/// 路由下行控制消息：握手 → 记握延迟并进入主菜单；Rtt → 刷新面板延迟；
 /// Announce → 入队通告；撤离成功 → 回主菜单。纯客户端编排，不触碰权威判定。
 ///
 /// 同时承担 Loading 兜底：`LOADING_TIMEOUT_SECS` 内未握手也放行进主菜单，
@@ -146,10 +143,8 @@ pub fn route_control_messages(
                     // 不在 Loading 态强切主菜单：留给 `loading_tick` 持有加载屏至最短可见时长
                     // 再切换（否则握手极快时加载屏一闪而过），此判定保持服务端握手驱动。
                 }
-                ClientInbound::Server(ServerMessage::Pong { .. }) => {
-                    if let Some(start) = live.pending.take() {
-                        live.rtt_ms = start.elapsed().as_secs_f32() * 1000.0;
-                    }
+                ClientInbound::Rtt(rtt_ms) => {
+                    live.rtt_ms = rtt_ms;
                 }
                 ClientInbound::Server(ServerMessage::Event {
                     kind: EventKind::Announce { text },

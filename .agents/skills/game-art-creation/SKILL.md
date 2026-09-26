@@ -105,4 +105,4 @@ powershell -NoProfile -Command "$p='tools\xxx.ps1'; $t=[System.IO.File]::ReadAll
 - 特效网格/材质必须入池共享（MaterialPool），逐发新建会复现已修复过的爆炸 OOM。
 - UI 默认用 NodeBundle + BackgroundColor 纯色而不是贴图；只有图标类才需要 Image 资产。
 - `Color::srgb(r, g, b)` 收 0~1 浮点；半透明用 `Color::srgba(..., a)` 或 `.with_alpha(a)`。
-- 中文字体用 assets/fonts/simhei.ttf。
+- 中文字体用 assets/simhei.ttf。

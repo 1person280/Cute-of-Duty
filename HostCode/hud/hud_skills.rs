@@ -1,4 +1,4 @@
-﻿//! HUD 右下：技能 CD + 元素状态 + 武器名/弹药；以及顶部公告/击杀流
+//! HUD 右下：技能 CD + 元素状态 + 武器名/弹药；以及顶部公告/击杀流
 //!
 //! 设计动机：技能冷却/元素状态/弹药/武器归属都是**服务端裁决**的热字段（`skill_cd_q/e`、
 //! `element_state`、`ammo`、`operator_id`），客户端只读快照展示；武器名/干员元素色来自
@@ -31,7 +31,7 @@ pub struct AmmoText;
 pub struct FeedText;
 
 /// 装配右下武器/弹药/技能面板 + 顶部公告流。
-pub fn spawn_skills(p: &mut ChildBuilder<'_>, fonts: &CjkFont, _ui: &crate::shared::ui_assets::UiAssets) {
+pub fn spawn_skills(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     // 右下：武器名 → 弹药 → Q → E → 元素（旧版右下弹药/武器 + 技能指示）
     p.spawn(NodeBundle {
         style: Style {

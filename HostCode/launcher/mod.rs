@@ -34,6 +34,8 @@ pub fn run(addr: &str) {
         .insert_resource(crate::net::SnapshotBuffer::new(snapshot_rx))
         .insert_resource(crate::net::ControlBuffer(std::sync::Mutex::new(control_rx)))
         .insert_resource(crate::net::NetOut(up_tx))
+        // 造型材质缓存：避免实体随 AOI 进出视野反复 spawn 时材质资源单调累积。
+        .init_resource::<crate::net::EntityMaterials>()
         // 中文字体句柄默认缺失（Default=None）但资源恒存在，避免任何 UI 系统
         // 在字体注入前的首帧对 `Res<CjkFont>` 取值 panic。
         .init_resource::<crate::flow::CjkFont>()
@@ -57,8 +59,7 @@ pub fn run(addr: &str) {
             (
                 crate::flow::setup_global,
                 crate::shared::init_ui_assets,
-                // world_assets 必须先于 spawn_scene 建好，world 才读得到贴图句柄。
-                (crate::world::init_world_assets, spawn_scene).chain(),
+                spawn_scene,
             ),
         )
         // 全局常驻：快照对账、鼠标视角、相机跟随、控制路由、延迟面板、设置应用，以及
@@ -74,7 +75,6 @@ pub fn run(addr: &str) {
                 crate::world::follow_system.run_if(crate::menu::pause_closed),
                 crate::flow::route_control_messages,
                 crate::shared::refresh_ui_ready,
-                crate::world::refresh_world_ready,
                 crate::net::caps_toggle,
                 crate::net::spawn_panel,
                 crate::net::panel_update,
@@ -138,10 +138,9 @@ fn spawn_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    world_assets: Res<crate::world::WorldAssets>,
 ) {
     crate::world::spawn_camera(&mut commands);
-    crate::world::spawn_world(&mut commands, &mut meshes, &mut materials, &world_assets);
+    crate::world::spawn_world(&mut commands, &mut meshes, &mut materials);
     commands.insert_resource(crate::net::CubeMesh {
         handle: meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
     });

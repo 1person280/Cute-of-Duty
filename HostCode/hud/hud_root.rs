@@ -5,15 +5,12 @@
 //! vitals / minimap / skills 的具体刷新各拆到独立子模块（保持每个 .rs ≤600 行）。
 //! 撤离的距离提示为纯表现层引导，**进入判定**由服务端按玩家世界坐标裁决。
 
-use bevy::ecs::system::EntityCommands;
 use bevy::prelude::*;
-use bevy::ui::UiImage;
 use cute_of_duty_server::net::protocol::ClientMessage;
 
 use crate::flow::flow_state::{self as flow, AppState, CjkFont, KillCount, LocalPlayer, EXTRACTION_POINT, EXTRACTION_RANGE};
 use crate::net::network::NetOut;
 use crate::net::snapshot::SnapshotBuffer;
-use crate::shared::ui_assets::UiAssets;
 
 /// HUD 整屏根标记（`StateScoped(InGame)` 随离场自动销毁）。
 #[derive(Component)]
@@ -28,7 +25,7 @@ pub struct ExtractLabel;
 pub struct ExtractPrompt;
 
 /// 生成 HUD：左下 vitals、右上击杀、右下弹药/技能、左上小地图、居中准星、顶部撤离引导。
-pub fn spawn_hud(mut commands: Commands, fonts: Res<CjkFont>, ui: Res<UiAssets>, kills: Res<KillCount>) {
+pub fn spawn_hud(mut commands: Commands, fonts: Res<CjkFont>, kills: Res<KillCount>) {
     if fonts.0.is_none() {
         return;
     }
@@ -47,9 +44,9 @@ pub fn spawn_hud(mut commands: Commands, fonts: Res<CjkFont>, ui: Res<UiAssets>,
             },
         ))
         .with_children(|p| {
-            super::hud_vitals::spawn_vitals(p, &fonts, &ui);
-            super::hud_skills::spawn_skills(p, &fonts, &ui);
-            super::hud_minimap::spawn_minimap(p, &fonts, &ui);
+            super::hud_vitals::spawn_vitals(p, &fonts);
+            super::hud_skills::spawn_skills(p, &fonts);
+            super::hud_minimap::spawn_minimap(p, &fonts);
             super::hud_crosshair::spawn_crosshair(p);
             super::hud_kill_counter::spawn_kill_counter(p, &fonts, &kills);
             super::hud_operator_panel::spawn_operator_panel(p, &fonts);
@@ -57,11 +54,10 @@ pub fn spawn_hud(mut commands: Commands, fonts: Res<CjkFont>, ui: Res<UiAssets>,
         });
 }
 
-/// 撤离引导：顶部中央，图标（可无）+ 距离/提示文本；另加一块入区后闪烁的居中大字提示。
+/// 撤离引导：顶部中央的距离/提示文本；另加一块入区后闪烁的居中大字提示。
 fn spawn_extract_label(p: &mut ChildBuilder, fonts: &CjkFont) {
     p.spawn((
         ExtractLabel,
-        UiImage::default(),
         NodeBundle {
             style: Style {
                 position_type: PositionType::Absolute,
@@ -163,36 +159,4 @@ pub fn extract_interaction(
     if (dx * dx + dz * dz).sqrt() <= EXTRACTION_RANGE {
         let _ = out.0.send(ClientMessage::ExtractRequest);
     }
-}
-
-/// 挂接贴图：把可选项变成一个图片子节点（未就绪返回空节点不显示图，数值照常）。
-///
-/// 0.14 的图片节点由独立的 `UiImage` 组件承载（`NodeBundle` 无 `image` 字段），
-/// 故这里把 `UiImage` 与 `NodeBundle` 组合成一个子实体。`p` 为容器 `EntityCommands`，
-/// 通过 `with_children` 挂子级。
-pub fn optional_image(
-    p: &mut EntityCommands,
-    ui: &UiAssets,
-    handle: Option<Handle<Image>>,
-    size: Val,
-    height: Val,
-) {
-    let image = if ui.ready {
-        handle.map(UiImage::new).unwrap_or_default()
-    } else {
-        UiImage::default()
-    };
-    p.with_children(|c| {
-        c.spawn((
-            NodeBundle {
-                style: Style {
-                    width: size,
-                    height,
-                    ..default()
-                },
-                ..default()
-            },
-            image,
-        ));
-    });
 }

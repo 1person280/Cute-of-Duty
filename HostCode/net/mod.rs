@@ -12,4 +12,6 @@ pub(crate) mod snapshot;
 pub(crate) use latency::{caps_toggle, panel_update, spawn_panel};
 pub(crate) use network::{ClientInbound, ControlBuffer, NetOut, run_pull_loop};
 pub(crate) use pilot::input_system;
-pub(crate) use snapshot::{CubeMesh, SnapshotBuffer, apply_entities, receive_snapshots};
+pub(crate) use snapshot::{
+    CubeMesh, EntityMaterials, SnapshotBuffer, apply_entities, receive_snapshots,
+};

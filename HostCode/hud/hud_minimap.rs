@@ -1,4 +1,4 @@
-﻿//! HUD 右下小地图：把服务端快照所有实体位置投影到一张 160×160 小图
+//! HUD 右下小地图：把服务端快照所有实体位置投影到一张 160×160 小图
 //!
 //! 设计动机：小地图是**纯表现层**——把所有 `EntitySnapshot` 的 x/z 相对本人实体做一次
 //! 直角投影（-Z 为北/上），画成色点。这里不关心实体"是什么角色"，只关心"在哪"，
@@ -7,10 +7,8 @@
 use bevy::prelude::*;
 
 use crate::flow::flow_state::{self as flow, CjkFont, LocalPlayer};
-use super::hud_root::optional_image;
 use crate::world::model::voxel_for;
 use crate::net::snapshot::SnapshotBuffer;
-use crate::shared::ui_assets::UiAssets;
 
 /// 小地图画布容器。
 #[derive(Component)]
@@ -28,7 +26,7 @@ const COMPASS_H: f32 = 26.0;
 const METERS_PER_PX: f32 = 2.0;
 
 /// 装配小地图（左上角，旧版锚点 + 上部罗盘条）。
-pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont, ui: &UiAssets) {
+pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     // 罗盘条（地图上方，方位刻度文案 + 深底；不带 MinimapLayer，避免被当成画布）
     p.spawn(NodeBundle {
             style: Style {
@@ -60,8 +58,8 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont, ui: &UiAssets) {
         ));
     });
 
-    // 地图画布（罗盘下方）
-    let mut map = p.spawn((
+    // 地图画布（罗盘下方）；外框贴图已废弃，画布底色 + 过程化点位出画。
+    p.spawn((
         MinimapLayer,
         NodeBundle {
             style: Style {
@@ -76,8 +74,6 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont, ui: &UiAssets) {
             ..default()
         },
     ));
-    // 底图外框（可无；就绪再挂，数值不依赖）
-    optional_image(&mut map, ui, ui.minimap_frame.clone(), Val::Px(MAP_SIZE), Val::Px(MAP_SIZE));
 }
 
 /// 每帧重建小地图点：清空旧点 → 读快照 → 相对本人投影画点。

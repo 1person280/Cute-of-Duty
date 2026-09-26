@@ -26,6 +26,8 @@ impl Session {
         let stream = tokio::net::TcpStream::connect(addr)
             .await
             .map_err(|e| format!("连接服务器失败 {addr}: {e}"))?;
+        // TCP_NODELAY：NDJSON 是一行一小帧，禁用 Nagle 合并，避免上行输入/探测被攒包拖慢往返。
+        let _ = stream.set_nodelay(true);
         let (reader, writer) = stream.into_split();
         let mut session = Self {
             reader: BufReader::new(reader),
@@ -72,6 +74,8 @@ impl Session {
 pub enum ClientInbound {
     /// 连接建立并收到握手：`assigned_id` 为本人权威实体 ID，`connect_ms` 含握手往返耗时。
     Connected { assigned_id: u64, connect_ms: f32 },
+    /// 常态 Ping/Pong 往返延迟（毫秒）。由**网络线程**打点测量，不含 Bevy 帧时间。
+    Rtt(f32),
     /// 其它服务端下行消息（事件/延迟回显/撤离回程）。
     Server(ServerMessage),
 }
@@ -89,6 +93,9 @@ pub struct NetOut(pub std::sync::mpsc::Sender<ClientMessage>);
 /// 重连间隔：连接失败/掉线后等待多久再试（避免忙轮询，也给用户留出启服务端的时间）。
 const RECONNECT_INTERVAL: Duration = Duration::from_secs(2);
 
+/// 常态 RTT 探测间隔（秒）。
+const PING_INTERVAL: Duration = Duration::from_secs(1);
+
 /// 后台网络拉取循环：连接、转发上行、把下行分路推入通道，**断线自动重连**。
 ///
 /// 设计动机（Why）：客户端与服务端是两个独立进程，玩家先开客户端是常见操作。若首次连接
@@ -100,7 +107,7 @@ pub fn run_pull_loop(
     addr: &str,
     snapshot_tx: mpsc::Sender<Vec<EntitySnapshot>>,
     control_tx: mpsc::Sender<ClientInbound>,
-    mut up_rx: mpsc::Receiver<ClientMessage>,
+    up_rx: mpsc::Receiver<ClientMessage>,
 ) {
     let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
         Ok(rt) => rt,
@@ -124,9 +131,16 @@ pub fn run_pull_loop(
             };
             println!("已连接服务器 {addr}，等待快照灌入场景...");
 
+            // 常态 RTT 探测全部在**网络线程**打点：`pending` 记录 Ping 真正写入 socket 的时刻，
+            // 收到 Pong 折现。这样面板显示的是真实链路往返，绝不会把 Bevy 帧时间算进去
+            // （此前在 Bevy 帧内打点，低帧率时会把 ~5ms 的网络往返放大成几百 ms 的假延迟）。
+            let mut ping_seq: u64 = 0;
+            let mut next_ping = Instant::now() + PING_INTERVAL;
+            let mut pending: Option<Instant> = None;
+
             // 阶段2：会话循环；任何收发错误都退到外层重连（而非终止线程）。
             loop {
-                // 1) 转发 bevy 侧排队的上行意图（移动/选装/进场/撤离/延迟探测）
+                // 1) 转发 bevy 侧排队的上行意图（移动/选装/进场/撤离）
                 while let Ok(msg) = up_rx.try_recv() {
                     if let Err(e) = session.send(&msg).await {
                         eprintln!("[网络] {e}");
@@ -134,10 +148,31 @@ pub fn run_pull_loop(
                     }
                 }
 
-                // 2) 接收一行下行并按类型分路
+                // 2) 定时 Ping（探测间隔到了就发；快照 60Hz 驱动本循环，实际抖动 < 1 帧）
+                let now = Instant::now();
+                if now >= next_ping {
+                    ping_seq += 1;
+                    if session
+                        .send(&ClientMessage::Ping { seq: ping_seq })
+                        .await
+                        .is_ok()
+                    {
+                        pending = Some(Instant::now());
+                    }
+                    next_ping = now + PING_INTERVAL;
+                }
+
+                // 3) 接收一行下行并按类型分路
                 match session.recv().await {
                     Ok(ServerMessage::Snapshot { entries, .. }) => {
                         let _ = snapshot_tx.send(entries);
+                    }
+                    Ok(ServerMessage::Pong { .. }) => {
+                        if let Some(start) = pending.take() {
+                            let _ = control_tx.send(ClientInbound::Rtt(
+                                start.elapsed().as_secs_f32() * 1000.0,
+                            ));
+                        }
                     }
                     Ok(ServerMessage::Handshake { assigned_id, .. }) => {
                         let connect_ms = start.elapsed().as_secs_f32() * 1000.0;

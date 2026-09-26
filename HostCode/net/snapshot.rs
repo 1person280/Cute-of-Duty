@@ -1,12 +1,13 @@
-﻿//! 实体渲染跟随：把服务端权威快照映射为场景中的体素造型
+//! 实体渲染跟随：把服务端权威快照映射为场景中的体素造型
 //!
 //! 设计动机（服务器权威）：本系统**只消费** `EntitySnapshot`（位置/存活/模型身份均为
 //! 服务端裁决值），为已存在的实体更新坐标系、为新实体生成造型、为消失实体销毁，
 //! 绝不做任何本地校订 —— 客户端只是服务端世界的一块"绘画镜面"。
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use bevy::prelude::*;
+use cute_of_duty_server::model::ModelPreset;
 use cute_of_duty_server::net::protocol::EntitySnapshot;
 
 use crate::world::model::voxel_for;
@@ -21,6 +22,45 @@ pub struct RenderedEntity {
 #[derive(Resource)]
 pub struct CubeMesh {
     pub handle: Handle<Mesh>,
+}
+
+/// 造型材质缓存：每个 `ModelPreset` 只建一份主色/强调色材质。
+///
+/// 设计动机（Why）：实体随 AOI 进出视野会被反复 `spawn_body`；若每次都对
+/// `Assets<StandardMaterial>` 调 `add`，材质资源会随实体增删**单调累积**（GPU 缓冲
+/// 永不释放），长时间游玩即内存涨到 GB、帧时间崩坏（表现为"延迟"飙升）。
+/// 造型身份是服务端权威且取值有限（`ModelPreset` 枚举），故按 preset 缓存句柄一次成型。
+#[derive(Resource, Default)]
+pub struct EntityMaterials {
+    cache: HashMap<ModelPreset, (Handle<StandardMaterial>, Handle<StandardMaterial>)>,
+}
+
+impl EntityMaterials {
+    /// 取某造型的（主色, 强调色）材质句柄；首次使用才创建，之后全场复用。
+    fn handles_for(
+        &mut self,
+        materials: &mut Assets<StandardMaterial>,
+        preset: ModelPreset,
+    ) -> (Handle<StandardMaterial>, Handle<StandardMaterial>) {
+        if let Some(pair) = self.cache.get(&preset) {
+            return pair.clone();
+        }
+        let body = voxel_for(preset);
+        let primary = materials.add(StandardMaterial {
+            base_color: body.primary,
+            perceptual_roughness: 0.7,
+            ..default()
+        });
+        let accent = materials.add(StandardMaterial {
+            base_color: body.accent,
+            emissive: body.accent.into(),
+            perceptual_roughness: 0.6,
+            ..default()
+        });
+        let pair = (primary, accent);
+        self.cache.insert(preset, pair.clone());
+        pair
+    }
 }
 
 /// 服务端快照来源（背景网络线程持续灌入最新一帧实体列表）。
@@ -64,6 +104,7 @@ pub fn apply_entities(
     buffer: Res<SnapshotBuffer>,
     cube: Res<CubeMesh>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut entity_mats: ResMut<EntityMaterials>,
     mut query: Query<(Entity, &mut Transform, &RenderedEntity)>,
 ) {
     // 快照里仍然存活/可见的 ID（AOI 过滤后仅服务端下发的就是应渲染的）
@@ -82,7 +123,7 @@ pub fn apply_entities(
     // 2) 生成快照里有、本地还没有的实体
     for entry in &buffer.current {
         if !local_ids.contains(&entry.entity_id) {
-            spawn_body(&mut commands, &cube, &mut materials, entry);
+            spawn_body(&mut commands, &cube, &mut materials, &mut entity_mats, entry);
         }
     }
 
@@ -102,20 +143,12 @@ fn spawn_body(
     commands: &mut Commands,
     cube: &CubeMesh,
     materials: &mut ResMut<Assets<StandardMaterial>>,
+    entity_mats: &mut ResMut<EntityMaterials>,
     entry: &EntitySnapshot,
 ) {
     let body = voxel_for(entry.model_preset);
-    let primary = materials.add(StandardMaterial {
-        base_color: body.primary,
-        perceptual_roughness: 0.7,
-        ..default()
-    });
-    let accent = materials.add(StandardMaterial {
-        base_color: body.accent,
-        emissive: body.accent.into(),
-        perceptual_roughness: 0.6,
-        ..default()
-    });
+    // 材质按造型身份复用（见 `EntityMaterials`）：实体反复增删不再累积材质资源。
+    let (primary, accent) = entity_mats.handles_for(materials, entry.model_preset);
 
     let mut root = commands.spawn((
         RenderedEntity { id: entry.entity_id },

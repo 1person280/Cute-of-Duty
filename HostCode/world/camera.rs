@@ -1,20 +1,21 @@
-//! 第三人称环绕镜头 + 鼠标自由视角
-//!
-//! 设计动机（Why）：0.6 早期版本朝向由 WASD 位移方向推导，既没有鼠标自由视角、
-//! 也无法把瞄准朝向报给服务端（弹道与移动轴系都因此失真）。本模块改为**鼠标驱动**：
-//! 偏航/俯仰写入共享资源 [`AimRig`]（`flow_state`），镜头据此摆放；`net::input_system`
-//! 再把同一份 `AimRig` 作为 `aim_yaw/aim_pitch` 上报 —— 视角与移动/弹道轴系从此同源。
-//!
-//! 取景方式（Why）：采用**环绕相机**——镜头沿视线反方向退到角色后方 `CAMERA_DIST`，
-//! 并**始终看向角色胸口** `center + Y*LOOK_TARGET_Y`。这样无论鼠标俯仰多大，角色都稳定
-//! 居于画面中央；此前「看向角色前方数米」的取景在窄 FOV 下会让角色头部贴边、俯视即出画。
-//!
-//! 轴系约定（与 `flow_state::AimRig` 及服务端 `shooter` 完全一致）：
-//! - 方向 = `(sinY·cosP, sinP, cosY·cosP)`，pitch 为正 = 抬头；
-//! - 默认 yaw = π 面向 -Z（北/撤离区），镜头落在玩家 +Z 侧后方，与服务端出生朝向一致。
-//!
-//! 视角/距离/FOV 均为纯表现层设定，不属于任何服务端权威数据（`game_settings` 据此改 FOV）。
-//! 镜头位置取自权威快照（服务端唯一真相源），客户端不做本地位置校订。
+//! 第三人称越肩镜头 + 鼠标自由视角
+///
+/// 设计动机（Why）：0.6 早期版本朝向由 WASD 位移方向推导，既没有鼠标自由视角、
+/// 也无法把瞄准朝向报给服务端（弹道与移动轴系都因此失真）。本模块改为**鼠标驱动**：
+/// 偏航/俯仰写入共享资源 [`AimRig`]（`flow_state`），镜头据此摆放；`net::input_system`
+/// 再把同一份 `AimRig` 作为 `aim_yaw/aim_pitch` 上报 —— 视角与移动/弹道轴系从此同源。
+///
+/// 取景方式（Why，对齐 0.3.2 `demo/camera.rs` 的越肩 SpringArm）：镜头挂在角色**右肩**后方，
+/// 并**沿视线方向平行注视**（而非回看角色）——角色因此稳定落在画面**偏左**，正是"第三人称
+/// 越肩"的标志观感；此前"纯环绕 + 始终看向角色胸口"的取景会让角色正中、并在贴墙时糊脸，
+/// 观感偏近于第一人称。轴系与旧版一致：右肩水平偏移 `SHOULDER_OFFSET`，臂长 `CAMERA_DIST`。
+///
+/// 轴系约定（与 `flow_state::AimRig` 及服务端 `shooter` 完全一致）：
+/// - 方向 = `(sinY·cosP, sinP, cosY·cosP)`，pitch 为正 = 抬头；
+/// - 默认 yaw = π 面向 -Z（北/撤离区），镜头落在玩家 +Z 侧后方，与服务端出生朝向一致。
+///
+/// 视角/距离/FOV 均为纯表现层设定，不属于任何服务端权威数据（`game_settings` 据此改 FOV）。
+/// 镜头位置取自权威快照（服务端唯一真相源），客户端不做本地位置校订。
 
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
@@ -23,15 +24,17 @@ use crate::flow::flow_state::{AimRig, LocalPlayer};
 use crate::menu::GameSettings;
 use crate::net::snapshot::SnapshotBuffer;
 
-/// 第三人称环绕镜头标记（每帧由 `follow_system` 重写世界变换；`game_settings` 据此改 FOV）。
+/// 第三人称越肩镜头标记（每帧由 `follow_system` 重写世界变换；`game_settings` 据此改 FOV）。
 #[derive(Component)]
 pub struct ChaseCamera;
 
-/// 镜头到角色的环绕半径（米）。
+/// 镜头到角色的臂长（米，旧版 `ARM_LEN_NORMAL` 的收敛值）。
 const CAMERA_DIST: f32 = 4.2;
-/// 视线锁定的角色高度（胸口偏上；角色整体高约 2.67m，取中部保证全身在框）。
-const LOOK_TARGET_Y: f32 = 1.4;
-/// 环绕俯仰限位：抬头不高于 +0.55（约 31°）、低头不低于 -0.75（约 -43°），
+/// 越肩机位的右肩水平偏移（米）：镜头右移后角色落于画面偏左，形成越肩观感。
+const SHOULDER_OFFSET: f32 = 0.65;
+/// 视线锚点高度（角色肩颈处；角色整体高约 2.67m，取肩部保证全身在框）。
+const PIVOT_Y: f32 = 1.55;
+/// 俯仰限位：抬头不高于 +0.55（约 31°）、低头不低于 -0.75（约 -43°），
 /// 避免镜头钻到角色脚下/贴地。瞄准用 `AimRig.pitch` 另有更宽的限位。
 const ORBIT_PITCH_MIN: f32 = -0.75;
 const ORBIT_PITCH_MAX: f32 = 0.55;
@@ -48,11 +51,11 @@ const PITCH_DOWN_MAX: f32 = 1.217;
 /// 限幅可防止视角被该跳变甩飞（正常鼠标移动远低于此值）。
 const MAX_FRAME_DELTA: f32 = 200.0;
 
-/// 生成环绕摄像机（初始面向 -Z 北侧；握手前停在原点后方，仍在场内）。
+/// 生成越肩摄像机（初始面向 -Z 北侧；握手前停在原点后方，仍在场内）。
 ///
 /// bevy 0.14 用 `Camera3dBundle` 承载相机（渲染图/投影/可见性一并装配）。
 pub fn spawn_camera(commands: &mut Commands) {
-    let look = Vec3::new(0.0, LOOK_TARGET_Y, 0.0);
+    let look = Vec3::new(0.0, PIVOT_Y, 0.0);
     commands.spawn((
         ChaseCamera,
         Camera3dBundle {
@@ -87,9 +90,11 @@ pub fn mouse_look_system(
     rig.pitch = rig.pitch.clamp(-PITCH_DOWN_MAX, PITCH_UP_MAX);
 }
 
-/// 每帧把镜头环绕到角色后方、始终注视角色胸口；握手前无本人实体则停在原点。
+/// 每帧把镜头摆到角色右肩后方并沿视线平行注视（越肩第三人称）；握手前无本人实体则停在原点。
 ///
 /// 目标位置取自权威快照（服务端唯一真相源），客户端不做本地校订；镜头姿态纯属表现层。
+/// 注意：本人实体若**暂时**不在本帧快照（AOI/对账间隙），直接保持上一帧机位而非退回世界原点——
+/// 否则镜头会瞬移到 (0,0,0)，表现为"看不见自己、场景乱飘"。
 pub fn follow_system(
     mut query: Query<(&mut Transform, &ChaseCamera)>,
     snap: Res<SnapshotBuffer>,
@@ -97,27 +102,35 @@ pub fn follow_system(
     rig: Res<AimRig>,
 ) {
     let center = if player.entity_id != 0 {
-        snap.current
+        match snap
+            .current
             .iter()
             .find(|e| e.entity_id == player.entity_id)
-            .map(|e| Vec3::new(e.x, e.y, e.z))
-            .unwrap_or(Vec3::ZERO)
+        {
+            Some(e) => Vec3::new(e.x, e.y, e.z),
+            // 已握手但本帧快照缺本人条目：保持上一帧机位，避免跳回原点。
+            None => return,
+        }
     } else {
         Vec3::ZERO
     };
 
-    // 环绕注视点固定在角色胸口：角色因此永远居于画面中央，俯仰也不会把它甩出画面。
-    let look = center + Vec3::Y * LOOK_TARGET_Y;
-    // 镜头沿「视线反方向」退到身后（含俯仰的环轨道），再钳制俯仰与最低高度。
+    // 视线锚点固定在角色肩部；镜头绕其沿视线反方向退到身后（含俯仰的环轨道）。
     let pitch = rig.pitch.clamp(ORBIT_PITCH_MIN, ORBIT_PITCH_MAX);
     let cos_p = pitch.cos();
+    // 视线方向（与服务端弹道同号：pitch 正 = 抬头）。
     let dir = Vec3::new(rig.yaw.sin() * cos_p, pitch.sin(), rig.yaw.cos() * cos_p);
-    let mut cam_pos = look - dir * CAMERA_DIST;
+    // 水平右向量 = normalize(cross(forward, Y))，用于右肩平移（越肩机位）。
+    let right = Vec3::new(-rig.yaw.cos(), 0.0, rig.yaw.sin());
+
+    let anchor = center + Vec3::Y * PIVOT_Y;
+    let mut cam_pos = anchor + right * SHOULDER_OFFSET - dir * CAMERA_DIST;
     if cam_pos.y < MIN_CAM_Y {
         cam_pos.y = MIN_CAM_Y;
     }
     for (mut tf, _) in &mut query {
         tf.translation = cam_pos;
-        tf.look_at(look, Vec3::Y);
+        // 沿视线**平行**注视（不回看角色）：角色因此稳定落在画面偏左，形成越肩第三人称观感。
+        tf.look_at(cam_pos + dir, Vec3::Y);
     }
 }

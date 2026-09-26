@@ -111,6 +111,8 @@ pub async fn accept_loop(addr: String, rt: Arc<NetRuntime>) -> std::io::Result<(
     tracing::info!("服务器权威已监听: {addr}");
     loop {
         let (stream, peer) = listener.accept().await?;
+        // TCP_NODELAY：NDJSON 是许多小帧，禁用 Nagle 合并避免人为攒包拖慢往返（延迟面板可见）。
+        let _ = stream.set_nodelay(true);
         let conn_id = rt.next_id.fetch_add(1, Ordering::Relaxed);
         tracing::info!("新连接 #{conn_id} 来自 {peer}");
 
