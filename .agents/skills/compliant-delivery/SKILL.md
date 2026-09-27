@@ -1,0 +1,173 @@
+---
+name: compliant-delivery
+description: Cute Of Duty 合规交付技能——把改动按「三闸门」合规地走完 提交(commit) → 推送(push) → 发布(release)：提交前过 CLA 声明 + 洁癖/架构/协议/文档/测试五道红线；推送遵循分支与"不重写历史"纪律；发布严格区分「发布号 0.6-Snapshot-N」与「协议版本 x.y.z」，并同步 README 版本表 + BarekHistory + tag + GitHub Release 四件套。凡用户要求提交、commit、推送、push、开 PR、打 tag、发快照、写 release note，或问"这个改动能不能提交/合规吗"时使用——即使用户只说"帮我提交""推一下""发个版本""把这个 release 做了"。
+---
+
+# Cute Of Duty 合规交付（提交 / 推送 / 发布）
+
+本项目合规 + 洁癖要求极硬（见 [CONTRIBUTING.md](../../../CONTRIBUTING.md)）。本技能把「提交 → 推送 → 发布」拆成三道互相独立、**逐关放行**的闸门。**上一关未过，禁止进入下一关**；任何"先推了再说"的行为都视为违规。
+
+一句话判据：**归属合法（CLA/署名）→ 红线全过（五道）→ 号对齐（发布号 ≠ 协议号）。**
+
+---
+
+## 零、三张通行证（每关开闸前先自问）
+
+| 通行证 | 问什么 | 在哪一步用 | 缺了会怎样 |
+|---|---|---|---|
+| ① 授权 | 贡献者已签 CLA？作者身份是登记身份？ | 提交前 | PR 不予合入；署名丢归属 |
+| ② 洁净 | 五道红线（洁癖/架构/协议/文档/测试）全过？ | 提交前 | 直接关 PR，不讨论 |
+| ③ 对齐 | 发布号与协议号没混？tag/Release/README/BarekHistory 一致？ | 发布前 | 版本漂移，无法追责与兼容 |
+
+---
+
+## 第一关：合规提交（commit）
+
+### 1.1 提交前五道红线（缺一不可）
+
+| 红线 | 判据 | 检查方式 |
+|---|---|---|
+| **洁癖** | 单文件 ≤ 600 行；禁循环依赖；禁 `common.rs`/`utils.rs`/`misc.rs`/`helpers.rs`；核心业务模块深度 ≤ 2 层；公开项有 **Why** Rustdoc（不是复述代码） | 逐文件核对 + `git diff --stat` |
+| **架构** | 禁跨模块直接调用（三层判据：①`use crate::<别模块>::` ②`HostCode/Cargo.toml` 不得含 `cute_of_duty_server` ③同层横向 `use crate::menu::`）；数据所有权唯一（他人只持快照/句柄）；依赖无环、只许 `表现层→契约层→领域层→基础设施层`；跨 crate/跨进程先写 `XxxPort` trait | 搜引用 + `grep`；新增依赖必须贴依赖图 |
+| **协议** | 碰 L2+ / 线格式 / 配置语义 / 公共 Trait → 必须同 PR 追加 [docs/barek-history.md](../../../docs/barek-history.md) 条目；`x+1` 必附迁移指南；契约同步 `docs/contracts/*.yaml` | 对照 [模块边界](../../../docs/architecture/module-boundaries.md) 的 L2 集合 |
+| **文档** | 碰某模块 → 同 PR 补该模块 `module.md`（现状 0，"碰到就补"）；改代码同更 BarekHistory / 契约 YAML；破坏性 L1 变更写 ADR | 见 CONTRIBUTING 第九节 |
+| **测试** | 任何改动 `cargo-wrap check --workspace`；服务端逻辑 `cargo-wrap test -p cute_of_duty_server`；线格式/契约 另加契约一致性；客户端表现 `cargo-wrap build --workspace --release` | 编译**一律走 `tools/cargo-wrap/target/release/cargo-wrap.exe`**，禁裸 `cargo` |
+
+Rust 硬规范：生产路径禁 `unwrap()`/`expect()`（用 `?`）；错误统一 `thiserror`（禁 `Box<dyn Error>` 穿模块边界）；内部字段 `pub(crate)`；跨 `await` 保 `Send + Sync`（禁 `Rc`/`RefCell` 跨界）；可调数值走 `src/config/`（禁硬编码副本）。
+
+### 1.2 授权与署名（合规的资格线）
+
+- **首次贡献者**必须在 PR 描述原样写入声明，否则不予合入：
+
+  ```
+  I have read the CLA Document and I hereby sign the CLA.
+  ```
+
+  维护者据 [docs/cla-signatures.md](../../../docs/cla-signatures.md) 登记（身份 / 邮箱 / CLA 版本 / 日期 / 覆盖提交范围）；历史贡献走"追溯补签"，联系不上或拒签的第三方须 clean-room 重写。
+- **作者身份必须等于登记身份** `1person280 <1975383276@qq.com>`；提交前先核对：
+
+  ```
+  git config user.name
+  git config user.email
+  ```
+
+  **AI/工具不得代填 author**：历史事故 `d857e61` 被工具误填成 `Bzhan-3493264141322312 <3493264141322312@users.noreply.github.com>`，已用根目录 [.mailmap](../../../.mailmap) 在显示层校正归属——**不重写历史、不 force-push**。
+
+### 1.3 提交信息规范
+
+```
+<type>(<scope>): <一句话为什么>
+
+<可选正文：为什么这么改，而不是怎么改>
+
+关联: ADR-xxxx / Issue #xx
+```
+
+- `type` ∈ `feat` / `fix` / `refactor` / `docs` / `test` / `chore` / `perf`。
+- `<scope>` 用**快照号**（如 `0.6-snapshot-8`）或**模块名**（如 `net`）。仓库既有的 `release(0.6-snapshot-9): …`、`refactor(0.6-snapshot-7): …`、`docs(0.6-snapshot-8): …` 即范本。
+- **一次提交只做一件事**；**重构与功能不得混在同一提交**。
+- 正文写"为什么"（Why），不是"改了什么"（What）。
+
+### 1.4 入库 / 不入库
+
+入库前 `git status --short` 逐条确认。**禁止提交**（见 [.gitignore](../../../.gitignore)）：
+
+`/target/`、`/tools/cargo-wrap/target/`、`/ServerCode/data/`（运行时档案）、`/_ref/`（1.6GB legacy 对照，不入库）、`/.trae/`、`* .zip`、`*.log`、`check_out.txt`、`smoke_out.log`、`/HostCode/check*.txt`。
+
+### 1.5 未验证改动只能进冻结区
+
+改了但没验证的功能，**只能**写进 [docs/stop-doing.md](../../../docs/stop-doing.md) 或 [docs/frozen-tasks/](../../../docs/frozen-tasks/)；**不得**在 README / CHANGELOG / release note 里被描述为"已完成"，也**不得**在其上继续叠加新代码。
+
+---
+
+## 第二关：合规推送（push）
+
+### 2.1 分支纪律
+
+- 从 `main` 拉分支，命名语义化：`feat/xxx`、`refactor/xxx`。
+- **未验证的玩法**留在 `wip/*`（如 `wip/0.8-snapshot-8`），**不合入 `main`**。
+
+### 2.2 推送动作
+
+```
+git push -u origin <branch>          # origin = https://github.com/1person280/Cute-of-Duty.git
+```
+
+- **禁 force-push 到 `main`/`master`**；**禁重写公共历史**（署名/归属问题一律用 `.mailmap`，不用 amend / rebase / reset 修公共历史）。
+
+### 2.3 PR 与评审门槛
+
+- **L2 模块**（`net` 线格式 / 契约层 `ContractCode` / 公共 Trait）或**新增顶层模块 / 提取独立 crate** → **先开 Issue 对齐**。
+- L2 变更须 **≥2 名 reviewer + maintainer 参与**；破坏性变更先写**迁移指南 + ADR**，再动代码。
+- PR 描述必附：改了哪个模块 / 为什么 / **依赖图**（证明无环）/ **验证命令 + 结果**；手工验收写清 **步骤 + 预期 + 实际**，未实测标注"未验证"。
+- 绕过 [stop-doing.md](../../../docs/stop-doing.md) 冻结项 → 直接关闭。
+
+### 2.4 CI
+
+`push` / `pull_request` 到 `main` 触发 [.github/workflows/rust.yml](../../../.github/workflows/rust.yml)（装 Linux bevy 系统库 → 缓存 → `cargo build` + `cargo test`）。**推送前先本地跑通 `cargo-wrap`**，不要拿 CI 当第一次编译。
+
+---
+
+## 第三关：合规发布（release）
+
+### 3.1 两套号，绝不混用
+
+| 号 | 形态 | 用途 | 驱动什么 |
+|---|---|---|---|
+| **发布号** | `<版本线>-Snapshot-<N>`（当前正式线 **`0.6-Snapshot-N`**，连续编号） | 面向玩家的里程碑（GitHub Release / README 版本表） | **不驱动**兼容性，纯发布标记 |
+| **协议版本** | `x.y.z`（记在 `docs/contracts/*.yaml` 的 `version`） | 线格式 / 契约兼容性 | `x+1`/`y+1`/`z+1` 规则 + BarekHistory 条目 |
+
+`Snapshot-N` **不映射** `x.y.z`。改协议 → 动 `x.y.z` 并写 BarekHistory；改发布 → 只动发布号。
+
+### 3.2 发布前门禁（全绿才可发）
+
+- [ ] `cargo-wrap check --workspace` 退出码 **0**
+- [ ] `cargo-wrap test -p cute_of_duty_server` **全绿**
+- [ ] 客户端改动：`cargo-wrap build --workspace --release`（**debug 产物 >2GB 会触发 `os error 193`**）
+- [ ] **冻结项审计**：[stop-doing.md](../../../docs/stop-doing.md) / [frozen-tasks](../../../docs/frozen-tasks/) 里未了结的 ❌ 项，一律不得写成"已完成"
+- [ ] 协议 / L2 改动：BarekHistory 条目**已追加**（变更类型 / 兼容性 / 迁移指南 / 验证 / 关联）
+
+### 3.3 发布四件套（必须一次性对齐）
+
+1. **README 版本表**：[README.md](../../../README.md)「六、版本历史」**顶部**加一行 ——
+   `| 0.6-Snapshot-N（Pre-Release） | YYYY-MM-DD | 说明… |`
+   说明须覆盖：做了什么、**未做**、**下一快照目标（roadmap）**、**本轮冻结（下次修）**。
+2. **BarekHistory**：协议 / L2 改动时在 [docs/barek-history.md](../../../docs/barek-history.md) 顶部追加条目（最新在最上）。
+3. **打 tag**：
+   ```
+   git tag 0.6-Snapshot-N              # 当前正式线无 v 前缀
+   git push origin 0.6-Snapshot-N
+   ```
+   （历史线 `0.3.x` / `0.5.x` 曾用 `v0.3.2` 形式；当前线以 `0.6-Snapshot-N` 为准。）
+4. **GitHub Release**：以该 tag 建 Release，快照一律标 **Pre-Release**：
+   ```
+   gh release create 0.6-Snapshot-N --prerelease --title "0.6-Snapshot-N" --notes-file <说明文件>
+   ```
+
+### 3.4 发布红线
+
+- 不得混用发布号与协议号；不得靠发布号掩盖协议破坏。
+- **不得启用已冻结的 WIP 号**：`0.7-Snapshot-7` / `0.8.0-Snapshot-8` 那批快照**未发布且已冻结**；正式线以 `0.6-Snapshot-N` 连续编号为准。
+- tag 名严格 `0.6-Snapshot-N`（历史曾误写 `v0.6-SnapShot-1`，大小写错乱，**不要复现**）。
+- **许可随版本发布**：代码 `LICENSE`（GPLv3 + Linking Exception，覆盖 `HostCode/`·`ServerCode/`·`ContractCode/`·`tools/`）+ 资产 `LICENSE-ASSETS`（CC BY-NC-SA 4.0）+ `CLA.md` 必须齐全。
+- **禁无版本分发**：任何 release 都必须对应明确 tag 与提交，客户端与服务端版本漂移须给兼容声明。
+
+---
+
+## 本项目已实测的踩坑（别重犯）
+
+- **发布号/文档漂移**：仓库出现过 tag 已存在（`0.6-Snapshot-9`）而 README 版本表顶行仍停在 `0.6-Snapshot-8` 的情况 —— 发布四件套必须**同一次**补齐，缺一即为漂移。
+- **debug 构建爆盘**：Windows debug 版 bevy 可 >2GB → `os error 193`（invalid Win32 application）→ 发布构建**必须 `--release`**。
+- **AI 工具误填 author**：见 1.2 的 `Bzhan-…` 事故 —— 提交前**必核对 `git config user.*`**。
+- **想靠 force-push 改署名**：**不要** —— 用 `.mailmap` 做显示层校正，不重写历史、不影响任何已 clone/fork 的仓库。
+- **把未验证改动写成"已完成"**：违反冻结区规则，属直接关闭 PR 的违规项。
+
+---
+
+## 快速检查表（TL;DR）
+
+- 提交前：CLA 已签？`user.name/email` 对？五道红线过了？`git status` 无该入库之外的杂物？
+- 提交信息：`<type>(<scope>): 为什么`，一次一件事，重构≠功能。
+- 推送：分支语义化，`main` 不 force-push、不重写历史；L2 先开 Issue + ≥2 reviewer。
+- 发布：`0.6-Snapshot-N` **无 v 前缀**；四件套（README 版本表 / BarekHistory / tag / GitHub Release）一次对齐；快照标 Pre-Release；冻结项不写"已完成"。
+- 编译一律 `cargo-wrap`；发布构建一律 `--release`。
