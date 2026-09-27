@@ -28,7 +28,8 @@
 
 - **变更类型**：**Breaking**（线格式 + 输入语义 + 玩法行为）
 - **影响模块**：`combat`(mod/combatant/shooter), `items`, `interact`, `entity`, `main.rs`（服务端）；
-  `hud_item_wheel`, `world/camera`, `menu/pause`, `menu/mod`, `net/pilot`, `launcher`（客户端）
+  `hud_item_wheel`, `hud_loot_panel`, `hud_backpack_panel`(**新增**), `hud_root`, `hud_bigmap`, `world/camera`,
+  `menu/pause`, `menu/mod`, `net/pilot`, `launcher`（客户端）
 - **兼容性**：**不兼容**（服务端与客户端必须**同版本**部署）
   - `PlayerInput` **新增** `jump: bool`（跳跃意图，持续量）；
   - `EntitySnapshot` **新增** `backpack` 内 `LootItem.count` 语义（同格堆叠计数，`display_label` 供 HUD）；
@@ -53,10 +54,23 @@
     `Entity.vertical_velocity/grounded`，仅着地可起跳）、疾跑键位与速度对齐、越肩 SpringArm 碰撞避障
     （`map::lawn` 静态 solid props → AABB 缓存 + slab 射线-AABB 扫掠，撞墙缩回 ≥0.7m / 离墙缓伸 /
     地面钳制 ≥0.35m）、Esc「无 UI 时释放鼠标」（`CursorReleased` + `cursor_release_toggle`）、
-    暂停键补 `/`（`pause_toggle` 接受 `Backquote | Slash`）。**未动**：`R` 键位裁决（随 Tab 背包一并裁决）。
+    暂停键补 `/`（`pause_toggle` 接受 `Backquote | Slash`）；`R` 键位裁决**随 Tab 背包落地**（背包内
+    悬停消耗品按 `R` 使用）。
+  - **新增 Tab 背包总览面板**（`hud_backpack_panel.rs`，对齐 legacy 操作表第 10 行）：左列双武器槽
+    （元素 + 手持槽弹夹、`▸` 标注）+ 备用弹药池，右列 **4×3 补给品格位**（`×N` 堆叠数）；**悬停 + `R`
+    使用**该格消耗品（仅上报 `PlayerInput.use_slot` 意图，扣/回仍由服务端 `combat::use_item_at` 裁决）；
+    打开时释放光标并纳入 `gameplay_input_active` / `cursor_lock_system` / `cursor_release_toggle` /
+    `item_wheel_input.blocked` 五处门控。
+  - **分支治理**：把快照9（`0f7f9bd`）**合入 `main`** 并**删除 `wip/0.8-snapshot-8`**（本地 + 远程）——
+    此前成批"返祖"的根因是快照 8/9 修复只存在于该 wip 分支、从未合入 main（详见冻结台账 E-1）。
+  - **堆叠数量显示统一**：`hud_backpack_panel` / `hud_loot_panel` / `hud_item_wheel::category_slots`
+    统一走 `LootItem::display_label()`。
 - **验证**：`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server`
-  **107 passed / 0 failed**。❌ **实机验证待补**（owner 自行验证）。
-- **关联**：[冻结任务 · 快照8 实机反馈](frozen-tasks/snapshot-8-playtest-feedback.md)（C.5/C.6/D-1）、
+  **107 passed / 0 failed**；`cargo-wrap build --workspace --release` 退出码 **0**。
+  ✅ **实机验证通过**（owner 复测：手雷可见投射物 / 跳跃 / Esc 呼出鼠标 / Tab 背包 /
+  物资箱·消耗品·轮盘 全部正常）。**注**：先前一轮反馈"问题依旧"经排查为运行了 `target/release/`
+  下 9:39 的**旧产物**（本轮改动只进了 debug），非代码缺陷——发布以 `--release` 重建为准。
+- **关联**：[冻结任务 · 快照8 实机反馈](frozen-tasks/snapshot-8-playtest-feedback.md)（C.5/C.6/D-1/E）、
   `_ref/Cute-of-Duty-0.3.2/README.md`
 
 ---

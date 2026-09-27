@@ -1,14 +1,14 @@
 # 冻结任务 · 0.6-Snapshot-8 实机反馈
 
-> **本目录的用途**：`main` 分支的 [stop-doing.md](../stop-doing.md) 冻结区在当前工作分支
-> （`wip/0.8-snapshot-8`）不存在，且本轮不合并 `main`。为避免"实测结论丢在聊天里"，
-> 本目录专门承接**当前工作分支上的冻结条目**——语义与 stop-doing.md 一致：
+> **本目录的用途**：本目录承接**快照 8 起的一切实机反馈冻结条目**（语义与 stop-doing.md 一致）。
+> 2026-09-27 起，`wip/0.8-snapshot-8` 分支已删除、快照 9 已合入 `main`，**只在 `main` 上开发**
+> （此前成批"返祖"的根因正是快照 8/9 修复只存在于 wip 分支、从未合入 main）。冻结语义如下：
 >
 > 1. 本目录列出的条目，在移出本目录前**不得**在 README / CHANGELOG / release note 里写成"已完成"；
 > 2. **不得**在其基础上继续叠加新玩法代码（先验证，再往前走）；
 > 3. 解除冻结必须补上"验证方式 + 实测结果"，并把条目迁回 stop-doing.md / barek-history。
 
-最后更新：2026-09-26（0.6-Snapshot-9 修复落地 · owner）
+最后更新：2026-09-27（0.6-Snapshot-10 修复落地 · owner）
 
 > **本轮（Snapshot-9）处置**：C 节四项**代码已全部落地并通过 `cargo-wrap check --workspace`
 > （退出码 0）与 `cargo-wrap test -p cute_of_duty_server`（**106 passed / 0 failed**）**。
@@ -106,7 +106,7 @@
 | 2 | **3/4 使用后 HUD 计数不更新**（用户二次澄清：**"仓库是有的，使用后没有正常消耗，所以不更新"**） | ✅ **根因已定位并修复**（本轮，推翻先前"模态冻结"猜测）：`hud_item_wheel.rs::item_wheel_input` 的**三条结算路径**（松开结算 / 同帧点按 / 兜底复位）都是**先写 `pending_slot`、紧接着 `*state = ItemWheelState::default()`**；`default()` 的 `pending_slot` 为 `None`，**把刚写好的格位原地抹掉** → `net::input_system` 恒取到 `None` → `PlayerInput.use_slot` 恒为 `None` → 服务端收不到使用意图 → **数量不减、也不投掷**（左上角提示由 `announce_use` 先于覆盖打出，故"有提示但没生效"）。修法：新增 `ItemWheelState::reset_session()`（只清会话字段、**保留 `pending_slot`**），会话收尾统一走它。 | ⏳ 待实机复测 |
 | 2b | **格位面板无拖拽预览**（"没有预览，**仓库是有的**"） | ✅ **已修**（本轮）`hud_loot_panel.rs` 新增 `LootGhost`/`LootGhostText`：`loot_panel_drag` 在拖拽期间**跟随光标显示被拖物资名**，与仓库选装 `arsenal.rs` 同形态（此前格位面板无幽灵，拖拽**无任何视觉反馈** → "拖着没反应"）。 | ⏳ 待实机复测 |
 | 3 | **手雷无可见投射物** | ✅ **已登记 README 已知问题**（服务端已生成投射物，疑为未进快照 / 客户端未渲染），按其指示**非本轮修复范围**。 | 🔒 已知问题 |
-| 4 | **新 feature（用户指定）**：备用子弹改为**背包物品**、可**堆叠 64**（部分物品上限 16，工具不可堆叠） | 📌 **已登记为下一快照 feature**（与 B 节「按钮」更新同期落地），并写入 README 版本行。 | ⏳ 下一快照 |
+| 4 | **新 feature（用户指定）**：备用子弹改为**背包物品**、可**堆叠 64**（部分物品上限 16，工具不可堆叠） | ✅ **已落地**（Snapshot-10）：`Backpack::starting()` 改为 2 医疗包 + 2 烈焰手雷 + 2 叠「步枪弹药 ×64」；`PickupKind::max_stack()` / `same_stack_kind()` / `draw_ammo()` 见 E 节。 | ⏳ 待实机复测 |
 
 ### D-1. 复测重点（本轮新增）
 
@@ -115,3 +115,60 @@
 2. **拖拽预览**：左键按住格子拖动时，光标处应出现**幽灵物资名**跟随（与仓库选装一致）。
 3. **3/4 计数**：确认**无面板打开**（光标处于锁定隐藏、相机可跟随鼠标）时短按 `3`：HP 应回血、
    HUD 3 槽计数应 -1；短按 `4` 计数 -1。（若计数仍不变，请回报"按下 3 后 HP 是否变化"+ 左上角提示原文）
+
+---
+
+## E. Snapshot-10 处置（2026-09-27）
+
+### E-1. 「返祖」根因：快照 8/9 的修复从未合入 `main`
+
+用户二次实测（0.6-Snapshot-9 release）报告**成批"返祖"**：手雷不可见、消耗品未消耗、轮盘不呼出鼠标、
+Esc 无 UI 时不呼出鼠标、物资箱不呼出鼠标、Tab 无法打开背包。
+
+**根因（git 拓扑核查，非代码逻辑回归）**：`git merge-base --is-ancestor 0f7f9bd HEAD` 返回 **NO** ——
+快照 9（`0f7f9bd`）的一大批修复（A-1 轮盘残留卡死、D#1 光标释放、D#2 `pending_slot` 被 `default()` 抹掉、
+Esc 关闭优先级）**只存在于 `wip/0.8-snapshot-8` 分支**，`main`（当时 HEAD）与其同源于 `e6a9ba0` 后即分叉，
+故在 main 上跑出来的必然是旧行为。**这不是回归，是分支分叉**。
+
+**处置（用户裁决）**：
+
+1. 把快照 9 **合入 `main`**（`1f827bb`，仅 `README.md` badge 段冲突，已解）；
+2. 删除 `wip/0.8-snapshot-8`（本地 + `origin`），**只留 `main`**，从流程上杜绝再次分叉返祖。
+
+### E-2. 本轮代码改动
+
+| # | 项 | 代码 | 验证 |
+|---|---|---|---|
+| 1 | **快照9 归位 main** | `git merge 0f7f9bd` → `1f827bb`；删除 wip 分支 | `git merge-base --is-ancestor 0f7f9bd HEAD` ✅ |
+| 2 | **备用子弹入背包** | `ServerCode/items/mod.rs`：`Backpack::starting()` 改为 2 医疗包 + 2 烈焰手雷 + 2 叠「步枪弹药 ×64」；`PickupKind::max_stack()`（Ammo 64 / Health·Armor·Grenade 16 / Weapon 1）、`same_stack_kind()`（**忽略逐件 `amount`**）、`Backpack::push`（先并堆再占格）、`draw_ammo()`（换弹从背包抽入弹夹） | 107 tests（含 `starting` / 堆叠 / `draw_ammo` 用例） |
+| 3 | **Tab 背包总览面板** | 新增 `HostCode/hud/hud_backpack_panel.rs`：左列双武器槽（元素 + 手持槽弹夹、`▸` 标注）+ 弹药池，右列 4×3 补给品格位（`×N` 堆叠数），**悬停 + `R` 使用**（只上报 `use_slot` 意图，服务端裁决）；接线 `launcher/mod.rs`（`init_resource` + 注册三系统 + OnExit 复位）、`hud_root.rs`（装配）、`hud_bigmap.rs::gameplay_input_active`、`menu/pause.rs::cursor_lock_system` / `cursor_release_toggle`、`hud_item_wheel.rs::blocked` 门控 | `cargo-wrap check --workspace` 退出码 0 |
+| 4 | **D-1 legacy 操作表六条逐行核对** | `Space` 跳跃（客户端绑定 + 服务端竖直积分，`JUMP_SPEED=7.0`，仅 grounded 可起跳）；疾跑 `ShiftLeft`→`ControlLeft`（1.75×）；越肩 SpringArm 避障（`build_colliders`/`sweep_nearest`）；Esc「无 UI 释放鼠标」软开关 `CursorReleased`；暂停键补 `/`；`R` = 使用/换弹 | `cargo-wrap check --workspace` 退出码 0 |
+| 5 | **堆叠数量显示统一** | 背包面板 / 物资箱面板（`sync_loot_panel`）/ 径向轮盘（`category_slots`）统一走 `LootItem::display_label()` | — |
+
+`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server` **107 passed / 0 failed**。
+
+### E-3. 复测清单（✅ 2026-09-27 用户复测通过）
+
+服务端 `cod_server.exe` + 客户端 `cod1.exe`（**先起服务端**），逐项确认：
+
+1. **手雷可见**：短按 `4`（或 Tab 背包悬停手雷按 `R`）→ 应看到**绿色投射物飞出并落地爆炸**，4 号槽计数 -1。
+   （此前 `pending_slot` 被抹掉，服务端根本收不到 `use_slot`，故无投掷。）
+2. **跳跃**：`Space` 应起跳（越肩相机随角色竖直跟随）。
+3. **Esc 呼出鼠标**：无任何面板时按 `Esc` → 光标立即可见可移动，再按 `Esc` 收回锁定。
+4. **Tab 背包**：按 `Tab` 打开背包总览（左武器/弹药 + 右 4×3 补给品），光标释放；悬停消耗品按 `R` 使用；
+   `Tab` / `Esc` 关闭，关闭后玩法输入恢复。
+5. **物资箱/消耗品/轮盘**：应恢复为快照9 的行为（合入 main 后不再返祖）。
+
+**复测结论（2026-09-27）**：✅ 五项**全部通过**，用户确认「没有问题了，可以发布快照了」。
+A#1/A#6、C.1–C.4、D#1/D#2/D#2b**解除冻结**；D#3（手雷无可见投射物）经本轮
+`pending_slot` 修复后随 #1 一并验证通过。
+
+> **踩坑归档（必须记住）**：首轮复测"五项全错"，根因是用户运行 `target/release/` 下
+> **9:39 的旧产物**，而本轮改动只重编译了 `target/debug/`——**debug 与 release 是两套独立产物**。
+> 今后发布/复测前，务必 `cargo-wrap build --workspace --release` 重建，并在交付说明里
+> **写明被测二进制的完整路径与构建时间**。
+
+### E-4. 下一版本目标（用户指定）
+
+**0.6 ——「单机落幕」**：本预发布线（`0.6-Snapshot-N`）收官，进入正式发布流程。
+（原 roadmap 中「清理本地目录」顺延其后。）

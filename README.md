@@ -9,7 +9,7 @@
 
 [![License: GPL-3.0 (code)](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
 [![License: CC BY-NC-SA 4.0 (assets)](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-lightgrey.svg)](LICENSE-ASSETS)
-[![Version](https://img.shields.io/badge/Version-0.6-SnapShot-9-blue.svg)](#六版本历史)
+[![Version](https://img.shields.io/badge/Version-0.6-Snapshot--10-blue.svg)](#六版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
 [![Headless](https://img.shields.io/badge/%E6%97%A0%E5%A4%B4%E6%A8%A1%E6%8B%9F-passing-2ea44f.svg)](#一快速开始)
 [![Demo](https://img.shields.io/badge/3D%20Demo-Bevy%200.14-2ea44f.svg)](#一快速开始)
@@ -328,7 +328,8 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 
 ### 5.2 当前进度
 
-> 现状：**0.6-SnapShot-6**（架构仍为服务端权威 + 客户端表现层，核心零 bevy）。
+> 现状：**0.6-Snapshot-10**（架构仍为服务端权威 + 客户端表现层，核心零 bevy）。**实机验证通过**。
+> **下一版本目标：0.6 —— 单机落幕**（收官预发布线，进入正式发布流程）。
 
 - 服务器权威模拟 + TCP 网络层已落地（`net/`：AOI 兴趣区域剔除、会话管理、状态广播、协议编解码）。
 - **网络协议已落地**：`Loadout` / `StartTraining` / `ExtractRequest` / `Ping` 及 serde 用例；
@@ -339,11 +340,11 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
   客户端只渲染**静态层**（棋盘格地板 + 静态 props + 发光件），靶/拾取物仍由快照下发，避免双份实体。
   光照按 0.3.2 原版参数复刻（主光 8000 + 补光 1500 + 四角点光 80000/60m）。
   `map::training`（30×30 室内 CQB）保留为备选地图数据。
-- **`~` 键暂停菜单**（移植 0.3.2 完整版：主面板「返回游戏 / 游戏设置 / 返回主界面」+ 设置子面板
+- **`/`（或 `~`）暂停菜单**（移植 0.3.2 完整版：主面板「返回游戏 / 游戏设置 / 返回主界面」+ 设置子面板
   ＋开源鸣谢，0.25s 输入防抖）；暂停期间冻结本地输入上报与相机跟随（纯客户端门控，不上行"暂停"概念）。
 - **客户端断线自动重连**（`net/network.rs` 每 2s 重试，不再"连不上就永久退出"）。
 - 模型 `model/` 经快照下发 `ModelPreset` 到客户端（易变化资源归服务端）。
-- `cargo test --offline` **全绿（94 个用例通过）**。
+- `cargo test --offline` **全绿（107 个用例通过）**。
 - 与 HostCode **彻底解耦**：ServerCode **不依赖 bevy**，分离不受渲染层升级影响。
 - 构建产物 `cod_server.exe`（服务端）+ `cod1.exe`（客户端），由 workspace 一次并行编译产出。
 - **待办（明示）**：① 服务端未生成 lawn 的拾取物，大场内暂无拾取物；
@@ -361,6 +362,7 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 0.6-Snapshot-10（Pre-Release） | 2026-09-27 | **快照9 归位 main + legacy 操作表 D-1 逐行落地 + 备用子弹入背包 + Tab 背包（实机验证通过）**：①**根治成批「返祖」**——拓扑核查发现快照 8/9 的一大批修复（轮盘残留卡死、消耗品未消耗、物资箱不释放鼠标、Esc 关闭优先级）此前**只存在于 `wip/0.8-snapshot-8` 分支**，从未合入 `main`，故在 main 上实测必然"回到旧 bug"；本轮把快照9（`0f7f9bd`）**合入 main**，并按用户指示**删除本地与远程 `wip/0.8-snapshot-8` 分支、只留 main**，从流程上杜绝再次分叉返祖。②**备用子弹改为背包物品**（用户指定 feature）：`Backpack::starting()` 改为两只医疗包 + 两颗烈焰手雷 + 两叠「步枪弹药 ×64」，弹药成为背包内的**可堆叠物品**；新增 `PickupKind::max_stack()`（弹药 64 / 恢复·战术 16 / 工具 1）与 `same_stack_kind()`（堆叠判定**忽略逐件 `amount`**，否则地面 60/30/90 弹药永远合并不了），`Backpack::push` 先并入同类未满堆再占空格，换弹经 `draw_ammo` 从背包抽入弹夹——背包格位成为备弹的唯一权威存储。③**新增 Tab 背包总览面板**（[hud_backpack_panel.rs](HostCode/hud/hud_backpack_panel.rs)，对齐 legacy 操作表第 10 行「背包 · Tab · 打开背包（双武器 / 弹药池 / 补给品）」）：左列双武器槽（元素 + 当前手持槽弹夹、`▸` 标注）+ 备用弹药池，右列 **4×3 补给品格位**（展示名带 `×N` 堆叠数量），**鼠标悬停 + `R` 直接使用**该格消耗品（只上报 `PlayerInput.use_slot` 意图，扣多少/回多少仍由服务端 `combat::use_item_at` 裁决）；打开时释放光标并纳入 `gameplay_input_active` / `cursor_lock_system` / Esc 软开关的门控。④**legacy 操作表 D-1 六条逐行核对落地**：**跳跃**补 `Space` 客户端绑定 + 服务端竖直积分（仅 grounded 可起跳、`JUMP_SPEED=7.0`）；**疾跑**键位由 `ShiftLeft` 对齐 legacy 改为 `ControlLeft`、系数 1.75×；**越肩 SpringArm 避障**（`build_colliders`/`sweep_nearest`）落地；**Esc**「无 UI 时释放鼠标」软开关（`CursorReleased`）；**暂停键**补 `/`；**`R`** 明确为使用/换弹语义。⑤物资箱/补给台/背包三处格位面板统一走 `LootItem::display_label()`，堆叠数量显示口径一致。`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server` **107 用例全绿**；`cargo-wrap build --release --workspace` 退出码 **0**。**实机验证通过**（owner 复测：手雷可见投射物 / 跳跃 / Esc 呼出鼠标 / Tab 背包 / 物资箱·消耗品·轮盘 全部正常；**排查确认**：先前一轮"问题依旧"实为运行了 9:39 的旧 release 产物，非代码缺陷）。**下一快照目标（roadmap）**：①**0.6 正式发布 ——「单机落幕」**（收官预发布线，进入正式发布流程）；②清理本地目录。 |
 | 0.6-Snapshot-9（Pre-Release） | 2026-09-26 | **缝缝补补又一版（快照8 冻结项解冻修复）**：①**根治「WASD 无法移动」**——两条根因路径同批堵死：`hud_item_wheel.rs::item_wheel_input` 重写为「**松开优先结算**（不受门控影响）/ 其它模态接管时**整体丢弃会话** / 键已不再按住却仍在会话中（失焦丢事件）**兜底复位**」三段式，消除 `held_key` 在 `blocked` 早退时残留 → `held` 持续累积 → 轮盘在**无按键**时自发 `open=true` 并永久卡死；`hud_interact.rs::interact_input` 把 **Esc 关闭二级面板提到轮盘/物资箱让位之前**，保证任何异常残留的 `open` 都能被 Esc 收起、`gameplay_input_active` 恢复正常（WASD/开火/鼠标视角/3-4 全恢复）。②**修「3/4 消耗品无响应」**：短按（< 0.25s）速用该类首件、长按呼出径向轮盘选格、松开使用；该类别无可用物品时推入 HUD 播报「XX：没有可用物品」（此前静默，观感等同"无响应"）。③**三者统一物品搬运形态**：物资箱 / 补给台全部改为与仓库选装同形态的 **4×3 双向格位面板**（新增 `loot_panel_drag`：**左键拖拽**落区判定 + **Shift+左键**快捷移动 + 拖拽源高亮），补给台走 `LootMode::Supply`（左网格为 `SUPPLY_OFFERINGS` 固定补给项，拖入背包即发 `InteractChoice::Supply`，领取与否仍由服务端 `interact::settle` 裁决）；补给台**无 `Container`**，故面板目标存在性改为**仅按实体判定**（否则会打开即自动关闭）；补给台原「二级选项菜单」形态取消。④**扩物品表**：物资箱掉落池 12 → 20 项（六种元素手雷 / 步枪各一 + 弹药 ×30/×60/×90 + 医疗包/大型/急救 + 护甲片/重型护甲板），纯数据表扩充、无协议变更。⑤**修「格位面板不释放鼠标」**（实测"没有呼出鼠标让我拖拽 / 箱子依旧别扭"的根因）：`menu/pause.rs::cursor_lock_system` 此前**只认暂停**，物资箱/补给台 4×3 面板、交互二级选项面板、战术大地图打开时鼠标仍被 `CursorGrabMode::Locked` 锁死并隐藏 → bevy `ui_focus_system` 只在窗口中心命中节点，玩家既悬停不到格子也拖不动（且容易被卡在面板里，看上去像"3/4 全无响应"）；现改为**任一指针型面板打开即释放光标并显示指针**（径向轮盘除外——它靠鼠标位移选格，保持锁定更合 legacy 手感）。⑥**修「极短点按丢按」**：3/4 的按下与松开若落在同一帧，会话刚建立就会被下一帧的兜底复位抹掉、`pending_slot` 永不置位；现同帧内直接按短按结算。⑦**根治「3/4 用后数量不减」**：`item_wheel_input` 三条结算路径都在写入 `pending_slot` 之后用 `ItemWheelState::default()` 整体覆盖，把刚写入的格位又抹成 `None`，`net::input_system` 因此永远取不到格位、服务端收不到使用意图（观感正是"左上角提示已出、数量不变、也不投掷"）；现统一改走新增的 `reset_session()`——只清会话字段、**保留待上报的 `pending_slot`**。⑧**格位面板补「拖拽幽灵」**：`loot_panel_drag` 现于拖拽期间跟随光标显示被拖物资名（`LootGhost`/`LootGhostText`），与仓库选装同形态，解决实测"没有预览，仓库是有的"。`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server` **106 用例全绿**。**推迟到下一快照**：B 节（①「按钮」= demo 操作方法的 UI 触发；②legacy demo 操作表逐行核对）按用户本轮指示整体后移。**下一快照 feature（本轮新增 · 用户指定）**：备用子弹改为**背包物品**、可**堆叠 64**（部分物品上限 16，工具不可堆叠），与 B 节「按钮」更新同期落地。 |
 | 0.6-Snapshot-8（Pre-Release） | 2026-09-26 | **老版本细节还原（UI + 地图交互 + 消耗品 + 武器解耦）**：①**小地图**改为**以玩家为中心的局部放大图**（半径 ≈60m AOI、约 1.47px/m）：罗盘条（24 刻度 / 四方位字 / 中央读数）保留，静态掩体·站点·拾取物随玩家**平移滚动重投影**，玩家恒居中、仅朝向菱形旋转（根治「只有玩家一点 + 起点看不到补给箱」的全图分辨率过低问题）；②新增**战术大地图**（M 键，600px 全景：搜打撤四段分区色带 + 边界线 + 入侵信标 + 全部掩体/目标/拾取物/站点 + 实时玩家定位点与朝向箭头）；③**HUD 面板图标化**（HP/ARMOR 数值条、Q/E 技能冷却盘、**[1]/[2] 双武器槽**（按当前槽元素名显示、当前槽高亮）+ 大字弹药 + `RELOADING`、3/4 消耗品计数槽）；④低血边缘红光 + 低弹闪红告警层；⑤**地图交互端到端落地**：服务端把 `map::lawn` 的拾取物 / 功能台 / **出生点物资箱**（新增 `EntityType::Station` / `ModelPreset::Station`·`SupplyCrate` / `interact::Interactable` 组件）落成权威实体，快照新增 `interact` 字段下发语义，客户端按语义配色渲染（弹药黄铜 / 医疗红白 / 护甲钢蓝 / 元素手雷·武器按元素上色 / 站点琥珀·青）；**按 F 弹出居中交互面板**（老版形态：平时不显示，F 呼出后滚轮翻页切换高亮（环绕 + 窗口跟随 + 滚动条 + 页码）、F/回车确认、Esc 关闭；选中站点转**二级选项面板**，面板内滚轮移高亮、F/Enter 确认、Esc 返回），面板打开时冻结玩法输入；选择经 `ClientMessage::Interact` 上行由服务端 `interact::settle` 做距离校验与效果发放；⑥**消耗品（3=医疗包 / 4=手雷）**：`Combatant` 新增 `medkit`/`grenade` 库存，3 使用医疗包回血（+50，钳制上限）、4 投掷手雷（70 伤 / 5m 半径）；医疗包 / 手雷拾取改为**入库存**（不再拾取即回血），快照新增 `medkit`/`grenade` 计数，HUD 3/4 槽显示剩余数（0 时压暗）；⑦**武器与干员彻底解耦**：武器拾取**装进当前手持槽**（覆盖并补满弹药，**不再切换同系干员**），1/2 切枪只改 `active_slot`、不改 `operator_idx`（技能组不变）；移除右下**干员切换卡**（避免与武器槽语义混淆），物资箱改用木箱造型；`cargo test` 101 用例全绿。**未做**：Tab 背包（快照暂无背包数据，需先扩协议）。**下一快照目标（roadmap）**：①**B. legacy demo 操作表逐行核对**（基准 [\_ref/Cute-of-Duty-0.3.2/README.md](_ref/Cute-of-Duty-0.3.2/README.md)，单机时代操作逐行对照）→ ②**0.6 正式发布** → ③**清理本地目录**。**本轮冻结（下次修）**：①**WASD 无法移动**（实机定位：进训练场后交互二级选项面板**自行展开**，使 `gameplay_input_active` 恒假、`input_system` 与鼠标视角被 `run_if` 冻结，详见 [冻结任务目录](docs/frozen-tasks/snapshot-8-playtest-feedback.md)）；②**3/4 消耗品短按/长按均无响应**；③物品搬运操作别扭 → 改**鼠标拖拽 / Shift+右键**（物资箱 / 仓库 / 补给台统一）；④物品种类偏少。**还差「按钮」**（demo 操作方法的 UI 触发）。 |
 | 0.6-Snapshot-7（Pre-Release） | 2026-09-26 | **架构边界体系落地 + 扁平化清理（名字致敬 CS2）**：与 CS2 一样"不改玩法、重造地基"——把模块边界从口头约定写成**可判定规范**（[CONTRIBUTING 第六～十二章](CONTRIBUTING.md) + [模块边界总览](docs/architecture/module-boundaries.md) + [ADR 0001–0004](docs/adr/) + [契约](docs/contracts/protocol.yaml) + [BarekHistory](docs/barek-history.md) + [冻结区](docs/stop-doing.md)，5 项边界冲突全部裁决）；逐条**复核并封闭规范自身的 8 条边界漏洞**（跨 crate 直连判据缺失、"唯一编排者"命名与事实不符、契约层载体写成 YAML 而非 crate、L2 集合"等"字兜底、铁律 4 空转、`module.md` 落地 0 的过渡纪律缺失、发布号与协议号混用、事件清单责任悬空）；目录清理：删空目录 `HostCode/render/`、修冷数据 `data/profiles/profiles` 双重嵌套（档案上移一格）；实测模块深度最大 2 层（`map/training` 因 803 行 > 600 红线**不可平**，属规则许可例外）、`launcher/mod.rs` 已缩至 147 行；服务端 `cargo test` 94 用例全绿；**无玩法变更**（WIP 未验证玩法仍冻结）。**下一快照目标**：冻结已可控，解冻顺序固定为 **先清理多余文件 → 再做冻结需求** |
