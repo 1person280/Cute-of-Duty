@@ -378,9 +378,10 @@ fn category_readout(
     if let Some(slots) = backpack {
         for item in slots.iter().flatten() {
             if item.kind.category() == Some(category) {
-                n += 1;
+                // 堆叠物品按"格内件数"累加，避免一叠 16 颗手雷只算 1。
+                n += item.count as i32;
                 if first.is_none() {
-                    first = Some(item.label.clone());
+                    first = Some(item.display_label());
                 }
             }
         }

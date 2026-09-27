@@ -500,7 +500,8 @@ pub fn sync_loot_panel(
             source
                 .get(cell.index)
                 .and_then(|s| s.as_ref())
-                .map(|item| item.label.clone())
+                // 展示名带堆叠数量（如「步枪弹药 ×64」），与背包总览面板同一口径。
+                .map(|item| item.display_label())
         };
         match label {
             Some(label) => {

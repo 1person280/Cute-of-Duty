@@ -1,4 +1,4 @@
-//! 暂停菜单：`~`(Backquote) 开关的游戏内浮层 + 设置子面板
+//! 暂停菜单：`/` 或 `~`(Backquote) 开关的游戏内浮层 + 设置子面板
 //!
 //! 设计动机（Why）：暂停是**纯客户端表现层门控**——它只冻结本地输入上报与相机朝向，
 //! 绝不向服务端发送"暂停"概念（服务器权威下，本地不再上报移动意图即等价于暂停）。
@@ -55,7 +55,7 @@ pub fn pause_closed(pause: Res<PauseMenu>) -> bool {
     *pause == PauseMenu::Closed
 }
 
-/// `~` 键开关暂停（打开弹主面板，再按则关闭并销毁面板）。
+/// `/` 或 `~` 键开关暂停（打开弹主面板，再按则关闭并销毁面板）。
 ///
 /// 每次调用先推进保护期计时；保护期由 `pause_menu_interaction` 消费，
 /// 避免"开菜单那一帧仍按着的键"直接触发按钮。
@@ -72,7 +72,8 @@ pub fn pause_toggle(
     if let Some(grace) = grace.as_mut() {
         grace.0.tick(time.delta());
     }
-    if !keyboard.just_pressed(KeyCode::Backquote) {
+    // legacy 0.3.2 的暂停键是 `/` 或 `~`（Backquote），两者等价。
+    if !keyboard.just_pressed(KeyCode::Backquote) && !keyboard.just_pressed(KeyCode::Slash) {
         return;
     }
     match *pause {
@@ -315,13 +316,17 @@ pub fn cursor_lock_system(
     bigmap: Res<crate::hud::BigMapOpen>,
     interact: Res<crate::hud::InteractState>,
     loot: Res<crate::hud::LootPanelState>,
+    backpack: Res<crate::hud::BackpackPanelState>,
+    released: Res<CursorReleased>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
 ) {
     let lock = *state.get() == AppState::InGame
         && *pause == PauseMenu::Closed
         && !bigmap.0
         && !interact.panel_open
-        && !loot.open;
+        && !loot.open
+        && !backpack.open
+        && !released.0;
     for mut window in &mut windows {
         let grab = if lock { CursorGrabMode::Locked } else { CursorGrabMode::None };
         if window.cursor.grab_mode != grab {
@@ -331,13 +336,51 @@ pub fn cursor_lock_system(
     }
 }
 
+/// 「无 UI 时释放鼠标」的软开关（legacy 0.3.2：Esc 在无任何面板打开时切换光标锁定/交还）。
+///
+/// 设计动机（Why）：与 [`cursor_lock_system`] 的"面板打开自动释放"互补——后者是随面板
+/// 生命周期的**硬**门控，本资源承载玩家**主动**要求交还光标的意图；入战时随 teardown 复位，
+/// 避免把"我要用鼠标"的状态带到下一局。
+#[derive(Resource, Default)]
+pub struct CursorReleased(pub bool);
+
+/// Esc 在**无任何模态 UI** 时切换 [`CursorReleased`]（再按一次收回锁定）。
+///
+/// 设计动机（Why）：任一模态打开时 Esc 的语义是"关闭该模态"（各级面板优先消费），
+/// 此时不得抢用 Esc 去切换光标，否则一次 Esc 会同时关面板又弹光标，手感割裂。
+pub fn cursor_release_toggle(
+    keys: Res<ButtonInput<KeyCode>>,
+    pause: Res<PauseMenu>,
+    open: Res<crate::hud::BigMapOpen>,
+    interact: Res<crate::hud::InteractState>,
+    loot: Res<crate::hud::LootPanelState>,
+    backpack: Res<crate::hud::BackpackPanelState>,
+    mut released: ResMut<CursorReleased>,
+) {
+    if !keys.just_pressed(KeyCode::Escape) {
+        return;
+    }
+    let any_ui = *pause != PauseMenu::Closed
+        || open.0
+        || interact.panel_open
+        || loot.open
+        || backpack.open;
+    if any_ui {
+        return;
+    }
+    released.0 = !released.0;
+}
+
 /// 离开 InGame 时的兜底清理：关闭暂停态并销毁浮层（返回主界面 / 状态切换通用）。
 pub fn teardown_pause(
     mut commands: Commands,
     ui: Option<Res<PauseMenuUi>>,
     mut pause: ResMut<PauseMenu>,
+    mut released: ResMut<CursorReleased>,
 ) {
     *pause = PauseMenu::Closed;
+    // 复位「无 UI 时释放鼠标」的软开关，避免把上一局的交还状态带到下一局。
+    released.0 = false;
     if let Some(ui) = ui {
         commands.entity(ui.root).despawn_recursive();
     }

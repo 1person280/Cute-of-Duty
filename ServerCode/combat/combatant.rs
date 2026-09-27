@@ -14,8 +14,12 @@ use std::any::Any;
 
 /// 武器槽数量（对齐 legacy 双主武器：1/2 两把）
 pub const WEAPON_SLOTS: usize = 2;
-/// 共享备弹池初始值（对齐 legacy `Inventory.ammo_pool = 150`）
-pub const DEFAULT_AMMO_POOL: i32 = 150;
+/// 共享备弹池初始值。
+///
+/// 设计动机（Why）：备用子弹改为**背包可堆叠物品**后，池不再是初始储备的宿主——
+/// 开局备弹由 [`crate::items::Backpack::starting`] 以两叠 64 发弹药给出；池初值置 0，
+/// 仅作为换弹时从背包折现的中转量（见 `combat::pull_ammo_from_backpack`）。
+pub const DEFAULT_AMMO_POOL: i32 = 0;
 
 /// 手雷爆炸基础伤害 / 半径（服务端权威数值）。
 pub const GRENADE_DAMAGE: f32 = 70.0;

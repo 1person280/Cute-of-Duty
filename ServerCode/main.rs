@@ -34,13 +34,20 @@ const EXTRACTION_POINT: (f32, f32) = (0.0, -440.0);
 /// 判定"进入撤离区"的触发半径（米，平面距离，忽略 Y）。撤离光垫半边长 3m，取 12m 留余量。
 const EXTRACTION_RANGE: f32 = 12.0;
 
-/// 疾跑相对基础移速的倍率（`Entity.move_speed × 此值`）。1km 大场南北纵深 910m，
-/// 无疾跑靠基础步速横穿耗时过久，故给一个明确的冲刺档（沿 0.3.2 手感量级）。
-const SPRINT_MULT: f32 = 1.6;
+/// 疾跑相对基础移速的倍率（`Entity.move_speed × 此值`）。基础步速 4 m/s、疾跑 ×1.75
+/// = 7 m/s，对齐 legacy 0.3.2 单机时代的走/跑档位（走 4、跑 7）。
+const SPRINT_MULT: f32 = 1.75;
 
 /// 越肩瞄准时的移速倍率（`速度 × 此值`）。瞄准是"用机动性换精度"的博弈位：
-/// 按住右键即从常态 5 m/s 降到 2.75 m/s，与旧版手感一致。
+/// 按住右键即从常态 4 m/s 降到 2.2 m/s，与旧版手感一致。
 const AIM_MULT: f32 = 0.55;
+
+/// 重力加速度（m/s²，服务端竖直积分用）。
+const GRAVITY: f32 = 22.0;
+/// 起跳初速（m/s）：约 1.1m 跳高，贴合 legacy 轻跳手感。
+const JUMP_SPEED: f32 = 7.0;
+/// 地面高度（草坪训练场为平地，地面 y = 0）。
+const GROUND_Y: f32 = 0.0;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -503,13 +510,9 @@ fn handle_loot_transfer(
         None => "该目标不是物资箱".to_string(),
         Some(TransferResult::Moved(text)) | Some(TransferResult::Rejected(text)) => text,
         Some(TransferResult::Apply(kind, text)) => {
-            // 不占格物品：弹药直接入备弹池、武器装进当前手持槽（均由 combat 权威落点施加）。
-            match kind {
-                PickupKind::Ammo { amount } => combat::add_ammo_pool(sim.world_mut(), player, amount),
-                PickupKind::Weapon { element } => {
-                    combat::equip_weapon(sim.world_mut(), player, element)
-                }
-                _ => {}
+            // 不占格物品：仅武器（工具）走"直接换手"；弹药已改为可堆叠背包物品，经 Moved 分支入格。
+            if let PickupKind::Weapon { element } = kind {
+                combat::equip_weapon(sim.world_mut(), player, element);
             }
             text
         }
@@ -608,6 +611,19 @@ fn apply_input(sim: &mut GameLoop, eid: EntityId, input: &PlayerInput, dt: f32) 
             let step = speed * dt;
             entity.position.x += mx / len * step;
             entity.position.z += mz / len * step;
+        }
+        // 竖直运动：Space 意图起跳 + 重力积分（服务端权威，客户端只上报 jump 意图）。
+        // 仅着地可起跳——防止空中连按叠成二段跳；离地后由重力把 y 拉回地面并复位 grounded。
+        if input.jump && entity.grounded {
+            entity.vertical_velocity = JUMP_SPEED;
+            entity.grounded = false;
+        }
+        entity.vertical_velocity -= GRAVITY * dt;
+        entity.position.y += entity.vertical_velocity * dt;
+        if entity.position.y <= GROUND_Y {
+            entity.position.y = GROUND_Y;
+            entity.vertical_velocity = 0.0;
+            entity.grounded = true;
         }
         // 刷新战斗朝向（供本帧射线 / 技能方向）
         if let Some(cb) = entity.get_component_mut::<cute_of_duty_server::combat::Combatant>() {

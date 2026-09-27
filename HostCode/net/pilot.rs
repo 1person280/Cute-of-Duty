@@ -37,7 +37,10 @@ pub fn input_system(
     input.move_backward = !wheel_open && keys.pressed(KeyCode::KeyS);
     input.move_left = !wheel_open && keys.pressed(KeyCode::KeyA);
     input.move_right = !wheel_open && keys.pressed(KeyCode::KeyD);
-    input.sprint = !wheel_open && keys.pressed(KeyCode::ShiftLeft);
+    // 疾跑键位对齐 legacy 0.3.2：`Ctrl`（左 Ctrl）而非 Shift——Shift 保留给未来的下蹲/静步。
+    input.sprint = !wheel_open && keys.pressed(KeyCode::ControlLeft);
+    // 跳跃（持续量，服务端仅在着地时消费一次）：报"按住 Space"意图，起跳/重力全在服务端结算。
+    input.jump = !wheel_open && keys.pressed(KeyCode::Space);
     // 越肩瞄准（按住右键）：既是相机取景切换，也是"压低移速换精度"的权威意图。
     input.aim = !wheel_open && mouse.pressed(MouseButton::Right);
     // 战斗意图：扳机为持续量（按住连发由服务端冷却节拍），换弹/技能为边沿量（按下即脉冲）。

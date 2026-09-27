@@ -11,13 +11,21 @@ use crate::entity::{EntityId, EntityType, World};
 
 /// 尝试换弹：满足条件才开始，计时完成后由 `Combatant::on_tick` 补弹。
 pub fn try_reload(world: &mut World, eid: EntityId) {
-    let (ammo, max_ammo) = {
+    let (ammo, max_ammo, pool) = {
         let Some(cb) = world.get_entity(eid).and_then(|e| e.get_component::<Combatant>()) else {
             return;
         };
         let slot = cb.active();
-        (slot.ammo, slot.max_ammo)
+        (slot.ammo, slot.max_ammo, cb.ammo_pool)
     };
+    // 备弹的权威存储是背包弹药堆（可堆叠物品）：换弹前把"补齐弹夹所缺、且池里没有的"
+    // 那部分从背包折现入池，否则"池空即换不了弹"，备用子弹形同虚设。
+    if ammo < max_ammo {
+        let want = (max_ammo - ammo - pool).max(0);
+        if want > 0 {
+            crate::combat::pull_ammo_from_backpack(world, eid, want);
+        }
+    }
     let Some(cb) = world.get_entity_mut(eid).and_then(|e| e.get_component_mut::<Combatant>()) else {
         return;
     };
@@ -41,6 +49,20 @@ pub fn try_fire(
     pitch: f32,
     element: ElementType,
 ) {
+    // 阶段0：备弹池见底时从背包弹药堆折现一个弹夹量——打空自动换弹同样依赖池里有弹。
+    // 只在池已耗尽时折现，避免每开一枪都把背包子弹倒进池里（浪费且语义错位）。
+    let (pool_empty, mag_size) = world
+        .get_entity(eid)
+        .and_then(|e| e.get_component::<Combatant>())
+        .map(|cb| {
+            let a = cb.active();
+            (cb.ammo_pool <= 0, a.max_ammo.max(1))
+        })
+        .unwrap_or((false, 0));
+    if pool_empty {
+        crate::combat::pull_ammo_from_backpack(world, eid, mag_size);
+    }
+
     // 阶段1：射手状态裁决（冷却 / 换弹 / 弹药），只改射手本身（作用于当前手持武器槽）
     let profile = crate::operator::rifle_profile(element);
     let (can_fire, origin_hit) = {
@@ -169,14 +191,10 @@ pub fn ray_sphere_hit(origin: Vec3, dir: Vec3, center: Vec3, radius: f32) -> Opt
 }
 
 trait Vec3Helper {
-    fn dot(&self, o: &Vec3) -> f32;
     fn try_normalize(&self) -> Vec3;
 }
 
 impl Vec3Helper for Vec3 {
-    fn dot(&self, o: &Vec3) -> f32 {
-        self.x * o.x + self.y * o.y + self.z * o.z
-    }
     fn try_normalize(&self) -> Vec3 {
         let len = (self.x * self.x + self.y * self.y + self.z * self.z).sqrt();
         if len < 1e-6 {

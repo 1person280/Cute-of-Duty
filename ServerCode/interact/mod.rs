@@ -204,7 +204,7 @@ pub fn settle(
 /// 结算地面拾取物效果，返回 `(回执文本, 是否应消耗该拾取物)`。
 ///
 /// 设计动机（Why）：武器拾取只换枪不换干员（武器与干员解耦，见 `combat` 模块头注释）；
-/// 医疗包/护甲片/手雷入 **4×3 背包格位**（由玩家按 3/4 主动使用），弹药直接入备弹池。
+/// 医疗包/护甲片/手雷/弹药一律入 **4×3 背包格位**（弹药为可堆叠背包物品，由玩家按 3/4 主动使用）。
 /// 背包满时**拒绝拾取且不消耗**地面物品（返回 `false`），避免物品凭空蒸发。
 fn apply_pickup(
     world: &mut World,
@@ -214,8 +214,13 @@ fn apply_pickup(
 ) -> (String, bool) {
     match kind {
         PickupKind::Ammo { amount } => {
-            add_ammo(world, player, amount);
-            (format!("拾取 {label}（备弹 +{amount}）"), true)
+            // 备用子弹按**可堆叠背包物品**入格（每叠上限 64）；背包满则拒收、不消耗地面物品。
+            let item = LootItem::with_count(label, kind, amount.max(1) as u32);
+            if combat::push_item(world, player, item) {
+                (format!("拾取 {label}（备用子弹 +{amount}）"), true)
+            } else {
+                ("背包已满".to_string(), false)
+            }
         }
         PickupKind::Health { .. } | PickupKind::Armor { .. } | PickupKind::Grenade { .. } => {
             // 占格物品：入背包（满则拒收、不消耗地面物品）。
@@ -237,8 +242,17 @@ fn apply_pickup(
 fn grant_supply(world: &mut World, player: EntityId, kind: SupplyKind) -> String {
     match kind {
         SupplyKind::Ammo => {
-            add_ammo(world, player, SUPPLY_AMMO);
-            format!("补给弹药 +{SUPPLY_AMMO}")
+            // 补给弹药同样按可堆叠背包物品发放（备弹的权威宿主是背包格位）。
+            let item = LootItem::with_count(
+                "步枪弹药",
+                PickupKind::Ammo { amount: SUPPLY_AMMO },
+                SUPPLY_AMMO.max(1) as u32,
+            );
+            if combat::push_item(world, player, item) {
+                format!("补给弹药 +{SUPPLY_AMMO}（入背包）")
+            } else {
+                "背包已满，无法领取弹药".to_string()
+            }
         }
         SupplyKind::Health => {
             heal(world, player, SUPPLY_HEALTH);
@@ -249,11 +263,6 @@ fn grant_supply(world: &mut World, player: EntityId, kind: SupplyKind) -> String
             format!("补给护甲 +{SUPPLY_ARMOR:.0}")
         }
     }
-}
-
-/// 备弹池追加（复用 `combat` 权威落点，避免两处各写一遍）。
-fn add_ammo(world: &mut World, player: EntityId, amount: i32) {
-    combat::add_ammo_pool(world, player, amount);
 }
 
 /// 回血（钳制到 `max_hp`）。
@@ -277,7 +286,7 @@ mod tests {
     use crate::damage::Vec3;
     use crate::element::ElementType;
 
-    /// 站得够近拾取弹药：备弹池增加、返回"应消耗"。
+    /// 站得够近拾取弹药：以**可堆叠背包物品**入格（备弹宿主为背包），返回"应消耗"。
     #[test]
     fn take_ammo_within_range_consumes() {
         let mut world = World::new();
@@ -289,23 +298,27 @@ mod tests {
         )));
         let lid = world.spawn(loot);
 
-        let before = world
-            .get_entity(pid)
-            .unwrap()
-            .get_component::<Combatant>()
-            .unwrap()
-            .ammo_pool;
+        // 统计背包内弹药总发数（弹药已不再进 `ammo_pool`，而是背包格位里的可堆叠物品）。
+        let ammo_of = |w: &World| -> u32 {
+            w.get_entity(pid)
+                .and_then(|e| e.get_component::<crate::items::Backpack>())
+                .map(|bp| {
+                    bp.slots
+                        .iter()
+                        .flatten()
+                        .filter(|it| matches!(it.kind, PickupKind::Ammo { .. }))
+                        .map(|it| it.count)
+                        .sum()
+                })
+                .unwrap_or(0)
+        };
+        let before = ammo_of(&world);
         let (msg, consumed) = settle(&mut world, pid, lid, InteractChoice::Take);
-        let after = world
-            .get_entity(pid)
-            .unwrap()
-            .get_component::<Combatant>()
-            .unwrap()
-            .ammo_pool;
+        let after = ammo_of(&world);
 
         assert!(consumed, "地面拾取物应被消耗");
-        assert_eq!(after, before + 30);
-        assert!(msg.contains("备弹"));
+        assert_eq!(after, before + 30, "背包弹药应 +30");
+        assert!(msg.contains("备用子弹"));
     }
 
     /// 距目标过远（超出 INTERACT_RANGE）时拒绝交互，且不消耗实体。

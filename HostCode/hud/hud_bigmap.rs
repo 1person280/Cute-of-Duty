@@ -331,10 +331,10 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     });
 }
 
-/// 运行条件：游玩输入可用 = 未暂停 **且** 全景图未打开 **且** 交互二级面板/物资箱面板/径向轮盘
-/// 均未打开。
+/// 运行条件：游玩输入可用 = 未暂停 **且** 全景图未打开 **且** 交互二级面板/物资箱面板/径向轮盘/
+/// 背包面板均未打开。
 ///
-/// 把四个模态门控合成单一条件，避免在 `run_if` 处用 `Condition::and` 组合（bevy 0.14 的
+/// 把五个模态门控合成单一条件，避免在 `run_if` 处用 `Condition::and` 组合（bevy 0.14 的
 /// `Condition` 组合器不在 prelude，直接在函数项上调用 `.and` 无法解析）。
 /// 注意：**就近交互列表本身不冻结输入**——它是常显的提示性列表，玩家可边跑边看（对齐 legacy）。
 pub fn gameplay_input_active(
@@ -343,12 +343,14 @@ pub fn gameplay_input_active(
     interact: Res<crate::hud::InteractState>,
     loot: Res<crate::hud::LootPanelState>,
     wheel: Res<crate::hud::ItemWheelState>,
+    backpack: Res<crate::hud::BackpackPanelState>,
 ) -> bool {
     *pause == crate::menu::PauseMenu::Closed
         && !open.0
         && !interact.panel_open
         && !loot.open
         && !wheel.open
+        && !backpack.open
 }
 
 /// 离开训练场时复位全景图门控（否则下次进场会带着"已打开"状态冻结输入）。

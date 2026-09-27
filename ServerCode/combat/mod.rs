@@ -247,11 +247,32 @@ pub fn equip_weapon(world: &mut World, eid: EntityId, element: ElementType) {
     cb.equip_active(element);
 }
 
-/// 备弹池追加（拾取弹药 / 补给 / 物资箱取弹的权威落点）；无战斗组件的实体静默忽略。
+/// 备弹池追加（补给/内部流转的权威落点）；无战斗组件的实体静默忽略。
 pub fn add_ammo_pool(world: &mut World, eid: EntityId, amount: i32) {
     let Some(entity) = world.get_entity_mut(eid) else { return };
     let Some(cb) = entity.get_component_mut::<Combatant>() else { return };
     cb.ammo_pool += amount;
+}
+
+/// 从背包弹药堆抽出至多 `want` 发倒入备弹池，返回实际抽出数。
+///
+/// 设计动机（Why）：备用子弹的**权威存储是背包格位**（可堆叠物品），弹药池只是换弹时的
+/// 中转量。换弹/自动换弹前调用本函数把背包子弹折现入池，避免"池空即打不出子弹"。
+pub fn pull_ammo_from_backpack(world: &mut World, eid: EntityId, want: i32) -> i32 {
+    if want <= 0 {
+        return 0;
+    }
+    let Some(entity) = world.get_entity_mut(eid) else { return 0 };
+    let got = match entity.get_component_mut::<Backpack>() {
+        Some(bp) => bp.draw_ammo(want),
+        None => 0,
+    };
+    if got > 0 {
+        if let Some(cb) = entity.get_component_mut::<Combatant>() {
+            cb.ammo_pool += got;
+        }
+    }
+    got
 }
 
 /// 把一件可携带物品放回玩家背包（拾取医疗/护甲/手雷的权威落点）。
@@ -270,12 +291,12 @@ pub fn push_item(world: &mut World, eid: EntityId, item: crate::items::LootItem)
 /// 设计动机（Why）：3/4 号速用既要支持"短按用首件"，也要支持"长按径向轮盘精确选格"，
 /// 二者在服务端收敛为同一件事——按**背包格位下标**取用。效果仍由服务端裁决：
 /// 恢复类（医疗包回血 / 护甲片加甲）按物品自身数值钳制到上限；战术类（手雷）按当前
-/// 朝向抛出，元素取自该颗手雷本身。空位或不可速用物（弹药/武器不占格）静默忽略。
+/// 朝向抛出，元素取自该颗手雷本身。空位或不可速用物（弹药/武器）静默忽略。
 pub fn use_item_at(world: &mut World, eid: EntityId, index: usize, origin: Vec3, yaw: f32) {
     let Some(item) = ({
         let Some(entity) = world.get_entity_mut(eid) else { return };
         let Some(bp) = entity.get_component_mut::<Backpack>() else { return };
-        bp.take_at(index)
+        bp.take_one_at(index)
     }) else {
         return;
     };
@@ -309,7 +330,7 @@ mod tests {
     use super::*;
     use crate::element::{ElementConfig, ElementSystem};
     use crate::entity::Entity;
-    use crate::items::ItemCategory;
+    use crate::items::{Backpack, ItemCategory};
 
     /// 搭建最小战斗环境：空世界 + 权威结算器 + 战斗系统
     struct CombatHarness {
@@ -507,7 +528,22 @@ mod tests {
             .unwrap_or(0)
     }
 
-    /// 3 号消耗品（按格位）：开局第 0 格医疗包回血并清空该格，钳制到上限，空格不再生效。
+    /// 背包内第一个属于 `cat` 类别的格位下标。
+    ///
+    /// 设计动机：速用测试要按"语义（哪个类别）"取格，而非硬编码下标——堆叠布局会随
+    /// 物品上限调整而变化（同类消耗品会并堆），硬编码下标极易随之失效。
+    fn first_slot_of(world: &World, pid: EntityId, cat: ItemCategory) -> Option<usize> {
+        world
+            .get_entity(pid)
+            .and_then(|e| e.get_component::<Backpack>())
+            .and_then(|bp| {
+                bp.slots
+                    .iter()
+                    .position(|s| s.as_ref().map(|it| it.kind.category()) == Some(Some(cat)))
+            })
+    }
+
+    /// 3 号消耗品（按格位）：开局医疗包回血并在用尽后清格，钳制到上限，空格不再生效。
     #[test]
     fn medkit_use_heals_and_consumes() {
         let mut h = CombatHarness::new();
@@ -515,67 +551,69 @@ mod tests {
         h.world.get_entity_mut(pid).unwrap().hp = 20.0;
         assert_eq!(category_count(&h.world, pid, ItemCategory::Consumable), 2, "开局应带 2 个恢复类");
 
+        let slot = first_slot_of(&h.world, pid, ItemCategory::Consumable).expect("应有恢复类格位");
         h.system.apply_input(
             &mut h.world,
             &h.resolver,
             pid,
             0.016,
             &h.env,
-            CombatIntent { use_slot: Some(0), ..CombatIntent::default() },
+            CombatIntent { use_slot: Some(slot as u8), ..CombatIntent::default() },
         );
         let e = h.world.get_entity(pid).unwrap();
         assert!((e.hp - 70.0).abs() < 1e-3, "应回血一个医疗包量（开局医疗包 50），实际 {}", e.hp);
         assert_eq!(category_count(&h.world, pid, ItemCategory::Consumable), 1, "背包计数应递减");
 
-        // 用尽剩余恢复类（第 1 格）：血量钳制到上限，计数归零。
+        // 用尽剩余恢复类（同一格内的第二件）：血量钳制到上限，计数归零。
         h.system.apply_input(
             &mut h.world,
             &h.resolver,
             pid,
             0.016,
             &h.env,
-            CombatIntent { use_slot: Some(1), ..CombatIntent::default() },
+            CombatIntent { use_slot: Some(slot as u8), ..CombatIntent::default() },
         );
-        // 再对已清空的第 0 格速用：应无任何反应、计数不为负。
+        // 再对已清空的格速用：应无任何反应、计数不为负。
         h.system.apply_input(
             &mut h.world,
             &h.resolver,
             pid,
             0.016,
             &h.env,
-            CombatIntent { use_slot: Some(0), ..CombatIntent::default() },
+            CombatIntent { use_slot: Some(slot as u8), ..CombatIntent::default() },
         );
         let e = h.world.get_entity(pid).unwrap();
         assert!(e.hp <= e.max_hp + 1e-3, "回血不得越过上限，实际 {}", e.hp);
         assert_eq!(category_count(&h.world, pid, ItemCategory::Consumable), 0, "背包不应为负");
     }
 
-    /// 4 号消耗品（按格位）：开局第 2 格手雷生成投射物并清空该格，取尽后不再生成。
+    /// 4 号消耗品（按格位）：开局手雷生成投射物并在用尽后清格，取尽后不再生成。
     #[test]
     fn grenade_use_throws_and_consumes() {
         let mut h = CombatHarness::new();
         let pid = spawn_player(&mut h.world, Vec3::default(), 0);
         assert_eq!(category_count(&h.world, pid, ItemCategory::Tactical), 2, "开局应带 2 颗手雷");
 
+        let slot = first_slot_of(&h.world, pid, ItemCategory::Tactical).expect("应有手雷格位");
         h.system.apply_input(
             &mut h.world,
             &h.resolver,
             pid,
             0.016,
             &h.env,
-            CombatIntent { use_slot: Some(2), ..CombatIntent::default() },
+            CombatIntent { use_slot: Some(slot as u8), ..CombatIntent::default() },
         );
         assert_eq!(count_grenades(&h.world), 1, "应生成一颗手雷投射物");
         assert_eq!(category_count(&h.world, pid, ItemCategory::Tactical), 1, "计数应递减");
 
-        // 用尽剩余手雷（第 3 格）：恰好再生成 1 颗；再对已清空格速用不再有反应。
+        // 用尽剩余手雷：恰好再生成 1 颗；再对已清空格速用不再有反应。
         h.system.apply_input(
             &mut h.world,
             &h.resolver,
             pid,
             0.016,
             &h.env,
-            CombatIntent { use_slot: Some(3), ..CombatIntent::default() },
+            CombatIntent { use_slot: Some(slot as u8), ..CombatIntent::default() },
         );
         h.system.apply_input(
             &mut h.world,
@@ -583,7 +621,7 @@ mod tests {
             pid,
             0.016,
             &h.env,
-            CombatIntent { use_slot: Some(2), ..CombatIntent::default() },
+            CombatIntent { use_slot: Some(slot as u8), ..CombatIntent::default() },
         );
         assert_eq!(count_grenades(&h.world), 2, "生成总数应恰好等于开局手雷数");
         assert_eq!(category_count(&h.world, pid, ItemCategory::Tactical), 0, "背包不应为负");

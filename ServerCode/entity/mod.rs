@@ -80,6 +80,14 @@ pub struct Entity {
     
     // 存活状态
     pub is_alive: bool,
+
+    /// 竖直速度（m/s，正 = 上升）：跳跃/重力积分的权威状态。
+    ///
+    /// 设计动机（Why）：跳跃属"应该算什么"的服务端权威——客户端只上报 Space 意图，
+    /// 起跳初速与重力积分都在服务端结算，再经快照回显 y，客户端不本地预演。
+    pub vertical_velocity: f32,
+    /// 是否着地（仅着地时可起跳，防止空中二段跳）。
+    pub grounded: bool,
 }
 
 /// 实体类型
@@ -106,14 +114,16 @@ impl Entity {
             hp: 100.0,
             max_hp: 100.0,
             armor: 0.0,
-            move_speed: 5.0,
-            base_move_speed: 5.0,
+            move_speed: 4.0,
+            base_move_speed: 4.0,
             element_state: EntityElementState::Normal,
             components: HashMap::new(),
             pending_removals: Vec::new(),
             inbox: Vec::new(),
             entity_type: EntityType::Player,
             is_alive: true,
+            vertical_velocity: 0.0,
+            grounded: true,
         }
     }
 

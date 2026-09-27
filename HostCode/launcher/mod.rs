@@ -54,6 +54,10 @@ pub fn run(addr: &str) {
         // 消耗品径向轮盘 / 物资箱格位面板门控资源常驻（默认关；`gameplay_input_active` 读其 open）。
         .init_resource::<crate::hud::ItemWheelState>()
         .init_resource::<crate::hud::LootPanelState>()
+        // 背包总览（Tab）门控资源常驻（默认关；`gameplay_input_active` 与光标锁定读其 open）。
+        .init_resource::<crate::hud::BackpackPanelState>()
+        // 「无 UI 时释放鼠标」软开关（Esc 主动交还光标；默认锁定）。
+        .init_resource::<crate::menu::CursorReleased>()
         .init_state::<AppState>()
         // bevy 0.14 必须显式启用 state-scoped 清理：`init_state` 只注册状态机与 OnEnter/OnExit，
         // 不会自动把 `clear_state_scoped_entities` 挂到 StateTransition。缺这一步则所有
@@ -88,6 +92,8 @@ pub fn run(addr: &str) {
                 crate::menu::settings_apply_fov,
                 crate::menu::settings_apply_ambient,
                 // 光标锁定随状态/暂停翻转，需在各状态下都跑（自身判态，无 run_if）。
+                // Esc「无 UI 时释放鼠标」先行置位软开关，再交由 cursor_lock_system 一并翻转。
+                crate::menu::cursor_release_toggle.run_if(in_state(AppState::InGame)),
                 crate::menu::cursor_lock_system,
             )
                 .chain(),
@@ -123,6 +129,7 @@ pub fn run(addr: &str) {
                 crate::hud::reset_interact,
                 crate::hud::reset_item_wheel,
                 crate::hud::reset_loot_panel,
+                crate::hud::reset_backpack_panel,
             ),
         )
         .add_systems(
@@ -139,6 +146,8 @@ pub fn run(addr: &str) {
                     crate::hud::update_bigmap,
                     crate::hud::update_extract,
                     crate::hud::extract_interaction,
+                    // 背包总览开关（Tab）：紧随其它模态开关之后，同帧生效的门控立即冻结下方输入。
+                    crate::hud::backpack_toggle,
                     // 交互链：刷附近目标 → 轮盘/物资箱输入 → F/滚轮/点击输入 → 点击选项 → 上报 → 重建。
                     // 注意：交互输入本身**不**受 `gameplay_input_active` 门控（面板打开时
                     // 正是它负责响应选择/关闭），仅下游玩法输入（移动/开火/切枪）被面板状态冻结。
@@ -149,6 +158,8 @@ pub fn run(addr: &str) {
                     crate::hud::loot_panel_input,
                     // 格位面板鼠标搬运（拖拽 / Shift+左键）：与键盘后备同帧，先于交互输入。
                     crate::hud::loot_panel_drag,
+                    // 背包面板：R 使用悬停格物品（直接上报 use_slot 意图，服务端裁决）。
+                    crate::hud::backpack_use_hovered,
                     crate::hud::interact_input,
                     crate::hud::interact_menu_click,
                     crate::hud::interact_commit,
@@ -169,6 +180,7 @@ pub fn run(addr: &str) {
                     // 模态覆盖层绘制：径向轮盘扇区 / 物资箱两个 4×3 网格。
                     crate::hud::update_item_wheel,
                     crate::hud::sync_loot_panel,
+                    crate::hud::sync_backpack_panel,
                     // 玩法意图输入在暂停/全景图/交互二级面板/物资箱面板/径向轮盘打开时冻结。
                     crate::net::input_system.run_if(crate::hud::gameplay_input_active),
                 )

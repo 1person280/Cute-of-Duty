@@ -24,5 +24,6 @@ pub(crate) use menu_behaviour::{
 pub(crate) use menu_main::spawn_menu;
 pub(crate) use mode_panel::{SelectedCategory, SelectedMode};
 pub(crate) use pause::{
-    cursor_lock_system, pause_closed, pause_menu_interaction, pause_toggle, teardown_pause, PauseMenu,
+    cursor_lock_system, cursor_release_toggle, pause_closed, pause_menu_interaction, pause_toggle,
+    teardown_pause, CursorReleased, PauseMenu,
 };

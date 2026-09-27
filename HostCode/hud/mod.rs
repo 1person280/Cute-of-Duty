@@ -4,6 +4,7 @@
 //! 本模块只负责把快照画到 UI，并就地触发撤离请求（距离判定由服务端权威裁决）。
 
 pub(crate) mod hud_alert;
+pub(crate) mod hud_backpack_panel;
 pub(crate) mod hud_bigmap;
 pub(crate) mod hud_crosshair;
 pub(crate) mod hud_interact;
@@ -17,6 +18,10 @@ pub(crate) mod hud_skills;
 pub(crate) mod hud_vitals;
 
 pub(crate) use hud_alert::update_alert;
+pub(crate) use hud_backpack_panel::{
+    backpack_toggle, backpack_use_hovered, reset_backpack_panel, sync_backpack_panel,
+    BackpackPanelState,
+};
 pub(crate) use hud_bigmap::{
     bigmap_toggle, gameplay_input_active, reset_bigmap, update_bigmap, BigMapOpen,
 };

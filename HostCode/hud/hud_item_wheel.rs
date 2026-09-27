@@ -227,6 +227,7 @@ pub fn item_wheel_input(
     bigmap: Res<crate::hud::BigMapOpen>,
     interact: Res<crate::hud::InteractState>,
     loot: Res<crate::hud::LootPanelState>,
+    backpack: Res<crate::hud::BackpackPanelState>,
     mut announces: ResMut<Announcements>,
     mut state: ResMut<ItemWheelState>,
 ) {
@@ -236,7 +237,8 @@ pub fn item_wheel_input(
     let blocked = *pause != crate::menu::PauseMenu::Closed
         || bigmap.0
         || interact.panel_open
-        || loot.open;
+        || loot.open
+        || backpack.open;
 
     // —— 松开优先结算：本次按键会话的唯一出口，不受任何模态门控影响 ——
     if let Some(key) = state.held_key {
@@ -399,7 +401,8 @@ fn category_slots(
                 if let Some(item) = slot {
                     if item.kind.category() == Some(category) {
                         slots.push(i);
-                        labels.push(item.label.clone());
+                        // 展示名带堆叠数量（如「医疗包 ×5」），与背包/物资箱面板同一口径。
+                        labels.push(item.display_label());
                     }
                 }
             }

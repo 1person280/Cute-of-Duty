@@ -24,6 +24,63 @@
 
 ---
 
+## [0.6-SnapShot-10] · 2026-09-27 · 手雷可见性根因修复 + 备用子弹改背包可堆叠物品 + legacy 操作表核对析出项（D-1）（**待实机验证**）
+
+- **变更类型**：**Breaking**（线格式 + 输入语义 + 玩法行为）
+- **影响模块**：`combat`(mod/combatant/shooter), `items`, `interact`, `entity`, `main.rs`（服务端）；
+  `hud_item_wheel`, `world/camera`, `menu/pause`, `menu/mod`, `net/pilot`, `launcher`（客户端）
+- **兼容性**：**不兼容**（服务端与客户端必须**同版本**部署）
+  - `PlayerInput` **新增** `jump: bool`（跳跃意图，持续量）；
+  - `EntitySnapshot` **新增** `backpack` 内 `LootItem.count` 语义（同格堆叠计数，`display_label` 供 HUD）；
+  - **玩法语义变更**：备弹权威宿主由 `Combatant.ammo_pool` 迁至背包格位（`ammo_pool` 降级为换弹中转）；
+    疾跑键位 `ShiftLeft → ControlLeft`、常速 `5 → 4`、疾跑倍率 `1.6 → 1.75`（= 4 → 7 单位/秒）。
+- **迁移指南**（不提供跨版本兼容）：
+  1. 客户端输入映射删除 `ShiftLeft` 疾跑绑定，改绑 `ControlLeft`；新增 `Space → PlayerInput.jump`；
+  2. 3/4 槽 / HUD 读取备弹时改按 `EntitySnapshot.backpack` 中 `ItemCategory::Ammo` 的 `count` 求和，
+     不再读 `Combatant.ammo_pool`；
+  3. 任何直接写弹药池的下游逻辑改为写背包物品（`Backpack::draw_ammo` / `push`）。
+- **内容**：
+  - **修「手雷无可见投射物」**：根因**不在快照/渲染**（`combat/grenade.rs::spawn_projectile` 与快照
+    `ModelPreset::Grenade` 链路经复核本就正确），而在客户端 `hud_item_wheel.rs::item_wheel_input`
+    松开分支先写 `pending_slot` 再 `*state = ItemWheelState::default()`，`default()` 把 `pending_slot`
+    一并抹掉 → `use_slot` 从未上报（同因导致 3/4「无响应」）。修法：先求值 → 复位会话 → **最后回填**
+    `pending_slot`，保证脉冲被 `net::input_system` 取走。
+  - **备用子弹改背包物品（可堆叠 64）**：`PickupKind::max_stack()`（弹药 64 / 恢复·战术类 16 / 武器 1）；
+    `LootItem` 增 `count`/`display_label`；`Backpack`/`Container::push` 改**堆叠感知**并新增
+    `same_stack_kind()`（忽略逐件 `amount`，以 `label` 兜底区分同名不同档）；
+    `combat::pull_ammo_from_backpack` 在换弹/自动换弹前折现备弹。
+  - **D-1 legacy 操作表核对落地六条**：跳跃整链路（`JUMP_SPEED/GRAVITY/GROUND_Y` 竖直积分 +
+    `Entity.vertical_velocity/grounded`，仅着地可起跳）、疾跑键位与速度对齐、越肩 SpringArm 碰撞避障
+    （`map::lawn` 静态 solid props → AABB 缓存 + slab 射线-AABB 扫掠，撞墙缩回 ≥0.7m / 离墙缓伸 /
+    地面钳制 ≥0.35m）、Esc「无 UI 时释放鼠标」（`CursorReleased` + `cursor_release_toggle`）、
+    暂停键补 `/`（`pause_toggle` 接受 `Backquote | Slash`）。**未动**：`R` 键位裁决（随 Tab 背包一并裁决）。
+- **验证**：`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server`
+  **107 passed / 0 failed**。❌ **实机验证待补**（owner 自行验证）。
+- **关联**：[冻结任务 · 快照8 实机反馈](frozen-tasks/snapshot-8-playtest-feedback.md)（C.5/C.6/D-1）、
+  `_ref/Cute-of-Duty-0.3.2/README.md`
+
+---
+
+## [0.6-Snapshot-9] · 2026-09-26 · 缝缝补补又一版——快照8 冻结项解冻修复
+
+- **变更类型**：Fix（冻结项解冻修复 + 物品搬运形态统一；**含输入门控与 UI 行为变更**）
+- **影响模块**：`hud_item_wheel`, `hud_interact`, `hud_loot_panel`, `hud_vitals`, `menu/pause`,
+  `net/pilot`, `launcher`（客户端）；`interact`, `items`（服务端）
+- **兼容性**：**兼容**（无协议字段/线格式变更；仅客户端 UI 形态与输入门控行为调整）
+- **迁移指南**：不适用（非 `x+1`）
+- **内容**：
+  - 修 **WASD 冻结**（轮盘 `held_key` 残留 + Esc 提升为二级面板优先关闭）；
+  - 修 **3/4 消耗品无响应**（短按速用 / 长按轮盘，无可用物品推 HUD 播报）；
+  - **统一物品搬运**：物资箱 / 补给台改 **4×3 双向格位面板**（左键拖拽 + Shift+左键），
+    与仓库选装同形态，补拖拽幽灵（`LootGhost`）；
+  - 格位面板打开即释放鼠标（`cursor_lock_system` 覆盖全部指针型面板）；
+  - 根治「3/4 用后数量不减」（会话收尾改走 `reset_session` 保留 `pending_slot`）；
+  - **扩物品表**：掉落池 **12 → 20**。
+- **验证**：`cargo-wrap check --workspace` 退出码 **0**（发布时随 tag `0.6-Snapshot-9` 打点）
+- **关联**：[冻结任务 · 快照8 实机反馈](frozen-tasks/snapshot-8-playtest-feedback.md)
+
+---
+
 ## [0.6-Snapshot-7] · 2026-09-26 · 架构边界体系落地 + 扁平化清理（**无玩法变更**）
 
 - **变更类型**：Refactor（规范修订 + 目录清理 + 冷数据路径修正；**不含任何玩法行为变更**）

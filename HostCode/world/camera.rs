@@ -20,6 +20,8 @@
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 
+use cute_of_duty_server::map;
+
 use crate::flow::flow_state::{AimRig, LocalPlayer};
 use crate::menu::GameSettings;
 use crate::net::snapshot::SnapshotBuffer;
@@ -32,6 +34,12 @@ use crate::net::snapshot::SnapshotBuffer;
 #[derive(Component)]
 pub struct ChaseCamera {
     pub aim_blend: f32,
+    /// 当前实际臂长（米，沿"锚点 → 理想机位"方向度量）。
+    ///
+    /// 存在动机（Why）：SpringArm 避障需要"记忆"上一帧臂长以区分收缩/回伸——
+    /// 撞墙时瞬间收缩（防穿模），离墙后按速度缓伸（防镜头弹跳），
+    /// 恒由 `follow_system` 维护，不参与快照/协议。
+    pub arm_dist: f32,
 }
 
 /// 镜头到角色的臂长（米，旧版 `ARM_LEN_NORMAL` 的收敛值）。
@@ -53,7 +61,13 @@ const PIVOT_Y: f32 = 1.55;
 const ORBIT_PITCH_MIN: f32 = -0.75;
 const ORBIT_PITCH_MAX: f32 = 0.55;
 /// 镜头最低高度（米），防止大角度俯视时穿到地面以下。
-const MIN_CAM_Y: f32 = 0.5;
+const MIN_CAM_Y: f32 = 0.35;
+/// 撞墙时臂长的下限（米）：镜头最多缩到锚点背后 0.7m，避免穿进角色体内或贴脸糊屏。
+const MIN_ARM_DIST: f32 = 0.7;
+/// 镜头与墙面的安全间隙（米）：命中点再往回收一点，杜绝近裁面切进墙里。
+const WALL_MARGIN: f32 = 0.25;
+/// 离墙后臂长回伸速度（米/秒）：缓伸而非瞬回，避免镜头"弹开"造成的眩晕。
+const ARM_RECOVER_SPEED: f32 = 6.0;
 
 /// 鼠标灵敏度（弧度/像素），再乘设置里的灵敏度；数值沿 0.3.2 手感。
 const MOUSE_SENS_X: f32 = 0.0024;
@@ -71,7 +85,7 @@ const MAX_FRAME_DELTA: f32 = 200.0;
 pub fn spawn_camera(commands: &mut Commands) {
     let look = Vec3::new(0.0, PIVOT_Y, 0.0);
     commands.spawn((
-        ChaseCamera { aim_blend: 0.0 },
+        ChaseCamera { aim_blend: 0.0, arm_dist: CAMERA_DIST },
         Camera3dBundle {
             transform: Transform::from_translation(look + Vec3::new(0.0, 0.0, CAMERA_DIST))
                 .looking_at(look, Vec3::Y),
@@ -119,6 +133,7 @@ pub fn follow_system(
     player: Res<LocalPlayer>,
     rig: Res<AimRig>,
     time: Res<Time>,
+    mut colliders: Local<Option<Vec<(Vec3, Vec3)>>>,
 ) {
     let center = if player.entity_id != 0 {
         match snap
@@ -155,7 +170,26 @@ pub fn follow_system(
 
         let dist = CAMERA_DIST + (AIM_DIST - CAMERA_DIST) * eased;
         let shoulder = SHOULDER_OFFSET + (AIM_SHOULDER - SHOULDER_OFFSET) * eased;
-        let mut cam_pos = anchor + right * shoulder - dir * dist;
+        // 理想机位（未避障）：锚点 + 右肩偏移 - 视线臂长。
+        let ideal = anchor + right * shoulder - dir * dist;
+
+        // SpringArm 避障：沿"锚点 → 理想机位"做射线-AABB 扫掠，命中实体墙（solid prop）则收缩臂长。
+        // 收缩瞬间生效（防穿模），离墙按 `ARM_RECOVER_SPEED` 缓伸（防弹跳）。
+        let to = ideal - anchor;
+        let full = to.length();
+        if full > 1e-4 {
+            let colliders = colliders.get_or_insert_with(build_colliders);
+            let target_arm = match sweep_nearest(anchor, to / full, full, colliders) {
+                Some(t) => (t - WALL_MARGIN).clamp(MIN_ARM_DIST, full),
+                None => full,
+            };
+            cam.arm_dist = if target_arm < cam.arm_dist {
+                target_arm
+            } else {
+                (cam.arm_dist + ARM_RECOVER_SPEED * time.delta_seconds()).min(target_arm)
+            };
+        }
+        let mut cam_pos = anchor + (to / full) * cam.arm_dist;
         if cam_pos.y < MIN_CAM_Y {
             cam_pos.y = MIN_CAM_Y;
         }
@@ -163,4 +197,62 @@ pub fn follow_system(
         // 沿视线**平行**注视（不回看角色）：角色因此稳定落在画面偏左，形成越肩第三人称观感。
         tf.look_at(cam_pos + dir, Vec3::Y);
     }
+}
+
+/// 收集地图静态 solid 物体的 AABB（世界坐标 min/max），供 SpringArm 扫掠使用。
+///
+/// 设计动机（Why）：镜头避障属**表现层**，不需要进服务端模拟；直接读 `map::lawn` 的
+/// 纯数据（与服务端共享同一份地图定义，不触碰任何模拟逻辑），缓存一次即可。
+fn build_colliders() -> Vec<(Vec3, Vec3)> {
+    map::lawn::layout()
+        .props
+        .iter()
+        .filter(|p| p.solid)
+        .map(|p| {
+            let h = p.aabb_half();
+            let c = Vec3::new(p.pos[0], p.pos[1], p.pos[2]);
+            let half = Vec3::new(h[0], h[1], h[2]);
+            (c - half, c + half)
+        })
+        .collect()
+}
+
+/// 射线-AABB 最近命中距离（slab 法）；`dir` 须为单位向量，返回 `[0, max_t]` 内的最小 `t`。
+fn sweep_nearest(origin: Vec3, dir: Vec3, max_t: f32, colliders: &[(Vec3, Vec3)]) -> Option<f32> {
+    let o = origin.to_array();
+    let d = dir.to_array();
+    let mut nearest: Option<f32> = None;
+    for &(min, max) in colliders {
+        let lo = min.to_array();
+        let hi = max.to_array();
+        let (mut t_min, mut t_max) = (0.0f32, max_t);
+        let mut hit = true;
+        for axis in 0..3 {
+            if d[axis].abs() < 1e-6 {
+                if o[axis] < lo[axis] || o[axis] > hi[axis] {
+                    hit = false;
+                    break;
+                }
+            } else {
+                let inv = 1.0 / d[axis];
+                let (mut t1, mut t2) = ((lo[axis] - o[axis]) * inv, (hi[axis] - o[axis]) * inv);
+                if t1 > t2 {
+                    std::mem::swap(&mut t1, &mut t2);
+                }
+                t_min = t_min.max(t1);
+                t_max = t_max.min(t2);
+                if t_min > t_max {
+                    hit = false;
+                    break;
+                }
+            }
+        }
+        if hit && t_min <= max_t {
+            nearest = Some(match nearest {
+                Some(n) => n.min(t_min),
+                None => t_min,
+            });
+        }
+    }
+    nearest
 }
