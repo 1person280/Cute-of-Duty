@@ -1,4 +1,4 @@
-﻿<div align="center">
+<div align="center">
 
 # Cute Of Duty 1: Simple
 
@@ -7,7 +7,8 @@
 基于 Rust + Bevy 0.14 的 3D 像素风 FPS · 无头确定性模拟与 3D Demo 双入口
 配置文件表驱动的全部玩法规则 · 单一事实来源
 
-[![License](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
+[![License: GPL-3.0 (code)](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
+[![License: CC BY-NC-SA 4.0 (assets)](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-lightgrey.svg)](LICENSE-ASSETS)
 [![Version](https://img.shields.io/badge/Version-0.7.0-SnapShot-7-blue.svg)](#六版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
 [![Headless](https://img.shields.io/badge/%E6%97%A0%E5%A4%B4%E6%A8%A1%E6%8B%9F-passing-2ea44f.svg)](#一快速开始)
@@ -209,7 +210,7 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 
 | 目录名 | 用途 | 文件格式 / 注意事项 |
 |---|---|---|
-| `assets/` | 美术资源（游戏内加载） | 子目录：`characters/` `environment/` `fonts/` `ui/` `weapons/`；`.jpg`/`.png`/`.ttf`（中文字体 `simhei.ttf`）+ `model/*.json`（体素模型） |
+| `assets/` | 美术资源（游戏内加载） | 子目录：`characters/` `environment/` `fonts/` `ui/` `weapons/`；`.jpg`/`.png`/`.ttf`（中文字体 `zcool_kuaile.ttf`，附 `zcool_kuaile_OFL.txt`）+ `model/*.json`（体素模型） |
 | `ServerCode/config/` | **配置表（含加载器，与核心代码物理相邻）** | `element_reactions.yaml`：无头模拟与主机端共用；**单一事实来源**——默认值由 `include_str!` 编译期嵌入，运行时同路径文件作为设计师热改覆盖；改表需同步重编译默认或改同文件 |
 | `tools/` | 开发辅助脚本 | PowerShell（图标生成、窗口截图、UI 自动测试等） |
 | `.github/workflows/` | CI | `rust.yml`：push/PR 到 `main` 自动跑 `cargo build` + `cargo test`（不带 demo） |
@@ -383,7 +384,9 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 
 * **项目规范**
   * [贡献指南（反屎山公约：600 行上限 / 无循环依赖 / 语义化命名）](CONTRIBUTING.md)
-  * [开源许可证 GPL-3.0-with-linking-exception（原文）](LICENSE)
+  * [代码许可 GPL-3.0-with-linking-exception（原文）](LICENSE) —— 适用于全部源代码与配置
+  * [资产许可 CC BY-NC-SA 4.0（原文）](LICENSE-ASSETS) —— 适用于美术 / 模型 / 音频 / 自有字体
+  * [贡献者许可协议 CLA](CLA.md) —— 提交 PR 前必读并同意
 * **AI 协作工作流（`.agents/skills/`）**
   * [游戏美术创作指南](.agents/skills/)
   * [地图建模验收流程](.agents/skills/)

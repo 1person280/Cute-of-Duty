@@ -237,6 +237,15 @@ cargo check --features demo     # 3D Demo 侧改动后必跑（bevy 已缓存，
 
 # 十一、开源贡献流程
 
+> ⚠️ **提交前必须先同意 [贡献者许可协议（CLA）](CLA.md）。**
+> 未在 PR 中按 CLA 第 7 节要求做出声明同意（`I have read the CLA Document and
+> I hereby sign the CLA.`）的 PR **不予合入**。这是项目方能对盗用与违反 GPL 的
+> 闭源分发进行追责、并在未来合法再许可的前提。
+>
+> 贡献代码 = 同意 CLA（第 2 条版权许可 + 第 3 条专利许可 + 第 4 条陈述保证）；
+> 你保留自己贡献的著作权，仅授予项目方**非独占的再许可权**。
+> 签署记录见 [CLA 签署台账](docs/cla-signatures.md)（含历史贡献追溯补签流程）。
+
 ## 11.1 贡献范围
 
 | 范围 | 是否接受 | 说明 |
@@ -283,6 +292,10 @@ cargo check --features demo     # 3D Demo 侧改动后必跑（bevy 已缓存，
 
 # 十二、文档索引
 
+- [贡献者许可协议 CLA](CLA.md)（提交前必读 / 必同意）
+- [CLA 签署台账](docs/cla-signatures.md)（签署登记 + 历史贡献追溯补签）
+- [代码许可 GPLv3 + Linking Exception](LICENSE)（`HostCode/`·`ServerCode/`·`ContractCode/`·`tools/`）
+- [资产许可 CC BY-NC-SA 4.0](LICENSE-ASSETS)（美术 / 模型 / 音频 / 自有字体）
 - [模块边界总览](docs/architecture/module-boundaries.md)（边界 / 数据 / 接口 / 成熟度 L0–L3 / 待裁决冲突）
 - [ADR 0001 · 模块化单体 + 事件总线](docs/adr/0001-modular-monolith-event-bus.md)
 - [BarekHistory · 变更与兼容性台账](docs/barek-history.md)

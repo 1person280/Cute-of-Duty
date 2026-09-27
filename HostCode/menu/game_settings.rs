@@ -145,6 +145,10 @@ pub fn spawn_credits_panel(parent: &mut ChildBuilder, fonts: &CjkFont) {
         ("Crossbeam-queue", "无锁队列（MIT / Apache-2.0）—— HAL 层环形缓冲的低延迟通信"),
         ("BLAKE3 1.5", "密码学哈希（CC0 / Apache-2.0）—— 交易记录审计与确定性验证的状态哈希"),
         ("Criterion 0.5", "基准测试框架（MIT / Apache-2.0，仅 dev 依赖）—— 性能回归基准"),
+        (
+            "ZCOOL KuaiLe 站酷快乐体",
+            "中文字体（SIL OFL 1.1）—— 界面中文显示；来源 https://github.com/googlefonts/zcool-kuaile",
+        ),
     ];
 
     parent
@@ -169,7 +173,7 @@ pub fn spawn_credits_panel(parent: &mut ChildBuilder, fonts: &CjkFont) {
                 flow::style(fonts, 17.0, menu_accent()),
             ));
             panel.spawn(TextBundle::from_section(
-                "本项目是开源软件（GPL-3.0 with linking exception），站在下列开源库的肩膀上",
+                "本项目代码以 GPL-3.0 with linking exception 开源、美术资产以 CC BY-NC-SA 4.0 授权，站在下列开源库的肩膀上",
                 flow::style(fonts, 12.0, Color::srgb(0.55, 0.62, 0.72)),
             ));
             panel.spawn(NodeBundle {
