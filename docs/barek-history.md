@@ -24,6 +24,58 @@
 
 ---
 
+## [0.9.1] · 2026-09-27 · 修手雷直线飞行 + 投掷轨迹预览 + 释放光标冻结视角
+
+- **变更类型**：**Fix**（z+1 兼容性修复；无字段增删、无语义变更）
+- **影响模块**：`combat/grenade`（服务端弹道）；客户端 `world/grenade_preview`(**新增**)、`hud/hud_bigmap`
+- **兼容性**：**兼容**（线格式未变。弹道由直线纠正为抛物线属**修复**——此前是缺陷，非既定语义）
+- **迁移指南**：无需迁移。
+- **内容**：
+  - **修「投掷物为直线、无视重力」**（`combat/grenade.rs::tick_grenades`）：根因是重力只扣在**局部副本**
+    `let mut vel = g.velocity` 上、**从未写回组件**，于是每 Tick 都从初速重新起步、竖直速度恒定 →
+    位置对时间呈线性（直线）。现把更新后的速度与剩余引信一并写回 `GrenadeState`，弹道恢复为
+    12 m/s² 重力抛物线。顺带把飞行常数（初速/重力/引信/落点高度/出手点）抽为 `pub const`，
+    供客户端预览**同源**复用。
+  - **新增投掷轨迹预览**（`HostCode/world/grenade_preview.rs`）：持雷越肩时用 `Gizmos` 画点状预测弧线 +
+    落点标记；弹道常数直接 `use` 服务端 `combat::grenade` 的常量，预览与实际结算不漂移。
+  - **修「释放鼠标会移动视角」**（`hud/hud_bigmap.rs::gameplay_input_active`）：Esc「无 UI 时交还光标」
+    的软开关 `CursorReleased` 此前未计入玩法门控，光标释放后 `mouse_look_system` 仍在跑、鼠标一动
+    视角就转。现并入该门控（释放光标即冻结视角与上报），与暂停/各面板口径一致。
+- **验证**：`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server`
+  **111 passed / 0 failed**（新增 `thrown_grenade_follows_parabola` 弹性回归用例）。
+- **关联**：[冻结任务 · 快照8 实机反馈](frozen-tasks/snapshot-8-playtest-feedback.md)（F-5）、
+  [契约 `protocol.yaml`](contracts/protocol.yaml)
+
+---
+
+## [0.9.0] · 2026-09-27 · 持雷态权威 + 可点击操作按钮组（0.6 遗留项补齐）
+
+- **变更类型**：**Additive**（仅新增字段 / 新增客户端能力，无既有语义改动）
+- **影响模块**：`net/protocol`（服务端契约）；`combat`（服务端持雷权威）；客户端 `hud`(grenade_hint/button_panel)、
+  `world/camera`、`menu/pause`、`net/pilot`、`launcher`
+- **兼容性**：**兼容**（y+1 加性）
+  - `PlayerInput` **新增** `grenade_cancel: bool`（`#[serde(default)]`，老客户端缺省即 `false`，行为不变）；
+  - `EntitySnapshot` **新增** `held_grenade: Option<ElementType>`（老客户端忽略该字段即可）。
+- **迁移指南**：无需迁移。老客户端连新服务端：不含 `grenade_cancel` / `held_grenade` 时按缺省处理，
+  持雷态对老客户端不可见（仍可通过 `use_slot` 投掷），无破坏性影响。
+- **内容**：
+  - **服务端持雷权威**：`combat` 新增 `HeldGrenade` 组件与结算——`use_item_at` 选中战术类手雷时**先握持、
+    不立即投掷**，左键 `shoot` 释放投掷并扣件、`grenade_cancel` 取消放回；持雷期间抑制常规射击。
+    快照下行 `held_grenade` 供表现层读取。
+  - **客户端持雷表现**（`hud_grenade_hint.rs`）：新增 `HeldGrenadeState` 派生资源，持雷时强制越肩
+    （`sync_grenade_aim` 叠加 `AimRig::aiming`）并屏幕下方常显「手持手雷 — 左键投掷 · Esc 取消」提示；
+    上行 `shoot` 语义在持雷态改为**左键边沿**、`grenade_cancel` 绑 Esc。
+  - **可点击操作按钮组**（`hud_button_panel.rs`，补齐台账 B#1）：`B` 打开模态面板，逐键合成 `PlayerInput`
+    上行（移动类点按切换、动作类边沿、使用类取该类别首格下标）；打开时释放光标并纳入
+    `gameplay_input_active` / `cursor_lock_system` / `cursor_release_toggle` / `item_wheel_input.blocked` /
+    `interact_input` 五处门控；关闭当帧补发全零输入以停止持续动作。
+- **验证**：`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server`
+  **110 passed / 0 failed**；`cargo-wrap build --workspace --release` 退出码 **0**。
+- **关联**：[冻结任务 · 快照8 实机反馈](frozen-tasks/snapshot-8-playtest-feedback.md)（B#1/B#2/F）、
+  [契约 `protocol.yaml`](contracts/protocol.yaml)
+
+---
+
 ## [0.6-SnapShot-10] · 2026-09-27 · 手雷可见性根因修复 + 备用子弹改背包可堆叠物品 + legacy 操作表核对析出项（D-1）（**待实机验证**）
 
 - **变更类型**：**Breaking**（线格式 + 输入语义 + 玩法行为）

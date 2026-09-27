@@ -8,7 +8,7 @@
 > 2. **不得**在其基础上继续叠加新玩法代码（先验证，再往前走）；
 > 3. 解除冻结必须补上"验证方式 + 实测结果"，并把条目迁回 stop-doing.md / barek-history。
 
-最后更新：2026-09-27（0.6-Snapshot-10 修复落地 · owner）
+最后更新：2026-09-27（0.6 正式发布 · 单机落幕 · F 节全部解除冻结 · owner）
 
 > **本轮（Snapshot-9）处置**：C 节四项**代码已全部落地并通过 `cargo-wrap check --workspace`
 > （退出码 0）与 `cargo-wrap test -p cute_of_duty_server`（**106 passed / 0 failed**）**。
@@ -59,13 +59,12 @@
 
 ## B. 快照8 未完成项（发布时明确"还差"的）
 
-> **本轮整体推迟**（用户指示"下一快照目标拖到下一快照"）：以下两项**不在 Snapshot-9 范围内**，
-> 原样顺延到下一快照，本轮不做任何实现。
+> 这两项在 Snapshot-9 曾整体推迟，**于 0.6 收官轮（见 F 节）处置**。
 
 | # | 项 | 状态 |
 |---|---|---|
-| 1 | **按钮**（demo 操作方法的 UI 触发） | ⏳ 推迟（本轮定为"仅核对，不实现"） |
-| 2 | 扁平化剩余目标：**B. legacy demo 操作表逐行核对**（基准 `_ref/Cute-of-Duty-0.3.2/README.md`） | ⏳ 推迟（逐行核对结论另记） |
+| 1 | **按钮**（demo 操作方法的 UI 触发） | ✅ 已实现（0.6 收官轮，见 F-2；**新增能力，非 legacy 还原**） |
+| 2 | 扁平化剩余目标：**B. legacy demo 操作表逐行核对**（基准 `_ref/Cute-of-Duty-0.3.2/README.md`） | ✅ 代码六条已落地（E-2 #4）；逐行结论见 F-3，**实机复测留待** |
 
 ---
 
@@ -172,3 +171,100 @@ A#1/A#6、C.1–C.4、D#1/D#2/D#2b**解除冻结**；D#3（手雷无可见投射
 
 **0.6 ——「单机落幕」**：本预发布线（`0.6-Snapshot-N`）收官，进入正式发布流程。
 （原 roadmap 中「清理本地目录」顺延其后。）
+
+---
+
+## F. 0.6 收官 · 遗留项补齐（2026-09-27）
+
+用户指令「确认哪些没有通过，确认即可 0.6 版本了」；核实后 0.6 尚差三条：**B#1 按钮**、
+**B#2 legacy 操作表逐行核对**、**手雷「先瞄准后释放」**（服务端已写完未提交，客户端表现未落地）。
+用户裁决：**补齐后再发 0.6**；未提交的服务端持雷改动**保留**，随 0.6 一并提交。
+
+### F-1. 本轮范围（协议 0.8.0 → 0.9.0，y+1 加性）
+
+| # | 项 | 结论 |
+|---|---|---|
+| 1 | **手雷「先瞄准后释放」**（`_ref` README 第 88 行） | ✅ 服务端 `HeldGrenade` 权威 + 客户端持雷表现 |
+| 2 | **B#1 可点击操作按钮组**（demo 操作方法的 UI 触发） | ✅ 新增 `hud_button_panel.rs`（**新增能力，非 legacy 还原**） |
+| 3 | **B#2 legacy 操作表逐行核对** | ✅ 逐行结论见 F-3（代码层面全部对齐；实机复测留待 F-4） |
+
+### F-2. 实现要点
+
+- **服务端持雷权威**（`ServerCode/combat/held_grenade.rs`）：`use_item_at` 选中战术类手雷→**先握持不投掷**；
+  左键 `shoot` 释放投掷并扣件、`grenade_cancel` 取消放回；持雷期间抑制常规射击；
+  `EntitySnapshot.held_grenade: Option<ElementType>` 下行。
+- **客户端持雷表现**（`HostCode/hud/hud_grenade_hint.rs`）：`HeldGrenadeState` 派生资源 →
+  持雷强制越肩（`world::sync_grenade_aim` 叠加 `AimRig::aiming`）+ 屏幕下方常显提示；
+  `net/pilot.rs` 上行 `shoot` 在持雷态改为**左键边沿**、`grenade_cancel` 绑 Esc。
+- **可点击操作按钮组**（`HostCode/hud/hud_button_panel.rs`）：`B` 开模态面板，19 个按钮逐键合成
+  `PlayerInput` 上行（移动类点按切换 / 动作类边沿 / 使用类取该类别首格下标 / 纯客户端面板直切）；
+  纳入五处门控（`gameplay_input_active` / `cursor_lock_system` / `cursor_release_toggle` /
+  `item_wheel_input.blocked` / `interact_input`）；关闭当帧补发全零输入以停止持续动作。
+
+### F-3. legacy demo 操作表逐行核对（基准 `_ref/Cute-of-Duty-0.3.2/README.md`）
+
+| legacy 行（按键组） | 基准按键 | 本仓现状 | 结论 |
+|---|---|---|---|
+| 视角 | 鼠标 | `world::mouse_look_system` | ✅ 一致 |
+| 移动 | W/A/S/D | `net/pilot.rs` 相对相机位移 | ✅ 一致 |
+| 跳跃 | Space | 客户端绑定 + 服务端竖直积分（E-2 #4） | ✅ 一致 |
+| 疾跑 | 左 Ctrl（4→7） | `ControlLeft`，1.75×（= 4→7） | ✅ 一致 |
+| 主武器切换 | 1 / 2 | `weapon_slot 0/1` | ✅ 一致 |
+| 干员技能 | Q / E | `skill_q` / `skill_e` | ✅ 一致 |
+| 越肩瞄准 | 鼠标右键（按住） | `AimRig::aiming`（0.9.0 起 `rig.aiming` 为单一来源；持雷强制叠加） | ✅ 一致 |
+| 射击 / 投掷 | 鼠标左键 | 常规连发；持雷态左键边沿投掷（0.9.0） | ✅ 一致 |
+| 交互 | F | 就近**常显**列表 + `F` 确认（老版为 F 呼出；本仓取常显更顺手，见 `hud_interact` 模块注） | ⚠️ 有意偏差 |
+| 背包 | Tab | `hud_backpack_panel`（悬停 + `R` 使用） | ✅ 一致 |
+| 使用物品 | R（悬停背包物品） | `backpack_use_hovered` | ✅ 一致 |
+| 快捷道具 | 3 / 4（按住开轮盘） | `hud_item_wheel`（短按速用 / 长按轮盘） | ✅ 一致 |
+| 关闭 / 取消 | Esc | 分层让位：面板→面板、持雷→取消放回、无 UI→释放鼠标 | ✅ 一致 |
+| 暂停 | / 或 ~ | `pause_toggle` 接受 `Slash | Backquote` | ✅ 一致 |
+
+> 唯一**有意偏差**为「交互」行：本仓自快照9 起改为**就近常显列表**（不需先按 F，边跑边看），
+> 与老版「F 呼出」形态不同，属手感改良而非缺失，已在 `hud_interact.rs` 模块注中说明。
+
+### F-4. 实机复测清单（待用户执行）
+
+服务端 `cod_server.exe` + 客户端 `cod1.exe`（**先起服务端**，均取 `target/release/` 本轮重建产物）：
+
+1. **持雷越肩 + 提示**：短按 `4`（或 Tab 背包悬停手雷按 `R`）→ 应进入**持雷态**：相机强制越肩、
+   屏幕下方显示「手持手雷 — 左键投掷 · Esc 取消」。
+2. **投掷**：持雷态左键 → 手雷飞出并落地爆炸，该格计数 -1，持雷提示消失、相机复位。
+3. **取消**：持雷态按 `Esc` → 放回背包（计数不减），提示消失、相机复位。
+4. **按钮面板**：按 `B` → 打开操作按钮面板（光标释放）；逐键点击生效（移动类点按切换高亮）；
+   `Esc` / `B` 关闭 → 光标重新锁定、玩法输入恢复。
+
+> **踩坑复述（务必遵守）**：复测前确认跑的是**本轮 `--release` 重建产物**，
+> 并核对 `target/release/cod_server.exe`、`cod1.exe` 的构建时间（见 E-3 踩坑归档）。
+
+### F-5. 实机复测回执 · 三条新缺陷修复（协议 0.9.0 → 0.9.1，z+1 兼容性修复）
+
+用户实测（F-4 首轮）反馈三条：**①缺投掷轨迹预览**（"没有抛物线预览"）；
+**②投掷物走直线、无视重力**（"投掷物为直线，无视了重力"）；**③释放鼠标后仍会移动视角**。
+
+| # | 反馈 | 根因 | 修复 |
+|---|---|---|---|
+| 1 | **投掷物直线飞行、重力不生效** | `ServerCode/combat/grenade.rs::tick_grenades` 阶段1 里 `let mut vel = g.velocity; vel.y -= GRAVITY*dt;` **只在局部副本扣重力、从不写回组件** → 每 Tick 都从初速重新起步、竖直速度恒定不衰减 → 走直线 | 阶段1 的 plan 元素携带更新后的 `vel`/`timer`，**阶段2 写回** `g.velocity = vel; g.timer = timer_left;`；同时抽出 7 个 `pub const`（`THROW_SPEED/THROW_UP/GRAVITY/FUSE_SECS/GROUND_Y/SPAWN_HEIGHT/SPAWN_FWD`）供预览同源复用 |
+| 2 | **无投掷轨迹预览**（用户选定"新增"） | legacy 无此功能，本仓从无 | 新增 `HostCode/world/grenade_preview.rs`：持雷时用 `Gizmos` 以**与服务端同源的弹道常数**逐步积分，画点状弧线 + 落点标记；接线 `world/mod.rs` + `launcher/mod.rs`（紧随 `sync_grenade_aim`） |
+| 3 | **释放鼠标仍移动视角** | `hud_bigmap.rs::gameplay_input_active` 未计入 `CursorReleased` → Esc 释放光标后 `mouse_look_system` 仍在跑，鼠标事件带着 `AimRig` 乱转 | 门控新增 `released: Res<CursorReleased>` 与 `&& !released.0` |
+
+**验证**：`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server`
+**111 passed / 0 failed**（新增回归用例 `combat::tests::thrown_grenade_follows_parabola`，
+断言竖直速度逐 Tick 递减、高度先升后降）。
+
+**实机复测结论（2026-09-27）**：✅ 三条**全部通过**，用户确认「3 个问题均已解决，可以发 release 了」。
+F 节（F-1 持雷 / F-2 按钮组 / F-3 操作表核对 / F-5 三条修复）**全部解除冻结**，随 **0.6（正式发布 ·
+单机落幕）** 一并发布。协议 `0.9.1`（z+1 兼容性修复）。
+
+### F-6. F-4 复测清单（✅ 2026-09-27 用户复测通过）
+
+服务端 `cod_server.exe` + 客户端 `cod1.exe`（**先起服务端**，均取 `target/release/` 本轮重建产物）：
+
+1. **持雷越肩 + 提示**：短按 `4`（或 Tab 背包悬停手雷按 `R`）→ 进入持雷态：相机强制越肩、
+   屏幕下方显示「手持手雷 — 左键投掷 · Esc 取消」。
+2. **投掷轨迹预览**（新增）：持雷态下应看到**橙色点状抛物线弧线**，末端有大号落点标记。
+3. **投掷**：持雷态左键 → 手雷**沿弧线飞出**（不再是直线）并落地爆炸，该格计数 -1，提示消失、相机复位。
+4. **取消**：持雷态按 `Esc` → 放回背包（计数不减），提示消失、相机复位。
+5. **按钮面板**：按 `B` → 打开操作按钮面板（光标释放）；逐键点击生效（移动类点按切换高亮）；
+   `Esc` / `B` 关闭 → 光标重新锁定、玩法输入恢复。
+6. **释放光标冻结视角**：无任何面板时按 `Esc` 释放鼠标后，**移动鼠标视角不应转动**；再按 `Esc` 收回锁定后恢复。

@@ -1,7 +1,7 @@
 # =============================================================================
 # Cute Of Duty · 线格式契约（machine-readable contract）
 # =============================================================================
-# 状态：草案 v0.8.0 —— 【尚不是权威源】
+# 状态：草案 v0.9.1 —— 【尚不是权威源】
 #   本文件目前是「手工整理的意图」，权威实现仍是 ServerCode/net/protocol.rs。
 #   权威源反转（YAML 为准、代码由 YAML 校验）是后续独立任务，见 docs/stop-doing.md。
 #
@@ -17,14 +17,14 @@
 # =============================================================================
 
 contract: protocol
-version: 0.8.0
+version: 0.9.1
 status: draft
 owner_module: ServerCode/net
 authoritative_impl: ServerCode/net/protocol.rs
 compat:
-  previous: 0.7.0
-  breaking: true
-  migration_guide: docs/barek-history.md#080-snapshot-8--2026-09-26--战局内格位制物资未验证不计入发布
+  previous: 0.9.0
+  breaking: false
+  migration_guide: null   # z+1 兼容性修复：不改字段，仅修手雷弹道/预览；0.9.0 的加性字段见 barek-history
 
 # -----------------------------------------------------------------------------
 # 上行：客户端 → 服务端
@@ -63,6 +63,11 @@ uplink:
         doc: 背包格位下标；按 ItemCategory 语义由客户端轮盘决定，服务端按该格内容裁决效果
       - { name: aim_yaw,   type: f32 }
       - { name: aim_pitch, type: f32 }
+      - name: grenade_cancel          # 0.9.0 新增
+        type: bool
+        added_in: 0.9.0
+        serde_default: true
+        doc: 持雷态下按 Esc 取消投掷并放回背包；未持雷时无副作用
     removed_fields:                # 0.8.0 删除 —— 老客户端编译期即失败
       - { name: use_medkit,  removed_in: 0.8.0, replaced_by: use_slot }
       - { name: use_grenade, removed_in: 0.8.0, replaced_by: use_slot }
@@ -88,6 +93,10 @@ downlink:
         type: "Option<Vec<Option<LootItem>>>"
         added_in: 0.8.0
         doc: 物资箱 12 格容器内容；非容器实体为 None
+      - name: held_grenade           # 0.9.0 新增
+        type: "Option<ElementType>"
+        added_in: 0.9.0
+        doc: 该实体当前持有的手雷元素类型；未持雷为 None。客户端据此强制越肩并显示持雷提示
     # TODO(核对): 其余既有字段（位置/朝向/model_preset/interact 等）待与 protocol.rs 对齐后补全
     removed_fields:
       - { name: medkit,  removed_in: 0.8.0, replaced_by: backpack }
