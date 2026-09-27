@@ -4,15 +4,13 @@
 
 **战术撤离射击游戏** · 核心差异化 **元素互斥生态 + 反护航经济架构**
 
-基于 Rust + Bevy 0.14 的 3D 像素风 FPS · 无头确定性模拟与 3D Demo 双入口
+基于 Rust + Bevy 0.14 的 3D 像素风 FPS · 服务端权威模拟与客户端表现层双 crate
 配置文件表驱动的全部玩法规则 · 单一事实来源
 
 [![License: GPL-3.0 (code)](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
 [![License: CC BY-NC-SA 4.0 (assets)](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-lightgrey.svg)](LICENSE-ASSETS)
-[![Version](https://img.shields.io/badge/Version-0.6-blue.svg)](#六版本历史)
+[![Version](https://img.shields.io/badge/Version-0.6-blue.svg)](#五版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
-[![Headless](https://img.shields.io/badge/%E6%97%A0%E5%A4%B4%E6%A8%A1%E6%8B%9F-passing-2ea44f.svg)](#一快速开始)
-[![Demo](https://img.shields.io/badge/3D%20Demo-Bevy%200.14-2ea44f.svg)](#一快速开始)
 
 **外部依赖 · 站在开源社区的肩膀上** · [![by Bevy](https://img.shields.io/badge/by-Bevy-E90000)](https://bevyengine.org)
 [![by Tokio](https://img.shields.io/badge/by-Tokio-blue)](https://tokio.rs)
@@ -38,57 +36,52 @@
 
 ### 直接试玩（无需编译）
 
-> 双击项目根目录下的 **`CuteOfDuty_Demo.exe`** 即可进入 3D 像素风 FPS Demo。
->
-> 程序启动时会自动定位项目目录（从工作目录逐级向上搜索，找不到再从 exe 所在目录搜索），
-> 因此从任意位置启动都能加载 `assets/` 与 `src/config/element_reactions.yaml`。
+> 先运行 **`target/release/cod_server.exe`**（服务端权威模拟），再运行
+> **`target/release/cod1.exe`**（客户端表现层）。**顺序不可颠倒**——服务端未起时客户端不会进入训练场
+> （客户端已实现每 2s 自动重连，服务端起来后会自动接入）。
 
 ### 本地编译
 
 环境要求：**Rust stable**（edition 2021，无需 nightly），Windows 10/11 或 Linux 均可。
+编译一律走封装工具 `tools/cargo-wrap.exe`（把 cargo/rustc 归入「Rust 编译器」作业便于任务管理器折叠，并行度钳制 `-j4`）：
 
 ```powershell
-cargo run --bin cod1          # 无头模拟：60Hz 固定 Tick + 确定性重放验证 + 战局/档案演示
-cargo run --features demo     # 3D 像素风 FPS Demo（Bevy 0.14）
-cargo test                    # 全部测试（不编译 bevy，秒级完成）
-cargo build --release         # 发布构建（已开启 LTO + strip）
+cargo-wrap check --workspace                # 全工作区检查
+cargo-wrap test -p cute_of_duty_server      # 服务端全部测试（不编译 bevy，秒级完成）
+cargo-wrap build --release --workspace      # 发布构建，产出 cod_server.exe + cod1.exe
 ```
 
-> **单 crate 双入口**：核心库与 3D Demo 同在一个包内，bevy 是被 feature `"demo"` 门控的
-> 可选依赖——默认 `cargo build` / `cargo test` **完全不编译 bevy**，核心逻辑秒级增量迭代；
-> 只有带 `--features demo` 的命令才触发 Bevy 全量编译（首次约 20 分钟以上，后续增量很快）。
+> 项目为 **Cargo Workspace**：`ServerCode`（服务端权威模拟 + TCP 网络层）与
+> `HostCode`（客户端表现层，动态装载 `bevy_dylib`）。默认构建**完全不编译 bevy**，核心逻辑秒级增量迭代；
+> 只有构建客户端时才触发 Bevy 全量编译。Windows 下 debug 产物可达 >2GB 并触发 `os error 193`，故用 release。
 
 ### Demo 操作方式
 
-> 下表为「按键组 × 触发环境」矩阵排版示意：`A 环境` / `B 环境` 两列用于承载后续玩法环境（如不同模式/天气）下的
-> 触发覆盖，当前版本尚未落地该维度，一律标注 `—`（沿用默认触发）。
+| 按键组 | 具体按键 | 默认触发 |
+|---|---|---|
+| 视角 | 鼠标 | 自由视角（X 轴偏航 / Y 轴俯仰，灵敏度独立，俯仰限制仰 50° / 俯 70°） |
+| 移动 | W / A / S / D | 前后左右位移（始终相对相机方向） |
+| 跳跃 | Space | 起跳（仅在地面时） |
+| 疾跑 | 左 Ctrl | 常速 4 → 7 单位/秒（按住） |
+| 主武器切换 | 1 / 2 | 在两把主武器间切换 |
+| 干员技能 | Q / E | 技能（点燃 DoT / 冰冻 / 位移冲刺 / 毒素领域） |
+| 越肩瞄准 | 鼠标右键（按住） | SpringArm 由右肩后方 6.5m 过渡到 2.4m（0.22s），FOV 收窄 28%，准星琥珀，移速降至 55% |
+| 射击 / 投掷 | 鼠标左键 | 射击（相机射线，靶心弱点 ×1.8）；持雷时改为投掷 |
+| 交互 | F | 呼出**居中交互面板**（功能台 + 拾取物 + 物资箱，站点优先）；滚轮翻页切换高亮，F/回车确认，Esc 关闭 |
+| 背包 | Tab | 打开背包（双武器 / 弹药池 / 补给品） |
+| 使用物品 | R（悬停背包物品） | 使用悬停的背包物品 |
+| 快捷道具 | 3 / 4 | 短按速用首件 / 长按开径向轮盘；3 恢复品（医疗包回血 +50）；4 战术手雷——**先持握并强制越肩**，左键投出（70 伤 / 5m 半径）/ Esc 取消放回背包 |
+| 操作按钮组 | B | 打开可点击操作按钮面板（逐键触发移动/动作/使用/面板），打开即释放光标；Esc 或 B 关闭 |
+| 关闭 / 取消 | Esc | 关闭背包 / 功能台 / 取消持雷 / 无 UI 时释放鼠标 |
+| 暂停 | / 或 ~ | 暂停菜单（返回游戏 / 设置 / 回主界面） |
+| 延迟面板 | CapsLock | 显示/隐藏到服务器的通信延迟列表（逐玩家毫秒） |
 
-| 按键组 | 具体按键 | 默认触发 | A 环境触发 · 是否忽略默认 | B 环境触发 · 是否忽略默认 |
-|---|---|---|---|---|
-| 视角 | 鼠标 | 自由视角（X 轴偏航 / Y 轴俯仰，灵敏度独立，俯仰限制仰 50° / 俯 70°） | — | — |
-| 移动 | W / A / S / D | 前后左右位移（始终相对相机方向） | — | — |
-| 跳跃 | Space | 起跳（仅在地面时） | — | — |
-| 疾跑 | 左 Ctrl | 常速 4 → 7 单位/秒（按住） | — | — |
-| 主武器切换 | 1 / 2 | 在两把主武器间切换 | — | — |
-| 干员技能 | Q / E | 技能（点燃 DoT / 冰冻 / 位移冲刺 / 毒素领域） | — | — |
-| 越肩瞄准 | 鼠标右键（按住） | SpringArm 由右肩后方 6.5m 过渡到 2.4m（0.22s），FOV 收窄 28%，准星琥珀，移速降至 55% | — | — |
-| 射击 / 投掷 | 鼠标左键 | 射击（相机射线，靶心弱点 ×1.8）；持雷时改为投掷 | — | — |
-| 交互 | F | 呼出**居中交互面板**（功能台 + 拾取物 + 物资箱，站点优先）；滚轮翻页切换高亮，F/回车确认，Esc 关闭 | — | — |
-| 背包 | Tab | 打开背包（双武器 / 弹药池 / 补给品） | — | — |
-| 使用物品 | R（悬停背包物品） | 使用悬停的背包物品 | — | — |
-| 快捷道具 | 3 / 4 | 短按速用首件 / 长按开径向轮盘；3 恢复品（医疗包回血 +50）；4 战术手雷——**先持握并强制越肩**，左键投出（70 伤 / 5m 半径）/ Esc 取消放回背包；库存由服务端权威下发 | — | — |
-| 操作按钮组 | B | 打开可点击操作按钮面板（逐键触发移动/动作/使用/面板），打开即释放光标；Esc 或 B 关闭 | — | — |
-| 关闭 / 取消 | Esc | 关闭背包 / 功能台 / 取消持雷 / 无 UI 时释放鼠标 | — | — |
-| 暂停 | / 或 ~ | 暂停菜单（返回游戏 / 设置 / 回主界面） | — | — |
-| 延迟面板 | CapsLock | 显示/隐藏到服务器的通信延迟列表（逐玩家毫秒） | — | — |
-
-> **越肩瞄准（SpringArm 相机架构，参考原神弓手瞄准模式）**
-> - 相机层级：脚底 Pivot（TopLevel，不随模型旋转）→ ShoulderPivot（Yaw）→ PitchPivot（Pitch）→ SpringArm（右肩偏移 + 后方距离）→ Camera；
-> - 默认机位：右肩 +0.55 / 眼高 ≈2.95 / 后方 6.5；瞄准机位：右肩 +1.0 / 后方 2.4，过渡 0.22s smoothstep；
-> - SpringArm 碰撞避障（原神方案）：撞墙缩回（贴墙最小 0.7m）、离墙缓伸，地面高度钳制 ≥0.35m；角色与相机之间不阻挡射击射线；
-> - 射击判定从相机视线出发（与准星一致），曳光从枪口收敛到命中点；命中靶板中心红心判定弱点，伤害 ×1.8（无弹道下坠，为即时射线；手雷保持 12 m/s² 重力抛物线）；
-> - 无蓄力机制（步枪保持连发手感）；不支持左右肩切换（固定右肩）；瞄准中跳跃保持瞄准；
-> - 手雷必须"先瞄准后释放"：任意途径使用后进入持握并强制越肩瞄准，左键投出 / Esc 取消放回背包。
+> **越肩瞄准（SpringArm 相机，参考原神弓手瞄准模式）**：相机层级为
+> 脚底 Pivot（不随模型旋转）→ ShoulderPivot（Yaw）→ PitchPivot（Pitch）→ SpringArm → Camera；
+> 默认机位右肩 +0.55 / 眼高 ≈2.95 / 后方 6.5，瞄准机位右肩 +1.0 / 后方 2.4（0.22s smoothstep）；
+> SpringArm 撞墙缩回（贴墙最小 0.7m）、离墙缓伸，地面高度钳制 ≥0.35m；射击判定自相机视线出发（与准星一致），
+> 曳光从枪口收敛到命中点；命中靶板中心红心判定弱点（×1.8 伤害，即时射线无下坠）；手雷保持 12 m/s² 重力抛物线，
+> 且必须"先瞄准后释放"。
 
 ---
 
@@ -99,9 +92,7 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 | **元素互斥生态** | 火 / 冰 / 电 / 毒等元素并非"越堆越强"。护甲与武器的元素互斥、同源元素协同增益、环境修正全部由配置表驱动——选型本身就是博弈 |
 | **反护航经济架构** | 装备等级不是保障线而是风险线：1 级新手保护舱 → 2–6 级可指定元素（成本翻倍）→ 7–9 级真随机混沌区；转售 / 给予会重置元素。高等级=高收益+高不确定性 |
 | **配置表驱动的全部规则** | 数值、元素反应、干员档案、地图布局一律沉淀为 YAML / 纯数据结构，核心库**不硬编码任何玩法**，改平衡不用动代码 |
-| **零 bevy 的核心库** | 游戏逻辑与渲染彻底分离：`cargo test` 秒级完成，Bezy 由 feature 门控，带来的直接好处是核心迭代几乎无编译负担 |
-
-> 三条铁律（改动前请先理解，这是项目约定）详见 [架构说明](#三架构总览)。
+| **零 bevy 的核心库** | 游戏逻辑与渲染彻底分离：`cargo test` 秒级完成，Bevy 由客户端独占，核心迭代几乎无编译负担 |
 
 #### 与热门友商 FPS 的差异化定位
 
@@ -155,144 +146,102 @@ cargo build --release         # 发布构建（已开启 LTO + strip）
 ## 三、架构总览（接手前必读）
 
 ```
-                ┌──────────────────────────────────┐
-                │  核心库（src/lib.rs 引出的 11 模块）│
-                │      ★ Cargo 层面零 bevy ★       │
-                │      配置表驱动的全部游戏逻辑      │
-                └───────┬──────────────────┬───────┘
-                        │ 共用同一套规则    │ 共用同一套规则
-            ┌───────────▼──────────┐  ┌────▼─────────────────────┐
-            │ cod1（src/main.rs）  │  │ 3D Demo                  │
-            │ 无头模拟 · 默认构建   │  │ src/demo + src/model     │
-            │ 固定Tick+确定性验证  │  │ feature "demo" · Bevy 0.14│
-            └──────────────────────┘  └──────────────────────────┘
+                    ┌────────────────────────────────────────────┐
+                    │  Cargo Workspace（虚拟 manifest）            │
+                    └───────┬──────────────────────────┬─────────┘
+              ┌─────────────▼────────────┐  ┌──────────▼─────────────────────┐
+              │ ServerCode（领域层 + 基础设施）│  │ HostCode（客户端表现层）          │
+              │ 权威 60Hz Tick · 核心零 bevy │  │ 动态装载 bevy 0.14 · 只吃快照 + 画 │
+              │ TCP 网络层 / 配置 / 存档     │  │ launcher 纯装配 + HUD / 相机 Rig  │
+              └────────────────────────────┘  └────────────────────────────────┘
+                              ▲                          ▲
+                              └──── ContractCode（契约层：线格式 + Port Trait）┘
 ```
 
-**三条铁律（改动前请先理解，这是项目约定）：**
+**三条铁律**：
 
-1. **核心逻辑全部在 `src/lib.rs` 引出的库模块中**，3D Demo 与无头模拟只是两个"入口"。
-2. **Demo 不硬编码规则**：数值、反应、地图、干员档案全部配置表/纯数据驱动。
-3. **核心库不依赖 bevy**：bevy 是根包的可选依赖，由 feature `"demo"` 门控；
-   默认 `cargo build`/`cargo test` 永远不编译 bevy；需要渲染的资源（Resource trait 等）
-   由 Demo 侧 newtype 包装（如 `ElementalSystem`）。
+1. **横切红线——服务端算、客户端显示**：任何"应该算什么"（血量、背包、CD、战局、归属判定、模型身份）
+   必须服务端权威；客户端只求快照 + 画。
+2. **客户端不硬编码规则**：数值、反应、地图、干员档案全部配置表/纯数据驱动。
+3. **核心库不依赖 bevy**：`ServerCode` 与 `ContractCode` 永不编译 bevy，可无头确定性模拟。
 
-### 目录结构总览（客户端结构 · HostCode）
-
-> 动态装载 bevy 0.14 的客户端表现层，**只吃快照 + 画**（服务端算、客户端显示）。
-> 模块深度 ≤ 2 层（`module/file.rs`），扁平化/拆分规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+### 目录结构总览
 
 | 模块 | 职责 | 关键文件 |
 |---|---|---|
-| `launcher` | 纯装配层：动态装载 bevy 0.14 + 装载渲染表现全套（相机 Rig / 体素绘制 / HUD / 小地图 / 背包 UI 绘制），只吃快照 + 画 | `mod.rs` |
+| **客户端 · `HostCode/`** | | |
+| `launcher` | 纯装配层：动态装载 bevy 0.14 + 承载渲染表现全套（相机 Rig / 体素绘制 / HUD / 小地图 / 背包 UI），只吃快照 + 画 | `mod.rs` |
 | `flow` | AppState 状态机（Loading / MainMenu / InGame）、加载屏、状态迁移 | `flow_state.rs` / `loading.rs` |
 | `net` | mpsc 后台线程消费服务端快照 + 上行 NetOut 命令通道 | `network.rs` |
-| `menu` | 主菜单 / 仓库·携带物资（拖拽 + Shift 选装）/ 模式 / 设置 / 加载 | `menu_main.rs` / `arsenal.rs` / `mode_panel.rs` / `game_settings.rs` |
-| `hud` | 血条 / 护甲量 / 弹药、技能 CD、小地图、击杀与通告、撤离提示 | `hud_vitals.rs` / `hud_minimap.rs` / `hud_skills.rs` / `hud_feed.rs`（语义化子文件） |
-| `world` | 训练场几何 / 材质 / 光照（服务端重画，客户端只摆） | `world_scene.rs` / `camera.rs` / `model.rs` |
-| `shared` | 主题色板「无影响月卡制」、字体句柄 | `theme.rs` |
+| `menu` | 主菜单 / 仓库·携带物资（拖拽 + Shift 选装）/ 模式 / 设置 / 暂停 | `menu_main.rs` / `arsenal.rs` / `pause.rs` |
+| `hud` | 血条 / 护甲 / 弹药 / 技能 CD / 小地图 / 战术大地图 / 背包面板 / 击杀通告 / 撤离提示 | `hud_vitals.rs` / `hud_minimap.rs` / `hud_bigmap.rs` / `hud_backpack_panel.rs` / `hud_feed.rs` |
+| `world` | 训练场几何 / 材质 / 光照 / 手雷弹道预览 | `world_scene.rs` / `camera.rs` / `grenade_preview.rs` |
+| `shared` | 主题色板、字体句柄 | `theme.rs` |
+| **服务端 · `ServerCode/`** | | |
+| `engine` | 权威 60Hz 固定 Tick + 确定性双缓冲快照 | `double_buffer.rs` |
+| `entity` | 自研 ECS（实体 = 组件容器） | `mod.rs` |
+| `combat` | 射击 / 手雷 / 技能 / 区域 / 干员切换·战斗判定 | `shooter.rs` / `grenade.rs` / `skill.rs` / `zone.rs` / `switch_operator.rs` |
+| `damage` | 伤害结算流水线 | `packet.rs` / `resolver.rs` / `effect.rs` |
+| `element` | 元素反应系统 | `mod.rs` |
+| `map` | 纯数据地图（训练场 CQB + `lawn` 1×1km 露天搜打撤大场） | `training/` + `lawn/` |
+| `model` | 模型文件（易变化资源）经快照下发客户端 | `mod.rs` |
+| `net` | TCP 网络层（AOI / 会话 / 广播 / 协议） | `aoi.rs` / `session.rs` / `broadcaster.rs` / `protocol.rs` |
+| `config` / `operator` / `player` / `equipment` / `gamemode` / `hal` | 配置 / 干员 / 档案 / 装备 / 模式 / 时钟 | 各自 `mod.rs` |
+| **契约 · `ContractCode/`** | 线格式类型 + 跨域载荷 + 共享常量 + Port Trait（不依赖两端） | `docs/contracts/protocol.yaml` 为其机器可读描述 |
 
-### 目录结构总览（服务端结构 · ServerCode）
+### 外部资源与配置
 
-> 服务端权威模拟 + TCP 网络层，**核心零 bevy**、可无头确定性模拟（详见「五、服务端进度」）。
-
-| 模块 | 职责 |
-|---|---|
-| `engine` | 权威 60Hz 固定 Tick + 确定性双缓冲快照 |
-| `entity` | 自研 ECS（实体 = 组件容器） |
-| `combat` | 射击 / 手雷 / 技能 / 区域 / 干员切换·战斗判定（`shooter.rs` / `range.rs` / `skill.rs` / `zone.rs` / `switch_operator`） |
-| `damage` | 伤害结算流水线（packet / resolver / effect） |
-| `element` | 元素反应系统 |
-| `map` | 纯数据地图（`map::training::layout()` 直接渲染完整 CQB 室内训练场） |
-| `model` | 模型文件（易变化资源）经快照下发客户端 |
-| `net` | TCP 网络层（AOI / 会话 / 广播 / 协议：Loadout / StartTraining / ExtractRequest / Ping） |
-| `config` / `operator` / `player` / `equipment` / `gamemode` / `hal` | 配置 / 干员 / 档案 / 装备 / 模式 / 时钟 |
-
-### 目录结构总览（表3 · 外部资源与配置）
-
-| 目录名 | 用途 | 文件格式 / 注意事项 |
+| 目录 | 用途 | 说明 |
 |---|---|---|
-| `assets/` | 美术资源（游戏内加载） | 子目录：`characters/` `environment/` `fonts/` `ui/` `weapons/`；`.jpg`/`.png`/`.ttf`（中文字体 `zcool_kuaile.ttf`，附 `zcool_kuaile_OFL.txt`）+ `model/*.json`（体素模型） |
-| `ServerCode/config/` | **配置表（含加载器，与核心代码物理相邻）** | `element_reactions.yaml`：无头模拟与主机端共用；**单一事实来源**——默认值由 `include_str!` 编译期嵌入，运行时同路径文件作为设计师热改覆盖；改表需同步重编译默认或改同文件 |
-| `tools/` | 开发辅助脚本 | PowerShell（图标生成、窗口截图、UI 自动测试等） |
-| `.github/workflows/` | CI | `rust.yml`：push/PR 到 `main` 自动跑 `cargo build` + `cargo test`（不带 demo） |
-| `.agents/skills/` | AI 协作工作流文档 | 美术创作 / 地图验收等技能的说明文档 |
-| `CuteOfDuty_Demo.exe` | 预编译 3D Demo | 双击即玩；启动自动定位项目根目录（向上搜索 `ServerCode/config/element_reactions.yaml`）|
+| `assets/` | 美术资源（游戏内加载） | `characters/` `environment/` `fonts/` `ui/` `weapons/`；中文字体 `zcool_kuaile.ttf`（附 OFL 许可） |
+| `ServerCode/config/` | **配置表（含加载器，与核心代码物理相邻）** | `element_reactions.yaml`：**单一事实来源**——默认值由 `include_str!` 编译期嵌入，运行时同路径文件作为设计师热改覆盖 |
+| `ServerCode/model/` | 模型文件（易变化资源） | 经快照 `ModelPreset` 下发客户端 |
+| `tools/` | 开发辅助 | `cargo-wrap`（编译封装，产物不入库）+ PowerShell 辅助脚本 |
+| `.agents/skills/` | AI 协作工作流文档 | 美术创作 / 地图验收等技能说明 |
+| `.github/workflows/rust.yml` | CI | push/PR 到 `main` 自动跑 `cargo build` + `cargo test` |
 
-### 配置表
-
-- `src/config/element_reactions.yaml`：元素反应表，无头模拟与 3D Demo **共用同一份**
-  （核心库 `cute_of_duty::config` 模块统一加载，自动定位项目根目录）。
-  改平衡直接改表，不用动代码。**单一事实来源**的加载语义：
-  - **权威默认** = 编译期 `include_str!` 嵌入的同目录 YAML，随二进制分发、无源码也能拿到一致默认值；
-    改表时同步改该文件即可（默认值由同一文件驱动，永不漂移）；
-  - **运行时覆盖** = 从项目根目录向上搜索同路径 YAML，供设计师不改代码热改表；
-  - **文件缺失** → 回退嵌入默认（与 YAML 恒一致），日志会提示；
-  - **文件存在但解析失败** → 启动直接报错退出（两个入口均如此）——改错表应当场失败，
-    而不是静默用默认值让改动"看起来生效了"。
-- 表内环境修正（`RainEnvironment`/`HighTemperature`/`SnowEnvironment` 各行）、
-  互斥规则（`mutual_exclusion`）、协同增益（`synergies`）均由运行时真实读取：
-  - 环境修正 = 以 (环境状态, 元素) 查反应表取 `damage_multiplier`；
-  - 互斥规则的 `elements` 字符串按**元素英文键名前缀**匹配（"IceArmor" 以 "Ice" 开头）；
-    `self_conflicts.elements` 顺序约定为 `[护甲, 武器]`，`teammate_conflicts` 顺序无关；
-  - 协同增益数值（如 `fire_damage_bonus`）通过 `ElementSystem::synergy_effect()` 读取。
+**配置加载语义（`element_reactions.yaml`）**：**权威默认** = 编译期 `include_str!` 嵌入的同目录 YAML；
+**运行时覆盖** = 从项目根向上搜索同路径 YAML（供热改表）；**文件缺失** → 回退嵌入默认；
+**文件存在但解析失败** → 启动直接报错退出（改错表当场失败，而非静默用默认值）。
 
 ### 如何新增一张地图
 
-1. 新建 `src/map/<名称>/mod.rs`（或单文件 `<名称>.rs`），实现一个返回 `MapLayout` 的 `layout()` 函数（照抄 `training/mod.rs` 的写法）；
-2. 在 `src/map/mod.rs` 里 `pub mod <名称>;`
-3. Demo 侧无需改动渲染逻辑——通用渲染器 `spawn_map_layout` 会自动处理网格、材质、光照；
-4. 跑 `cargo test` 确认布局约束（边界、通道净空、遮挡不与掩体相交等）全部通过。
+1. 新建 `ServerCode/map/<名称>/mod.rs`（或单文件 `<名称>.rs`），实现返回 `MapLayout` 的 `layout()`（照抄 `training/` 写法）；
+2. 在 `map/mod.rs` 里 `pub mod <名称>;`
+3. 客户端无需改动渲染逻辑——通用渲染器 `spawn_map_layout` 自动处理网格、材质、光照；
+4. 跑 `cargo-wrap test` 确认布局约束（边界、通道净空、遮挡不与掩体相交等）全部通过。
 
 ---
 
-## 四、网络架构规划（未来部署上线）
+## 四、通信协议
 
-> **本节为未来线上部署的技术选型与架构蓝图**（部分已在 ServerCode 落地，见 [五、服务端进度](#五服务端进度servercode)）。
 > Cute Of Duty 的玩法底座决定它的网络层形态：**长 TTK + 元素反应 + 撤离式搜打撤**，
-> 天然适合 TCP 服务器权威的可靠同步模型，而非毫秒级瞬时反应的 UDP 快节奏同步。
+> 天然适合 **TCP 服务器权威的可靠同步模型**，而非毫秒级瞬时反应的 UDP 快节奏同步。
 
-### 4.1 设计目标：为什么是「长 TTK + TCP 服务器权威」
+### 4.1 为什么是「长 TTK + TCP 服务器权威」
 
-Cute Of Duty 1 采用**长 TTK** 设计——基础击杀时间约 **5 秒**，叠加元素反应后可拖到数分钟。
-这不同于传统 FPS 的"见面即死"：
+- 基础击杀时间约 **5 秒**，叠加元素反应后可拖到数分钟——战斗强调**战术拉扯、技能配合与持续输出**，
+  而非毫秒级瞬时反应；每次命中的权重被稀释，玩家对瞬时同步的苛刻要求显著降低；
+- 网络波动导致的短暂卡顿有充足时间调整战术，不会出现"见面即死"的恶性体验；
+- 由此选定**基于 TCP 的服务器权威架构**（参考 Minecraft Java 版的可靠同步模型），而非 UDP + 快照插值。
 
-- 战斗强调**战术拉扯、技能配合与持续输出**，而非毫秒级瞬时反应；
-- 每一次命中的权重都被稀释，玩家对瞬时网络同步的苛刻要求显著降低；
-- 网络波动导致的短暂卡顿，玩家有充足时间调整战术，不会出现"见面即死"的恶性体验。
+### 4.2 服务器权威
 
-这一设计直接决定了网络层选型：**基于 TCP 的服务器权威架构**（参考 Minecraft Java 版的
-可靠同步模型），而非 UDP + 快照插值。
+服务端作为**游戏世界的唯一真理源**，掌握全部**热数据**：地图区块、实体位置与状态、
+元素反应状态（DoT / 冰冻 / 毒域）、背包数据、战局 / 赛季 / 信誉进度。
+客户端仅作**渲染与输入的表现层**，定期拉取状态快照保持同步；
+TCP 的可靠传输更好保障**元素状态、技能效果、背包交互**等关键数据的准确送达。
 
-### 4.2 服务器权威架构
+### 4.3 AOI 兴趣区域与实体剔除
 
-服务端作为**游戏世界的唯一真理源**，掌握全部**热数据**：
+服务端实现**移动实体剔除（AOI / 兴趣区域）**：每个客户端只收到**其视野范围内**的实体数据，
+超出范围的实体不参与同步——既降低 TCP 带宽压力，也从根源上杜绝 **ESP 透视类外挂**（客户端根本不知道视野外有什么）。
 
-- 地图区块与方块状态
-- 实体位置与状态
-- 元素反应状态（DoT / 冰冻 / 毒域等持续效果）
-- 背包数据
-- 战局 / 赛季 / 信誉进度
+### 4.4 客户端开源 + 反作弊
 
-客户端仅作为**渲染与输入的表现层**，定期从服务端拉取最新状态快照以保持同步。
-TCP 的可靠传输能更好地保障**元素状态、技能效果、背包交互**等关键数据的准确同步。
-
-### 4.3 AOI 兴趣区域与移动实体剔除
-
-服务端实现**移动实体剔除（AOI / 兴趣区域）机制**：
-
-- 每个客户端只收到**其视野范围内**或 **AOI 兴趣区域内**的实体数据；
-- 超出范围的实体不参与该客户端的同步；
-- 既降低 TCP 带宽压力，也从根源上杜绝 **ESP 透视类外挂**——客户端根本不知道视野外有什么。
-
-### 4.4 客户端开源 + 反作弊：开源不会破坏完整性
-
-Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源本可被质疑"外挂层出不穷"，
-但**服务器权威架构天然化解这一矛盾**：
-
-- 所有**热数据由服务端权威管理**，客户端代码的开放不会破坏游戏世界的完整性；
-- 对地图、实体、状态的任何修改请求，都必须经过**服务端校验**；
-- 从根本上杜绝：**地图篡改、穿墙、刷物品**等作弊行为；
-- TCP 的稳定协议同时降低了第三方工具与社区 MOD 的开发门槛，良性反哺开源生态。
+全开源（GPL-3.0-with-linking-exception）本可被质疑"外挂层出不穷"，但**服务器权威架构天然化解矛盾**：
+所有热数据由服务端管理，客户端代码开放不破坏世界完整性；对地图、实体、状态的任何修改请求都必须经**服务端校验**；
+从根本上杜绝**地图篡改、穿墙、刷物品**等作弊；同时 TCP 的稳定协议降低了第三方工具与社区 MOD 的开发门槛，良性反哺开源生态。
 
 ### 4.5 网络层与玩法基座的协同
 
@@ -300,213 +249,72 @@ Cute Of Duty 是全开源（GPL-3.0-with-linking-exception）。客户端开源�
 |---|---|
 | 长 TTK（基础 ~5s / 元素反应可达数分钟） | 削弱对瞬时同步的依赖，TCP 可靠传输足以支撑 |
 | 元素反应持续状态 | 依赖可靠的逐包送达，TCP 按序保数据一致 |
-| 服务器权威（唯一直理源） | 热数据全在服务端，客户端仅表现层 |
+| 服务器权威（唯一真理源） | 热数据全在服务端，客户端仅表现层 |
 | AOI 剔除 | 控带宽 + 根治 ESP 透视外挂 |
 | 客户端全开源 | 服务器校验兜底，开源不破坏完整性，反哺 Mod 生态 |
 
 ---
 
-## 五、服务端进度（ServerCode）
+## 五、版本历史
 
-> 自 **0.6.0** 起，项目由「单 crate + feature 门控 Bevy Demo」重构为 **Cargo Workspace 物理分离**：
-> `ServerCode`（服务端权威模拟 + TCP 网络层）与 `HostCode`（客户端表现层）。
-> 横切红线：**服务端算、客户端显示**——任何"应该算什么"（血量、背包、CD、战局、归属判定、
-> 模型身份）必须服务端权威；客户端只求快照 + 画。
-
-### 5.1 服务端模块与职责
-
-| 模块 | 职责 | 关键文件 |
-|---|---|---|
-| `engine` | 权威游戏循环（60Hz 固定 Tick）+ 确定性双缓冲快照 | `double_buffer.rs` / `pre_explosion_cache.rs` |
-| `entity` | 自研 ECS：实体 = 组件容器 | `mod.rs`（`EntityType` 等） |
-| `combat` | 战斗判定：射击 / 手雷 / 技能 / 区域 / 战斗者 | `shooter.rs`（相机射线）+ `range.rs`（靶）+ `grenade.rs`/`skill.rs`/`zone.rs`/`combatant.rs` |
-| `damage` | 伤害结算流水线 | `packet.rs` / `resolver.rs` / `effect.rs` |
-| `element` | 元素反应系统 | `mod.rs` |
-| `map` | 纯数据地图定义（训练场 + 草坪四区） | `training/` + `lawn/`（spawn / engage / search / extract / perimeter） |
-| `model` | **模型文件放服务端**（易变化资源） | `mod.rs`（`ModelPreset` 经快照下发客户端） |
-| `net` | TCP 网络层：AOI / 会话 / 广播 / 协议 | `aoi.rs` / `session.rs` / `broadcaster.rs` / `protocol.rs` |
-| `config` / `operator` / `player` / `equipment` / `gamemode` / `hal` | 配置 / 干员 / 档案 / 装备 / 模式 / 时钟 | 各自 `mod.rs` |
-
-### 5.2 当前进度
-
-> 现状：**0.6（正式发布 · 单机落幕）**（架构仍为服务端权威 + 客户端表现层，核心零 bevy；线协议 `0.9.1`）。
-> 0.6 收官遗留项**已补齐**：手雷「先瞄准后释放」持雷态、可点击操作按钮组（`B`）、legacy 操作表逐行核对。
-> 实机复测暴露的三条缺陷**已修复并验证通过**（协议 `0.9.1`，z+1 兼容性修复）：手雷重力未写回致走直线、
-> 新增投掷轨迹预览、释放光标后视角仍随鼠标乱转。
-> **下一版本目标：0.6.1 —— 网游版本**（①多玩家 → ②匹配机制 → ③无掩体竞技场）。
-
-- 服务器权威模拟 + TCP 网络层已落地（`net/`：AOI 兴趣区域剔除、会话管理、状态广播、协议编解码）。
-- **网络协议已落地**：`Loadout` / `StartTraining` / `ExtractRequest` / `Ping` 及 serde 用例；
-  `session.rs` 映射 4 个新 NetCommand 到对应处理。
-- **干员切换 `combat::switch_operator`**（四名干员档案）+ **撤离距离权威判定 `handle_extract`**。
-- **活动地图切换为 `map::lawn::layout()`（1×1km 露天搜打撤大场，0.3.2 运行时同款）**：
-  服务端靶机生成、出生点（南端 z=470）与撤离点（北端 `(0,-440)`，半径 12m）均取自 lawn；
-  客户端只渲染**静态层**（棋盘格地板 + 静态 props + 发光件），靶/拾取物仍由快照下发，避免双份实体。
-  光照按 0.3.2 原版参数复刻（主光 8000 + 补光 1500 + 四角点光 80000/60m）。
-  `map::training`（30×30 室内 CQB）保留为备选地图数据。
-- **`/`（或 `~`）暂停菜单**（移植 0.3.2 完整版：主面板「返回游戏 / 游戏设置 / 返回主界面」+ 设置子面板
-  ＋开源鸣谢，0.25s 输入防抖）；暂停期间冻结本地输入上报与相机跟随（纯客户端门控，不上行"暂停"概念）。
-- **客户端断线自动重连**（`net/network.rs` 每 2s 重试，不再"连不上就永久退出"）。
-- 模型 `model/` 经快照下发 `ModelPreset` 到客户端（易变化资源归服务端）。
-- `cargo test --offline` **全绿（107 个用例通过）**。
-- 与 HostCode **彻底解耦**：ServerCode **不依赖 bevy**，分离不受渲染层升级影响。
-- 构建产物 `cod_server.exe`（服务端）+ `cod1.exe`（客户端），由 workspace 一次并行编译产出。
-- **待办（明示）**：① 服务端未生成 lawn 的拾取物，大场内暂无拾取物；
-  ② 仓库携带「带入进图后的生效结算」`apply_loadout` 属训练场后续，
-  当前加载仅存会话热副本（自带风险提示）。
-
-### 5.3 运行
-
-- 服务端：`cargo run --bin cod_server`（默认 `cargo build` 已并行产出）
-- 客户端（表现层）：`HostCode` 消费服务端权威快照
-
----
-
-## 六、版本历史
+### 网络游戏时代（0.6 起）
 
 | 版本 | 日期 | 说明 |
-|------|------|------|
-| **0.6（Release）** | 2026-09-27 | **单机落幕 · 0.6 正式发布（预发布线收官）**：①**收官遗留项补齐**——**手雷「先瞄准后释放」**（对齐 `_ref` README 第 88 行）：服务端新增 `HeldGrenade` 权威组件（`use_item_at` 选中战术手雷先**握持不投掷**、左键 `shoot` 释放投掷并扣件、`grenade_cancel` 取消放回、持雷期间抑制常规射击），客户端新增 `hud_grenade_hint.rs` 持雷表现（`HeldGrenadeState` 派生资源 → 强制越肩 + 屏幕下方常显提示）；**可点击操作按钮组**（新增 `hud_button_panel.rs`，`B` 开模态面板、逐键合成 `PlayerInput` 上行，纳入全部五处输入门控）；**legacy 操作表逐行核对**（14 行 13 条一致 + 1 条「交互」为有意偏差：本仓自快照9 起改就近常显列表）。②**实机复测三条缺陷修复**（协议 `0.9.0`→`0.9.1`，z+1 兼容性修复）：**手雷投掷物走直线、重力不生效**——根因 `combat/grenade.rs::tick_grenades` 只在局部副本扣重力、从不写回 `GrenadeState` 组件，每 Tick 都从初速重新起步；现由 plan 携带更新后的速度/引信并于阶段2 写回，并抽出 7 个 `pub const` 弹道常数；**新增投掷轨迹预览**——`world/grenade_preview.rs` 用 `Gizmos` 以**与服务端同源的弹道常数**逐点积分，持雷时画点状抛物线弧线 + 落点标记；**释放光标后视角仍随鼠标乱转**——`hud_bigmap.rs::gameplay_input_active` 补入 `CursorReleased` 门控。③**验证**：`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server` **111 passed / 0 failed**（新增回归用例 `combat::tests::thrown_grenade_follows_parabola`）；`cargo-wrap build --release --workspace` 退出码 **0**。**实机验证通过**（owner 复测：持雷越肩/投掷/取消、抛物线预览、按钮面板、释放光标冻结视角 全部正常）。**未做**：多玩家 / 匹配 / 无掩体竞技场（见下一版）。**下一版本目标（roadmap）**：**0.6.1 —— 网游版本**（①多玩家 → ②匹配机制 → ③无掩体竞技场）。**本轮冻结**：无（F 节三项全部解除冻结）。 |
-| 0.6-Snapshot-10（Pre-Release） | 2026-09-27 | **快照9 归位 main + legacy 操作表 D-1 逐行落地 + 备用子弹入背包 + Tab 背包（实机验证通过）**：①**根治成批「返祖」**——拓扑核查发现快照 8/9 的一大批修复（轮盘残留卡死、消耗品未消耗、物资箱不释放鼠标、Esc 关闭优先级）此前**只存在于 `wip/0.8-snapshot-8` 分支**，从未合入 `main`，故在 main 上实测必然"回到旧 bug"；本轮把快照9（`0f7f9bd`）**合入 main**，并按用户指示**删除本地与远程 `wip/0.8-snapshot-8` 分支、只留 main**，从流程上杜绝再次分叉返祖。②**备用子弹改为背包物品**（用户指定 feature）：`Backpack::starting()` 改为两只医疗包 + 两颗烈焰手雷 + 两叠「步枪弹药 ×64」，弹药成为背包内的**可堆叠物品**；新增 `PickupKind::max_stack()`（弹药 64 / 恢复·战术 16 / 工具 1）与 `same_stack_kind()`（堆叠判定**忽略逐件 `amount`**，否则地面 60/30/90 弹药永远合并不了），`Backpack::push` 先并入同类未满堆再占空格，换弹经 `draw_ammo` 从背包抽入弹夹——背包格位成为备弹的唯一权威存储。③**新增 Tab 背包总览面板**（[hud_backpack_panel.rs](HostCode/hud/hud_backpack_panel.rs)，对齐 legacy 操作表第 10 行「背包 · Tab · 打开背包（双武器 / 弹药池 / 补给品）」）：左列双武器槽（元素 + 当前手持槽弹夹、`▸` 标注）+ 备用弹药池，右列 **4×3 补给品格位**（展示名带 `×N` 堆叠数量），**鼠标悬停 + `R` 直接使用**该格消耗品（只上报 `PlayerInput.use_slot` 意图，扣多少/回多少仍由服务端 `combat::use_item_at` 裁决）；打开时释放光标并纳入 `gameplay_input_active` / `cursor_lock_system` / Esc 软开关的门控。④**legacy 操作表 D-1 六条逐行核对落地**：**跳跃**补 `Space` 客户端绑定 + 服务端竖直积分（仅 grounded 可起跳、`JUMP_SPEED=7.0`）；**疾跑**键位由 `ShiftLeft` 对齐 legacy 改为 `ControlLeft`、系数 1.75×；**越肩 SpringArm 避障**（`build_colliders`/`sweep_nearest`）落地；**Esc**「无 UI 时释放鼠标」软开关（`CursorReleased`）；**暂停键**补 `/`；**`R`** 明确为使用/换弹语义。⑤物资箱/补给台/背包三处格位面板统一走 `LootItem::display_label()`，堆叠数量显示口径一致。`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server` **107 用例全绿**；`cargo-wrap build --release --workspace` 退出码 **0**。**实机验证通过**（owner 复测：手雷可见投射物 / 跳跃 / Esc 呼出鼠标 / Tab 背包 / 物资箱·消耗品·轮盘 全部正常；**排查确认**：先前一轮"问题依旧"实为运行了 9:39 的旧 release 产物，非代码缺陷）。**下一快照目标（roadmap）**：①**0.6 正式发布 ——「单机落幕」**（收官预发布线，进入正式发布流程）；②清理本地目录。 |
-| 0.6-Snapshot-9（Pre-Release） | 2026-09-26 | **缝缝补补又一版（快照8 冻结项解冻修复）**：①**根治「WASD 无法移动」**——两条根因路径同批堵死：`hud_item_wheel.rs::item_wheel_input` 重写为「**松开优先结算**（不受门控影响）/ 其它模态接管时**整体丢弃会话** / 键已不再按住却仍在会话中（失焦丢事件）**兜底复位**」三段式，消除 `held_key` 在 `blocked` 早退时残留 → `held` 持续累积 → 轮盘在**无按键**时自发 `open=true` 并永久卡死；`hud_interact.rs::interact_input` 把 **Esc 关闭二级面板提到轮盘/物资箱让位之前**，保证任何异常残留的 `open` 都能被 Esc 收起、`gameplay_input_active` 恢复正常（WASD/开火/鼠标视角/3-4 全恢复）。②**修「3/4 消耗品无响应」**：短按（< 0.25s）速用该类首件、长按呼出径向轮盘选格、松开使用；该类别无可用物品时推入 HUD 播报「XX：没有可用物品」（此前静默，观感等同"无响应"）。③**三者统一物品搬运形态**：物资箱 / 补给台全部改为与仓库选装同形态的 **4×3 双向格位面板**（新增 `loot_panel_drag`：**左键拖拽**落区判定 + **Shift+左键**快捷移动 + 拖拽源高亮），补给台走 `LootMode::Supply`（左网格为 `SUPPLY_OFFERINGS` 固定补给项，拖入背包即发 `InteractChoice::Supply`，领取与否仍由服务端 `interact::settle` 裁决）；补给台**无 `Container`**，故面板目标存在性改为**仅按实体判定**（否则会打开即自动关闭）；补给台原「二级选项菜单」形态取消。④**扩物品表**：物资箱掉落池 12 → 20 项（六种元素手雷 / 步枪各一 + 弹药 ×30/×60/×90 + 医疗包/大型/急救 + 护甲片/重型护甲板），纯数据表扩充、无协议变更。⑤**修「格位面板不释放鼠标」**（实测"没有呼出鼠标让我拖拽 / 箱子依旧别扭"的根因）：`menu/pause.rs::cursor_lock_system` 此前**只认暂停**，物资箱/补给台 4×3 面板、交互二级选项面板、战术大地图打开时鼠标仍被 `CursorGrabMode::Locked` 锁死并隐藏 → bevy `ui_focus_system` 只在窗口中心命中节点，玩家既悬停不到格子也拖不动（且容易被卡在面板里，看上去像"3/4 全无响应"）；现改为**任一指针型面板打开即释放光标并显示指针**（径向轮盘除外——它靠鼠标位移选格，保持锁定更合 legacy 手感）。⑥**修「极短点按丢按」**：3/4 的按下与松开若落在同一帧，会话刚建立就会被下一帧的兜底复位抹掉、`pending_slot` 永不置位；现同帧内直接按短按结算。⑦**根治「3/4 用后数量不减」**：`item_wheel_input` 三条结算路径都在写入 `pending_slot` 之后用 `ItemWheelState::default()` 整体覆盖，把刚写入的格位又抹成 `None`，`net::input_system` 因此永远取不到格位、服务端收不到使用意图（观感正是"左上角提示已出、数量不变、也不投掷"）；现统一改走新增的 `reset_session()`——只清会话字段、**保留待上报的 `pending_slot`**。⑧**格位面板补「拖拽幽灵」**：`loot_panel_drag` 现于拖拽期间跟随光标显示被拖物资名（`LootGhost`/`LootGhostText`），与仓库选装同形态，解决实测"没有预览，仓库是有的"。`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server` **106 用例全绿**。**推迟到下一快照**：B 节（①「按钮」= demo 操作方法的 UI 触发；②legacy demo 操作表逐行核对）按用户本轮指示整体后移。**下一快照 feature（本轮新增 · 用户指定）**：备用子弹改为**背包物品**、可**堆叠 64**（部分物品上限 16，工具不可堆叠），与 B 节「按钮」更新同期落地。 |
-| 0.6-Snapshot-8（Pre-Release） | 2026-09-26 | **老版本细节还原（UI + 地图交互 + 消耗品 + 武器解耦）**：①**小地图**改为**以玩家为中心的局部放大图**（半径 ≈60m AOI、约 1.47px/m）：罗盘条（24 刻度 / 四方位字 / 中央读数）保留，静态掩体·站点·拾取物随玩家**平移滚动重投影**，玩家恒居中、仅朝向菱形旋转（根治「只有玩家一点 + 起点看不到补给箱」的全图分辨率过低问题）；②新增**战术大地图**（M 键，600px 全景：搜打撤四段分区色带 + 边界线 + 入侵信标 + 全部掩体/目标/拾取物/站点 + 实时玩家定位点与朝向箭头）；③**HUD 面板图标化**（HP/ARMOR 数值条、Q/E 技能冷却盘、**[1]/[2] 双武器槽**（按当前槽元素名显示、当前槽高亮）+ 大字弹药 + `RELOADING`、3/4 消耗品计数槽）；④低血边缘红光 + 低弹闪红告警层；⑤**地图交互端到端落地**：服务端把 `map::lawn` 的拾取物 / 功能台 / **出生点物资箱**（新增 `EntityType::Station` / `ModelPreset::Station`·`SupplyCrate` / `interact::Interactable` 组件）落成权威实体，快照新增 `interact` 字段下发语义，客户端按语义配色渲染（弹药黄铜 / 医疗红白 / 护甲钢蓝 / 元素手雷·武器按元素上色 / 站点琥珀·青）；**按 F 弹出居中交互面板**（老版形态：平时不显示，F 呼出后滚轮翻页切换高亮（环绕 + 窗口跟随 + 滚动条 + 页码）、F/回车确认、Esc 关闭；选中站点转**二级选项面板**，面板内滚轮移高亮、F/Enter 确认、Esc 返回），面板打开时冻结玩法输入；选择经 `ClientMessage::Interact` 上行由服务端 `interact::settle` 做距离校验与效果发放；⑥**消耗品（3=医疗包 / 4=手雷）**：`Combatant` 新增 `medkit`/`grenade` 库存，3 使用医疗包回血（+50，钳制上限）、4 投掷手雷（70 伤 / 5m 半径）；医疗包 / 手雷拾取改为**入库存**（不再拾取即回血），快照新增 `medkit`/`grenade` 计数，HUD 3/4 槽显示剩余数（0 时压暗）；⑦**武器与干员彻底解耦**：武器拾取**装进当前手持槽**（覆盖并补满弹药，**不再切换同系干员**），1/2 切枪只改 `active_slot`、不改 `operator_idx`（技能组不变）；移除右下**干员切换卡**（避免与武器槽语义混淆），物资箱改用木箱造型；`cargo test` 101 用例全绿。**未做**：Tab 背包（快照暂无背包数据，需先扩协议）。**下一快照目标（roadmap）**：①**B. legacy demo 操作表逐行核对**（基准 [\_ref/Cute-of-Duty-0.3.2/README.md](_ref/Cute-of-Duty-0.3.2/README.md)，单机时代操作逐行对照）→ ②**0.6 正式发布** → ③**清理本地目录**。**本轮冻结（下次修）**：①**WASD 无法移动**（实机定位：进训练场后交互二级选项面板**自行展开**，使 `gameplay_input_active` 恒假、`input_system` 与鼠标视角被 `run_if` 冻结，详见 [冻结任务目录](docs/frozen-tasks/snapshot-8-playtest-feedback.md)）；②**3/4 消耗品短按/长按均无响应**；③物品搬运操作别扭 → 改**鼠标拖拽 / Shift+右键**（物资箱 / 仓库 / 补给台统一）；④物品种类偏少。**还差「按钮」**（demo 操作方法的 UI 触发）。 |
-| 0.6-Snapshot-7（Pre-Release） | 2026-09-26 | **架构边界体系落地 + 扁平化清理（名字致敬 CS2）**：与 CS2 一样"不改玩法、重造地基"——把模块边界从口头约定写成**可判定规范**（[CONTRIBUTING 第六～十二章](CONTRIBUTING.md) + [模块边界总览](docs/architecture/module-boundaries.md) + [ADR 0001–0004](docs/adr/) + [契约](docs/contracts/protocol.yaml) + [BarekHistory](docs/barek-history.md) + [冻结区](docs/stop-doing.md)，5 项边界冲突全部裁决）；逐条**复核并封闭规范自身的 8 条边界漏洞**（跨 crate 直连判据缺失、"唯一编排者"命名与事实不符、契约层载体写成 YAML 而非 crate、L2 集合"等"字兜底、铁律 4 空转、`module.md` 落地 0 的过渡纪律缺失、发布号与协议号混用、事件清单责任悬空）；目录清理：删空目录 `HostCode/render/`、修冷数据 `data/profiles/profiles` 双重嵌套（档案上移一格）；实测模块深度最大 2 层（`map/training` 因 803 行 > 600 红线**不可平**，属规则许可例外）、`launcher/mod.rs` 已缩至 147 行；服务端 `cargo test` 94 用例全绿；**无玩法变更**（WIP 未验证玩法仍冻结）。**下一快照目标**：冻结已可控，解冻顺序固定为 **先清理多余文件 → 再做冻结需求** |
-| 0.6-Snapshot-6（Pre-Release） | 2026-09-26 | **第三人称越肩瞄准修复（标杆版本）**：根治「看不到本人角色 / 靶机」的根因——`net/snapshot.rs` 实体根节点此前只挂 `Transform` 而缺 `GlobalTransform`，而 bevy_transform 0.14 的 `propagate_transforms` 只从「无 Parent 且带 `GlobalTransform`」的根开始向下递归，导致所有快照实体的子级 `GlobalTransform` 恒为 identity、被画在世界原点且缩放松失（此前被误判为 AOI 60m 视野受限）；根节点改用 `SpatialBundle` 一次补齐 Transform / GlobalTransform / Visibility / InheritedVisibility / ViewVisibility。**越肩瞄准（右键）全套落地**：相机臂长 4.2→2.4m + 肩偏 0.65→1.0m 的 0.22s smoothstep 过渡、FOV 收窄 28%、准星常态白 / 瞄准琥珀；瞄准意图经 `PlayerInput.aim` 上行，服务端权威将移速压至 55%（防"瞄准中全速冲刺"）；同时修复客户端 `error[B0003]` 刷屏（bevy 0.14 单实体 `despawn()` 不维护父子关系 → 小地图 `Children` 每帧累积失效实体 ID，改用 `despawn_descendants()`；快照造型根改 `despawn_recursive()` 不再留孤儿子方块）；`cargo test` 94 用例全绿 |
-| 0.6-Snapshot-5（Pre-Release） | 2026-09-26 | **资源精简 + 渲染内存泄漏根治 + 射击链路还原 + 越肩第三人称**：客户端 assets 由 ~28MB 精简至 ~9.3MB（废弃 `environment/`、字体去嵌套为 `assets/simhei.ttf`、`ui/` 仅留 `gear_icon.png`、角色模型迁至 `ServerCode/assets/model/` 经快照下发）；定位并根治 `net/snapshot.rs` 实体材质重复创建导致的资产无限累积（`EntityMaterials` 按 `ModelPreset` 缓存）；延迟面板改由网络线程真 RTT 打点（不再把 Bevy 帧时间算进延迟）并前后端启用 `TCP_NODELAY`；还原射击链路（左键开火 / R 换弹 / Q·E 技能，服务端对边沿量锁存 + 消费后清空）；第三人称改越肩取景并修掉机位回世界原点的兜底 bug；`cargo test` 94 用例全绿 |
-| 0.6-Snapshot-4（Pre-Release） | 2026-09-26 | **鼠标自由视角 + 第三人称环绕相机 + 服务端确定性移动结算 + 撤离可用**：视角改由鼠标驱动（`AimRig` yaw/pitch），镜头改为**环绕相机**始终注视角色胸口（修「看不到自己角色」）；客户端每帧上报朝向与按键意图，服务端按每连接「最新意图」每固定 Tick 以 `速度 × dt` 确定结算（基础 5 m/s、疾跑 1.6×）；撤离区弹**居中闪烁大字**提示，Enter 或 F 均可发起（服务端按权威坐标裁决）；`cargo test` 94 用例全绿。**已知问题**：AOI 60m 视野受限、射击输入未接线 |
-| 0.6-Snapshot-3（Pre-Release） | 2026-09-26 | **训练场迁移至 0.3.2 `map::lawn` 露天搜打撤大场（1×1km）+ `~` 暂停菜单**：活动地图 / 靶机生成 / 出生点（z=470）/ 撤离点（`(0,-440)`，半径 12m）双端对齐；客户端只渲染**静态层**（棋盘格地板 + props + 发光件，靶与拾取物仍走快照）并复刻 0.3.2 原版光照；`~` 键暂停菜单完整移植（返回游戏 / 设置子面板 / 返回主界面，0.25s 防抖）并冻结本地输入与相机；客户端断线自动重连（每 2s）；`cargo test` 94 用例全绿。**已知问题**：第三人称缺鼠标自由视角、实测未能走到撤离点（见「已知问题」） |
-| 0.6-Snapshot-2（Pre-Release） | 2026-09-25 | **仓库·携带物资 UI 100% 还原 0.3.2**（拖拽 + Shift 左键 + 已携带✓ + 容量计数 + 返回/开始游戏）；协议 `Loadout`/`StartTraining`/`ExtractRequest`/`Ping` 与干员切换、撤离判定落地；launcher 拆平级模块 + 扁平化清理；`cargo test` 94 用例全绿；**带仓库带入属于训练场后续**（`apply_loadout`，当前加载仅存会话热副本，自带风险提示） |
-| 0.6-Snapshot-1（Pre-Release） | 2026-09-25 | **双 crate workspace + 服务端落地**：重构为 `ServerCode`（服务端权威模拟 + TCP 网络层，含 AOI/会话/广播/协议）与 `HostCode`（客户端表现层），Model 文件归服务端并经快照下发；射击场射线检测系统完成（目标可射击/命中计分/自动往返）；`cargo test` 81 用例全绿；bevy 因底层稳定性问题由 0.19 回退至 0.14（详见「已知坑」底层冻结红线） |
-| 0.3.2 | 2026-09-22 | **搜打撤**：物资箱重塑为体素栅格木箱（四角立柱 + 四面通板 + 平顶盖）并接入统一交互菜单（站点优先于拾取，F 必开箱不误拾，弃用自建触发）；对局仓库/背包拖拽选装落地并打通 Tab 背包；核心差异化补「与热门友商 FPS 对比」定位表；Demo 操作方式改为「按键组 × 触发环境」矩阵排版（A/B 环境列为玩法环境预留，当前标 `—`） |
-| 0.3.1 | 2026-09-21 | **渲染内存泄漏定向修复 + README 翻新**：修复 `damage_popup_system` 相机缺失时弹字永久存活的确定性泄漏；新增 `effect_guard.rs`（五类高频特效硬性存活上限兜底）；收敛特效密度/寿命（命中粒子 5→3、爆炸碎块 10→4 等）；新增 `debug_tracer.rs`（每 5s 实体/资产采样，供定位残余增长） |
-| 0.3.0 | 2026-09-20 | **反屎山扁平化重构**：`config/` 并入 `src/config/`（YAML `include_str!` 嵌入 + 运行时覆盖，单一事实来源）；全部 >500 行上帝文件拆成语义化子模块（`damage`→packet/resolver/effect，`map/training`→分区分文件，`demo` 的 `inventory`/`menu`/`hud`/`combat`→面板目录，`model`→operator_models 等）；`common.rs`→`frontend.rs`；新增 [CONTRIBUTING.md（反屎山公约）](CONTRIBUTING.md) 与目录结构表格 |
-| 未发布（main） | 2026-09-11 | GitHub Actions CI 接入；`src/map/training.rs` 扁平化重构并修复 CI 构建错误；设置面板新增「开源代码鸣谢」；`src/demo` 由 7300 行单文件拆分为 15 个功能子模块 |
-| 0.2.3 | 2026-09-10 | 首个真开源版本：demo3d 独立 crate 并回本包（bevy 改由 feature `"demo"` 门控）；新增 `src/model` 干员模型（Yanhu）与动作系统；仓库以 GPL-3.0-with-linking-exception 开源 |
-| 0.2.1 | 2026-09-06 | 0.2 hotfix 1：主界面改版（右下角「切换模式/开始游戏」、右侧 60% 分类+模式选择面板、右上角齿轮设置浮层）；workspace 解耦（核心库零 bevy、配置表全量生效） |
+|---|---|---|
+| **0.6（Release）** | 2026-09-27 | **单机落幕 · 正式发布**：收官补齐手雷「先瞄准后释放」持雷态、可点击操作按钮组（`B`）、legacy 操作表逐行核对；修复三条实机缺陷（手雷重力未写回致走直线、新增抛物线预览、释放光标后视角仍转）——协议 `0.9.1`。**下一版本目标：0.6.1 网游版本**（①多玩家 → ②匹配机制 → ③无掩体竞技场） |
+| 0.6-Snapshot-1…10（Pre-Release） | 2026-09-25 ~ 09-27 | **由单 crate 迁移为双 crate workspace，并逐快照还原玩法**：确立 `ServerCode`（服务端权威模拟 + TCP 网络层）/ `HostCode`（客户端表现层）物理分离；训练场迁移至 0.3.2 `map::lawn` 1×1km 露天搜打撤大场 + `~` 暂停菜单 + 断线自动重连；越肩瞄准全套（SpringArm + 撞墙避障 + 越肩取景）；地图交互端到端（`F` 交互面板 / 物资箱 / 补给台 4×3 双向格位 / Tab 背包总览）；消耗品 `3`/`4`（医疗包 / 手雷）与手雷「先瞄准后释放」；备用子弹改为可堆叠背包物品（弹药 ×64 / 恢复·战术 ×16 / 工具不可堆叠）；HUD 图标化 + 战术大地图；架构边界体系落地（ADR 0001–0004 / 模块边界 / 契约 YAML / 冻结区）。逐快照完整记录见 [barek-history.md](docs/barek-history.md) |
+
+### 单机时代（0.1 – 0.3.2）
+
+| 版本 | 日期 | 说明 |
+|---|---|---|
+| 0.3.2 | 2026-09-22 | 搜打撤：物资箱重塑为体素栅格木箱并接入统一交互菜单；对局仓库/背包拖拽选装 + Tab 背包；补「与热门友商 FPS 对比」定位表；操作表改矩阵排版 |
+| 0.3.1 | 2026-09-21 | 渲染内存泄漏定向修复（弹字回收 + `effect_guard.rs` 特效硬性存活上限 + 密度/寿命收敛）+ README 翻新 |
+| 0.3.0 | 2026-09-20 | 反屎山扁平化重构：`config/` 并入（`include_str!` 嵌入 + 运行时覆盖，单一事实来源）；全部上帝文件拆语义化子模块；新增 CONTRIBUTING.md |
+| 未发布（main） | 2026-09-11 | GitHub Actions CI 接入；`src/map/training.rs` 扁平化重构；设置面板新增「开源代码鸣谢」；`src/demo` 由 7300 行拆为 15 个功能子模块 |
+| 0.2.3 | 2026-09-10 | 首个真开源版本：demo3d 独立 crate 并回本包（bevy 改 feature 门控）；新增 `src/model` Yanhu 干员模型与动作系统；以 GPL-3.0-with-linking-exception 开源 |
+| 0.2.1 | 2026-09-06 | 0.2 hotfix 1：主界面改版；workspace 解耦（核心库零 bevy、配置表全量生效） |
 | 0.1.1 | 2026-09-05 | 首个对外分享打包版：补齐交接文档（本 README）、`.gitignore` |
 | 0.1.0 | — | 内部开发版：核心库 + 无头模拟 + 3D Demo 全部跑通 |
 
 ---
 
-## 七、文档
+## 六、文档
 
-* **项目规范**
-  * [贡献指南（反屎山公约：600 行上限 / 无循环依赖 / 语义化命名）](CONTRIBUTING.md)
-  * [代码许可 GPL-3.0-with-linking-exception（原文）](LICENSE) —— 适用于全部源代码与配置
-  * [资产许可 CC BY-NC-SA 4.0（原文）](LICENSE-ASSETS) —— 适用于美术 / 模型 / 音频 / 自有字体
-  * [贡献者许可协议 CLA](CLA.md) —— 提交 PR 前必读并同意
-* **AI 协作工作流（`.agents/skills/`）**
-  * [游戏美术创作指南](.agents/skills/)
-  * [地图建模验收流程](.agents/skills/)
+- **项目规范**
+  - [贡献指南（反屎山公约：600 行上限 / 无循环依赖 / 语义化命名）](CONTRIBUTING.md)
+  - [代码许可 GPL-3.0-with-linking-exception](LICENSE) —— 适用于全部源代码与配置
+  - [资产许可 CC BY-NC-SA 4.0](LICENSE-ASSETS) —— 适用于美术 / 模型 / 音频 / 自有字体
+  - [贡献者许可协议 CLA](CLA.md) —— 提交 PR 前必读并同意
+- **架构与契约**
+  - [模块边界总览](docs/architecture/module-boundaries.md) / [ADR 0001–0004](docs/adr/)
+  - [线格式契约 protocol.yaml](docs/contracts/protocol.yaml) / [BarekHistory 变更台账](docs/barek-history.md) / [stop-doing.md 冻结区](docs/stop-doing.md)
+- **AI 协作工作流**：`.agents/skills/`（[游戏美术创作](.agents/skills/) / [地图建模验收](.agents/skills/)）
 
 ---
 
-## 八、开发环境说明与已知坑
+## 七、开发环境说明与已知坑
 
-1. 项目为 **Cargo Workspace**：`HostCode`（客户端表现层）+ `ServerCode`（服务端权威模拟 + 网络层）。
-   `cargo build` 会并行编译出 `cod1.exe` 与 `cod_server.exe`；ServerCode **不依赖 bevy**，核心模拟秒级增量迭代。
-2. 编译一律走 **`tools/cargo-wrap.exe`**：把 cargo/rustc 归入「Rust 编译器」作业以便任务管理器折叠，
-   并把并行度钳制为 **`-j4`**（防 CPU / 进程数爆炸）。并行度用环境变量 `CARGO_WRAP_JOBS` 覆盖。
-3. **编译缓存禁用以省磁盘**：`target/` 与 `tools/cargo-wrap/target/` 不入库；多轮构建会累积较大
-   二进制（release 且 LTO 时每份可达数百 MB～GB），需定期 `cargo clean` 释放空间。
-4. **CI**：`.github/workflows/rust.yml` 在 push / PR 到 `main` 时自动跑 `cargo build` + `cargo test`
-   （提交前本地跑一遍同样命令可提前发现问题）。
+1. 项目为 **Cargo Workspace**：`cargo build` 并行编译出 `cod1.exe` 与 `cod_server.exe`；`ServerCode` **不依赖 bevy**，核心模拟秒级增量迭代。
+2. 编译一律走 **`tools/cargo-wrap.exe`**：把 cargo/rustc 归入「Rust 编译器」作业以便任务管理器折叠，并把并行度钳制为 **`-j4`**（防 CPU / 进程数爆炸）。并行度可用环境变量 `CARGO_WRAP_JOBS` 覆盖。
+3. **编译缓存禁用以省磁盘**：`target/` 与 `tools/cargo-wrap/target/` 不入库；多轮构建会累积较大二进制（release 且 LTO 时每份可达数百 MB～GB），需定期 `cargo clean` 释放空间。
+4. **CI**：`.github/workflows/rust.yml` 在 push / PR 到 `main` 时自动跑 `cargo build` + `cargo test`。
 
-### 已知问题（试玩实测）
+### 已知问题（未解决 / 待复测）
 
-- ~~**0.6-Snapshot-9 实测 · 手雷投掷无可见投射物**~~：已修复并**实机验证通过**（2026-09-27）。根因在客户端
-  `hud_item_wheel.rs::item_wheel_input`——三条结算路径均在写入 `pending_slot` 后紧接着
-  `*state = ItemWheelState::default()` 把刚写入的格位抹成 `None`，`net::input_system` 永远取不到格位、
-  服务端收不到 `use_slot`，故"提示已出、数量不减、也不投掷"。现改为会话收尾走 `reset_session()`
-  （只清会话字段、**保留待上报的 `pending_slot`**）。
-- ~~**0.6-Snapshot-9 实测 · 3/4 使用后 HUD 计数未刷新**~~：同上根因一并修复（「格位面板不释放鼠标」是另一条
-  独立路径：面板卡住时 `gameplay_input_active` 恒假同样会冻结 3/4 上报）。**实机验证通过**。
-- **0.6-Snapshot-10 实测 · 手雷持雷位移（已按 legacy 对齐，待复测）**：按 `4` 或 Tab 背包使用手雷时，
-  改为**先持握并强制越肩瞄准**（不再立即投掷），左键投出 / Esc 取消放回背包——对齐 `_ref` README 第 88 行
-  「手雷必须"先瞄准后释放"」。同时新增 `B` 可点击操作按钮组。两项均**待用户实机复测**。
-- ~~**0.6-Snapshot-10 实测 · 手雷投掷物走直线、重力不生效**~~：已修复（协议 `0.9.1`，**待复测**）。
-  根因 `ServerCode/combat/grenade.rs::tick_grenades` 只在局部副本上扣重力、**从不写回 `GrenadeState` 组件**，
-  每 Tick 都从初速重新起步 → 竖直速度恒定不衰减。现改为 plan 携带更新后的速度/引信并于阶段2 写回。
-  同时抽出 7 个 `pub const` 弹道常数，供客户端预览**同源复用**。
-- **0.6-Snapshot-10 实测 · 新增投掷轨迹预览（待复测）**：`HostCode/world/grenade_preview.rs` 用 `Gizmos`
-  以与服务端同源的弹道常数逐步积分，持雷时绘制**点状抛物线弧线 + 落点标记**。
-- ~~**0.6-Snapshot-10 实测 · 释放鼠标后仍会移动视角**~~：已修复（**待复测**）。根因
-  `hud_bigmap.rs::gameplay_input_active` 未计入 `CursorReleased`，Esc 释放光标后 `mouse_look_system` 仍在跑；
-  现门控补 `&& !released.0`，释放光标即冻结视角。
-- **0.6-Snapshot-4 实测（未修复，已登记）**：
-  - **视野受限**：AOI 兴趣区域半径 60m，大场内远处靶机不进快照因而不可见。
-    场上物资（拾取物 / 功能台 / 出生点物资箱）已由服务端 `interact::spawn_from_layout`
-    按 `map::lawn` 落成权威实体并经快照下发（0.7-Snapshot-7 起），出生点即可见可交互。
-  - **运行顺序**：必须先启动 `cod_server.exe` 再启动 `cod1.exe`（客户端已能自动重连，
-    但服务端未起时不会进入训练场）。
-- ~~射击输入未接线（`PlayerInput.shoot` 恒为 false）~~：已修复（`net/pilot.rs` 接线
-  左键开火 / R 换弹 / Q·E 技能；服务端 `main.rs` 对换弹与技能等边沿量做锁存 + 消费后清空，
-  避免同 Tick 覆盖丢失或重复触发）。
-- ~~第三人称视角不完整（无鼠标自由视角 / 看不到自己角色）~~：0.6-Snapshot-6 已根治。
-  根因是快照实体根节点缺 `GlobalTransform`（bevy_transform 0.14 的 `propagate_transforms`
-  只从「无 Parent 且带 `GlobalTransform`」的根向下递归），子级世界变换恒为 identity →
-  所有实体被画在世界原点且缩放松失；改用 `SpatialBundle` 后本人角色与靶机均正常显示于服务端坐标。
-  同时落地越肩瞄准：右键按住 → 相机 0.22s smoothstep 由 4.2m/肩偏 0.65 收到 2.4m/肩偏 1.0，
-  FOV 收窄 28%，准星转琥珀，服务端权威将移速压至 55%；**观感仍待玩家实测确认**。
-- ~~客户端 assets 臃肿（约 28MB）与渲染内存单调增长~~：已修复 —— assets 瘦身至
-  ~9.3MB（废弃 `environment/`、字体去嵌套为 `assets/simhei.ttf`、`ui/` 仅留 `gear_icon.png`、
-  角色模型改由服务端 `ServerCode/assets/model/` 下发）；内存增长根因系
-  `net/snapshot.rs` 每次 spawn 都对 `Assets<StandardMaterial>` 新建两份材质，实体随 AOI
-  进出反复 spawn 致材质资产无限累积，现以 `EntityMaterials` 按 `ModelPreset` 缓存句柄根治。
-- ~~无法移动到撤离点（910m 走不到 / 撤离不触发）~~：0.6-Snapshot-4 已修复
-  （服务端 `速度 × dt` 确定性结算 + 入区居中闪烁提示 + Enter / F 触发）。
-- ~~手雷爆炸内存飙升 / OOM~~：2026-09-05 已修复（爆炸/枪口特效网格与材质入池共享，不再逐发新建资产）。
-- ~~术能锁定后相机冻结~~：实为玩家初始 yaw 朝向问题（背对靶场），已修复（默认面向靶场出生）。
-- **渲染内存缓慢增长（已定向缓解，仍待长时间确认）**：长时间游玩（数分钟级）GPU 内存仍会缓慢累积，
-  最终可能 OOM。2026-09-21 起做了定向修复（仍在观察是否彻底根治，见下）：
-  - 修复「弹字清理依赖相机，相机暂不可用时弹字永久存活」的确定性回收失效点（`damage_popup_system`）；
-  - 为曳光/弹字/粒子/反应文字/爆炸等高频特效增加**硬性存活上限兜底清道夫**（`effect_guard.rs`），
-    杜绝任何回收路径失效导致的无限堆积；
-  - 收敛高频特效的生成密度与寿命（命中粒子 5→3、爆炸碎块 10→4、曳光/枪口/爆闪寿命收短等），
-    减少 Bevy 每帧反复 spawn/despawn 造成的渲染 batch 抖动。
-  - 定位其余增长点时，可用内置诊断采样（`cargo run --features demo` 游玩后看日志，`debug_tracer.rs`
-    每 5s 打印各类特效实体存活数与 `Mesh`/`Material` 资产表容量）；
-  - 后续补充定位到**实体材质重复创建**这一确定性泄漏点（见上「assets 臃肿与渲染内存单调增长」），
-    已用 `EntityMaterials` 缓存根治，尚待长时间游玩复验是否仍有残余增长。
-- 自动化试玩提示：若用外部自动化驱动本 Demo，winit 可能拦截合成鼠标事件，可用系统级 `mouse_event` 绕过。
+- **视野受限（AOI 60m）**：AOI 兴趣区域半径 60m，大场内远处靶机不进快照因而不可见。场上物资（拾取物 / 功能台 / 出生点物资箱）已由服务端按 `map::lawn` 落成权威实体并经快照下发，出生点即可见可交互。
+- **运行顺序**：必须先启动 `cod_server.exe` 再启动 `cod1.exe`（客户端已能自动重连，但服务端未起时不会进入训练场）。
+- **渲染内存缓慢增长（已定向缓解，仍待长时间确认）**：长时间游玩（数分钟级）GPU 内存仍会缓慢累积，可能最终 OOM。已做定向修复（弹字回收失效点 + `effect_guard.rs` 硬性存活上限清道夫 + 特效密度/寿命收敛 + `net/snapshot.rs` 实体材质按 `ModelPreset` 缓存根治重复创建），**尚待长时间复验**。诊断可用 `debug_tracer.rs`（每 5s 打印特效实体存活数与 `Mesh`/`Material` 资产表容量）。
+- **待复测（0.6 收官批次）**：手雷「先瞄准后释放」持雷态、可点击操作按钮组（`B`）、投掷轨迹预览——均已实现，待实机复测。
+- **自动化试玩提示**：若用外部自动化驱动 Demo，winit 可能拦截合成鼠标事件，可用系统级 `mouse_event` 绕过。
 
 ### 已知坑（开发 / 部署实测）
 
-- **底层冻结红线（2026-09-25 起生效）**：在 bevy 及其大版本依赖（wgpu / naga / winit / glam 等）出稳定
-  版本之前，**不要更新底层**。曾把 bevy 升到 0.19 又因大量 API 变动与稳定性问题回退到 0.14
-  （本机离线缓存 0.14.2，`cargo check --offline` 通过；渲染代码用 0.14 的
-  `MaterialMeshBundle` / `PbrBundle` / `DirectionalLightBundle` / `Camera3dBundle`、
-  `Time::elapsed_seconds()`）。ServerCode 不依赖 bevy，回退不影响服务端分离。
-- **Windows debug 构建 Bevy 0.19 可能产出 >2GB 可执行文件，报 `os error 193`（无效 Win32 程序）**：
-  用 release 构建或优化 dev profile 规避。
-- **release 构建偶发 `os error 3`（路径找不到）**：编译 bevy crate 写 `.fingerprint` 时失败，非代码错误，
-  疑似 target 残留 + LTO / `codegen-units=1` 重负载；重试会触发整树重建（约 40 分钟），必要时先 `cargo clean`。
-- **ServerCode 遗留 dead_code 告警**：`combat/shooter.rs` 的 `Vec3Helper::dot` 暂未被调用，属无碍告警，
-  后续接入近战/命中反馈时可复用。
-- **历史遗留（0.5 单 crate 架构，已随重构隔离到 `legacy/0.1-0.5` 分支）**：返回主菜单时曾崩溃/连带销毁窗口、
-  进场即现 `B0004` 层级损坏洪水，根因系聚合根 / 层级挂接与 teardown 方案冲突，已在新架构中改用
-  服务端权威 + 客户端快照模式规避。
+- **底层冻结红线（2026-09-25 起生效）**：在 bevy 及其大版本依赖（wgpu / naga / winit / glam 等）出稳定版本前**不要更新底层**。曾把 bevy 升到 0.19 又因大量 API 变动与稳定性问题回退到 0.14（本机离线缓存 0.14.2）。`ServerCode` 不依赖 bevy，回退不影响服务端分离。
+- **release 构建偶发 `os error 3`（路径找不到）**：编译 bevy crate 写 `.fingerprint` 时失败，非代码错误，疑似 target 残留 + LTO / `codegen-units=1` 重负载；重试会触发整树重建，必要时先 `cargo clean`。
+- **ServerCode 遗留 dead_code 告警**：`combat/shooter.rs` 的 `Vec3Helper::dot` 暂未被调用，属无碍告警，后续接入近战/命中反馈时可复用。
 
 ---
 
-## 九、目录结构
-
-```
-CuteOfDutyAlpha/
-├── Cargo.toml / Cargo.lock       # Cargo Workspace 根（虚拟 manifest，声明 HostCode + ServerCode 成员）
-├── CONTRIBUTING.md               # ⚠️ 反屎山公约（贡献前必读）
-├── README.md                     # 本档案（交接文档）
-├── .github/workflows/rust.yml    # CI：push/PR 到 main 跑 cargo build + cargo test
-├── .agents/skills/               # AI 协作工作流文档（美术创作 / 地图验收）
-├── tools/                        # cargo-wrap（编译封装，产物不入库）+ PowerShell 辅助脚本
-├── HostCode/                     # 客户端表现层（launcher 模块：动态装载 bevy_dylib + 渲染/快照消费）
-└── ServerCode/                   # 服务端权威模拟 + TCP 网络层（详见「五、服务端进度」）
-    ├── lib.rs / main.rs          # 核心库 + cod_server 入口
-    ├── config/                   # 配置加载器 + element_reactions.yaml（单一事实来源）
-    ├── engine/ entity/ combat/ damage/ element/ map/ model/ net/
-    ├── operator/ player/ equipment/ gamemode/ hal/
-    └── (构建产物 target/ 已 git 忽略)
-```
-
-> 一位开发者接手前，只需要读三份：**本 README（概览）** → **服务端进度与架构表** → **CONTRIBUTING.md（公约）**。
+> 一位开发者接手前，只需读三份：**本 README（概览）** → **CONTRIBUTING.md（公约）** → **`ServerCode/` 各模块的 `mod.rs` Why 注释**。
 > 核心业务模块保持 ≤ 2 层深度、每个 `.rs` ≤ 600 行、禁止 `utils.rs` 之类的语义化空壳——这些是硬约束，不是建议。
