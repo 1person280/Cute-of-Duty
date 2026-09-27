@@ -21,6 +21,7 @@ use cute_of_duty_server::equipment::EquipmentSystem;
 use cute_of_duty_server::inventory;
 use cute_of_duty_server::items::{self, Backpack, Container, TransferDir, TransferResult};
 use cute_of_duty_server::map::PickupKind;
+use cute_of_duty_server::motion;
 use cute_of_duty_server::net::protocol::{EventKind, InventoryAction, PlayerInput, ServerMessage};
 use cute_of_duty_server::net::{self, NetCommand, NetRuntime};
 use cute_of_duty_server::player::PlayerProfile;
@@ -33,21 +34,6 @@ const DEFAULT_ADDR: &str = "127.0.0.1:8888";
 const EXTRACTION_POINT: (f32, f32) = (0.0, -440.0);
 /// 判定"进入撤离区"的触发半径（米，平面距离，忽略 Y）。撤离光垫半边长 3m，取 12m 留余量。
 const EXTRACTION_RANGE: f32 = 12.0;
-
-/// 疾跑相对基础移速的倍率（`Entity.move_speed × 此值`）。基础步速 4 m/s、疾跑 ×1.75
-/// = 7 m/s，对齐 legacy 0.3.2 单机时代的走/跑档位（走 4、跑 7）。
-const SPRINT_MULT: f32 = 1.75;
-
-/// 越肩瞄准时的移速倍率（`速度 × 此值`）。瞄准是"用机动性换精度"的博弈位：
-/// 按住右键即从常态 4 m/s 降到 2.2 m/s，与旧版手感一致。
-const AIM_MULT: f32 = 0.55;
-
-/// 重力加速度（m/s²，服务端竖直积分用）。
-const GRAVITY: f32 = 22.0;
-/// 起跳初速（m/s）：约 1.1m 跳高，贴合 legacy 轻跳手感。
-const JUMP_SPEED: f32 = 7.0;
-/// 地面高度（草坪训练场为平地，地面 y = 0）。
-const GROUND_Y: f32 = 0.0;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -579,72 +565,37 @@ fn currency_summary(profile: &PlayerProfile) -> String {
 
 /// 把客户端输入意图应用到权威实体（位移 + 朝向 + 战斗意图），每 Tick 调用一次。
 ///
-/// 服务器权威原则：最终位移由服务端按本节转速写回 `world`，再经快照回传，
-/// 客户端不做任何本地校订 → 天生免疫坐标篡改。战斗（开火/换弹/技能）也在此
-/// 经 `sim.apply_combat_input` 结算，命中/击杀由服务端定夺。
-///
-/// 轴系（与客户端 `AimRig` 同源）：视线水平分量 `(sinY, cosY)`，右向量
-/// `(-cosY, sinY)`；`W/S` 沿视线前后、`D/A` 沿右手左右。位移量 = `速度 × dt`
-/// （`dt` 为固定 Tick 步长），因此速度单位是 m/s、与消息频率无关。
+/// 服务器权威原则：最终位移由服务端写回 `world` 再经快照回传，客户端不做本地校订，
+/// 天生免疫坐标篡改。位移数学（移速档 / WASD 分解 / 竖直积分）已抽到 `motion` 模块，
+/// 本函数只做「取值 → 纯函数 → 写回 → 结算战斗」的编排；轴系与速度语义见
+/// [`cute_of_duty_server::motion::integrate_motion`]。
 fn apply_input(sim: &mut GameLoop, eid: EntityId, input: &PlayerInput, dt: f32) {
-    let yaw = input.aim_yaw;
-    let (fx, fz) = (yaw.sin(), yaw.cos()); // 视线水平方向
-    let (rx, rz) = (-yaw.cos(), yaw.sin()); // 右手方向 = forward × Y
-
-    let mut mx = 0f32;
-    let mut mz = 0f32;
-    if input.move_forward { mx += fx; mz += fz; }
-    if input.move_backward { mx -= fx; mz -= fz; }
-    if input.move_right { mx += rx; mz += rz; }
-    if input.move_left { mx -= rx; mz -= rz; }
-
-    // 位移 + 朝向：先写回权威实体
+    // 作用域块结束 `entity` 的可变借用，之后才能把 `sim` 交给 `apply_combat_input`。
     {
         let Some(entity) = sim.world_mut().get_entity_mut(eid) else { return };
-        let len = (mx * mx + mz * mz).sqrt();
-        if len > 1e-6 {
-            let mut speed = if input.sprint { entity.move_speed * SPRINT_MULT } else { entity.move_speed };
-            // 瞄准优先于疾跑压制移速：按住右键即进入"慢走精度档"（见 `AIM_MULT`）。
-            if input.aim {
-                speed *= AIM_MULT;
-            }
-            let step = speed * dt;
-            entity.position.x += mx / len * step;
-            entity.position.z += mz / len * step;
-        }
-        // 竖直运动：Space 意图起跳 + 重力积分（服务端权威，客户端只上报 jump 意图）。
-        // 仅着地可起跳——防止空中连按叠成二段跳；离地后由重力把 y 拉回地面并复位 grounded。
-        if input.jump && entity.grounded {
-            entity.vertical_velocity = JUMP_SPEED;
-            entity.grounded = false;
-        }
-        entity.vertical_velocity -= GRAVITY * dt;
-        entity.position.y += entity.vertical_velocity * dt;
-        if entity.position.y <= GROUND_Y {
-            entity.position.y = GROUND_Y;
-            entity.vertical_velocity = 0.0;
-            entity.grounded = true;
-        }
+        let step = motion::integrate_motion(
+            entity.move_speed, entity.position, entity.grounded, entity.vertical_velocity, input, dt,
+        );
+        // 位移 + 竖直状态：写回权威实体
+        entity.position = step.position;
+        entity.vertical_velocity = step.vertical_velocity;
+        entity.grounded = step.grounded;
         // 刷新战斗朝向（供本帧射线 / 技能方向）
         if let Some(cb) = entity.get_component_mut::<cute_of_duty_server::combat::Combatant>() {
             cb.update_aim(input.aim_yaw, input.aim_pitch);
         }
     }
-
     // 战斗意图独立结算（与位移解耦）
-    sim.apply_combat_input(
-        eid,
-        CombatIntent {
-            shoot: input.shoot,
-            reload: input.reload,
-            skill_q: input.skill_q,
-            skill_e: input.skill_e,
-            yaw: input.aim_yaw,
-            pitch: input.aim_pitch,
-            weapon_slot: input.weapon_slot,
-            use_slot: input.use_slot,
-        },
-    );
+    sim.apply_combat_input(eid, CombatIntent {
+        shoot: input.shoot,
+        reload: input.reload,
+        skill_q: input.skill_q,
+        skill_e: input.skill_e,
+        yaw: input.aim_yaw,
+        pitch: input.aim_pitch,
+        weapon_slot: input.weapon_slot,
+        use_slot: input.use_slot,
+    });
 }
 
 /// 把本帧战斗突发事件（击杀/命中）转发给受影响玩家的连接。

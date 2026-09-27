@@ -23,6 +23,7 @@ pub mod inventory;
 pub mod items;
 pub mod map;
 pub mod model;
+pub mod motion;
 pub mod net;
 pub mod operator;
 pub mod player;
