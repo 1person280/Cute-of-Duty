@@ -122,6 +122,18 @@ pub fn mouse_look_system(
     rig.pitch = rig.pitch.clamp(-PITCH_DOWN_MAX, PITCH_UP_MAX);
 }
 
+/// 手雷持握期间强制越肩瞄准（表现层）：把持雷态叠加进 [`AimRig::aiming`]。
+///
+/// 设计动机（Why）：持雷时服务端已按越肩速度（`AIM_MULT`）结算位移；客户端相机必须同步
+/// 收臂收 FOV，否则"看着全速站立、实际走得很慢"，表现与权威不一致。本系统**排在
+/// [`mouse_look_system`] 之后**：先由鼠标写入右键基准，再叠加持雷态——`AimRig::aiming`
+/// 全程单点写入，杜绝两系统同帧互相覆盖。
+pub fn sync_grenade_aim(held: Res<crate::hud::HeldGrenadeState>, mut rig: ResMut<AimRig>) {
+    if held.element.is_some() {
+        rig.aiming = true;
+    }
+}
+
 /// 每帧把镜头摆到角色右肩后方并沿视线平行注视（越肩第三人称）；握手前无本人实体则停在原点。
 ///
 /// 目标位置取自权威快照（服务端唯一真相源），客户端不做本地校订；镜头姿态纯属表现层。

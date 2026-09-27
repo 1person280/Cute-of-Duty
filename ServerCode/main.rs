@@ -172,14 +172,15 @@ async fn serve_authoritative(
             }
         }
 
-        // 阶段1.6：清空已消费的边沿量（换弹/技能），避免同一次按键在后续 Tick 被重复触发。
-        // 扳机（shoot）是持续量，按住即持续开火，故不在此清空。
+        // 阶段1.6：清空已消费的边沿量（换弹/技能/取消持雷），避免同一次按键在后续 Tick
+        // 被重复触发。扳机（shoot）是持续量，按住即持续开火，故不在此清空。
         for input in conn_input.values_mut() {
             input.reload = false;
             input.skill_q = false;
             input.skill_e = false;
             input.weapon_slot = None;
             input.use_slot = None;
+            input.grenade_cancel = false;
         }
 
         // 阶段2：推进确定性模拟一个 Tick
@@ -281,12 +282,13 @@ fn drain_commands(
                 // 的同 Tick 输入覆盖，故按位「或」锁存，直到被某次 Tick 消费后清空（见阶段1.5），
                 // 保证单次按键既不因乱序丢失、也不被重复触发。
                 let slot = conn_input.entry(conn_id).or_default();
-                let (pending_reload, pending_q, pending_e, pending_weapon, pending_use_slot) =
-                    (slot.reload, slot.skill_q, slot.skill_e, slot.weapon_slot, slot.use_slot);
+                let (pending_reload, pending_q, pending_e, pending_weapon, pending_use_slot, pending_cancel) =
+                    (slot.reload, slot.skill_q, slot.skill_e, slot.weapon_slot, slot.use_slot, slot.grenade_cancel);
                 *slot = player;
                 slot.reload |= pending_reload;
                 slot.skill_q |= pending_q;
                 slot.skill_e |= pending_e;
+                slot.grenade_cancel |= pending_cancel;
                 // 切枪 / 速用格位 Intent 均为"最新优先"：本帧无请求时保留同 Tick 更早一次的请求
                 if slot.weapon_slot.is_none() {
                     slot.weapon_slot = pending_weapon;
@@ -570,11 +572,23 @@ fn currency_summary(profile: &PlayerProfile) -> String {
 /// 本函数只做「取值 → 纯函数 → 写回 → 结算战斗」的编排；轴系与速度语义见
 /// [`cute_of_duty_server::motion::integrate_motion`]。
 fn apply_input(sim: &mut GameLoop, eid: EntityId, input: &PlayerInput, dt: f32) {
+    // 持雷 = 强制瞄准姿态（Why）：手雷"先瞄准后释放"要求持握期间移动压到 `AIM_MULT` 档，
+    // 不能全速冲刺；故在算移速前把有效意图的 `aim` 置真（不改客户端上报的原始意图）。
+    let holding = sim
+        .world()
+        .get_entity(eid)
+        .and_then(|e| e.get_component::<cute_of_duty_server::combat::HeldGrenade>())
+        .map(|h| h.is_holding())
+        .unwrap_or(false);
+    let mut eff = *input;
+    if holding {
+        eff.aim = true;
+    }
     // 作用域块结束 `entity` 的可变借用，之后才能把 `sim` 交给 `apply_combat_input`。
     {
         let Some(entity) = sim.world_mut().get_entity_mut(eid) else { return };
         let step = motion::integrate_motion(
-            entity.move_speed, entity.position, entity.grounded, entity.vertical_velocity, input, dt,
+            entity.move_speed, entity.position, entity.grounded, entity.vertical_velocity, &eff, dt,
         );
         // 位移 + 竖直状态：写回权威实体
         entity.position = step.position;
@@ -582,7 +596,7 @@ fn apply_input(sim: &mut GameLoop, eid: EntityId, input: &PlayerInput, dt: f32) 
         entity.grounded = step.grounded;
         // 刷新战斗朝向（供本帧射线 / 技能方向）
         if let Some(cb) = entity.get_component_mut::<cute_of_duty_server::combat::Combatant>() {
-            cb.update_aim(input.aim_yaw, input.aim_pitch);
+            cb.update_aim(eff.aim_yaw, eff.aim_pitch);
         }
     }
     // 战斗意图独立结算（与位移解耦）
@@ -595,6 +609,7 @@ fn apply_input(sim: &mut GameLoop, eid: EntityId, input: &PlayerInput, dt: f32) 
         pitch: input.aim_pitch,
         weapon_slot: input.weapon_slot,
         use_slot: input.use_slot,
+        grenade_cancel: input.grenade_cancel,
     });
 }
 

@@ -13,17 +13,21 @@ use crate::element::{ElementType, EntityElementState};
 use crate::entity::{Entity, EntityId, EntityType, World};
 use crate::items::Backpack;
 use crate::map::PickupKind;
-use crate::operator::{roster, SkillEffect, SkillKind};
+use crate::operator::{roster, SkillKind};
 
 /// 护甲显示上限（与 `interact::ARMOR_CAP`、表现层同源）：速用护甲片钳制用。
 const ARMOR_CAP: f32 = 100.0;
 
-mod grenade;
+// 公开 grenade 子模块：客户端轨迹预览需复用其弹道常数（初速/重力/出手点），
+// 保证预览与实际结算**同源**、不各自硬编码副本（见 `combat::grenade` 顶部常量）。
+pub mod grenade;
+mod held_grenade;
 mod shooter;
 mod skill;
 mod zone;
 
 pub use combatant::Combatant;
+pub use held_grenade::HeldGrenade;
 mod combatant;
 pub mod range;
 
@@ -64,8 +68,10 @@ pub struct CombatIntent {
     pub pitch: f32,
     /// 切枪请求（Some = 本 Tick 请求切换到该武器槽；None = 无请求）
     pub weapon_slot: Option<u8>,
-    /// 使用背包第 `slot` 格物品（边沿量）：医疗包回血、护甲片加甲、手雷投掷。
+    /// 使用背包第 `slot` 格物品（边沿量）：医疗包回血、护甲片加甲、手雷进入**持握**。
     pub use_slot: Option<u8>,
+    /// 取消持握中的手雷（边沿量）：原样放回背包、不消耗。
+    pub grenade_cancel: bool,
 }
 
 /// 权威战斗系统：持有干员名册引用与事件出队队列。
@@ -104,7 +110,20 @@ impl CombatSystem {
             return;
         };
         let op_element = roster()[op_idx].element;
-        if intent.shoot {
+        // 持雷（服务端权威）——手雷"先瞄准后释放"：持握时左键=投掷、Esc=取消，并**抑制
+        // 枪械射击**（否则投出后会紧接着用枪开火）；其余意图（换弹/技能/切枪）照常。
+        let holding = world
+            .get_entity(eid)
+            .and_then(|e| e.get_component::<HeldGrenade>())
+            .map(|h| h.is_holding())
+            .unwrap_or(false);
+        if holding {
+            if intent.grenade_cancel {
+                held_grenade::cancel_held_grenade(world, eid);
+            } else if intent.shoot {
+                held_grenade::throw_held_grenade(world, eid);
+            }
+        } else if intent.shoot {
             shooter::try_fire(
                 world,
                 resolver,
@@ -127,7 +146,7 @@ impl CombatSystem {
             self.cast_skill(world, resolver, env, eid, origin, yaw, pitch, op_element, op_idx, false);
         }
         if let Some(slot) = intent.use_slot {
-            use_item_at(world, eid, slot as usize, origin, yaw);
+            use_item_at(world, eid, slot as usize);
         }
     }
 
@@ -212,6 +231,8 @@ pub fn spawn_player(world: &mut World, position: Vec3, operator_idx: usize) -> E
     entity.add_component(Box::new(Combatant::new(operator_idx)));
     // 开局携带 2 医疗包 + 2 手雷（宿主为 4×3 背包组件，权威格位见 `items`）。
     entity.add_component(Box::new(Backpack::starting()));
+    // 持雷态宿主：初始未持雷（手雷"先瞄准后释放"的中间状态，见 `held_grenade`）。
+    entity.add_component(Box::new(HeldGrenade::default()));
     world.spawn(entity)
 }
 
@@ -290,9 +311,10 @@ pub fn push_item(world: &mut World, eid: EntityId, item: crate::items::LootItem)
 ///
 /// 设计动机（Why）：3/4 号速用既要支持"短按用首件"，也要支持"长按径向轮盘精确选格"，
 /// 二者在服务端收敛为同一件事——按**背包格位下标**取用。效果仍由服务端裁决：
-/// 恢复类（医疗包回血 / 护甲片加甲）按物品自身数值钳制到上限；战术类（手雷）按当前
-/// 朝向抛出，元素取自该颗手雷本身。空位或不可速用物（弹药/武器）静默忽略。
-pub fn use_item_at(world: &mut World, eid: EntityId, index: usize, origin: Vec3, yaw: f32) {
+/// 恢复类（医疗包回血 / 护甲片加甲）按物品自身数值钳制到上限；战术类（手雷）**进入持握**
+/// ——"先瞄准后释放"的中间态，取出既不消耗也不生成投射物，待左键释放才投出、或取消放回
+/// （见 [`held_grenade`]）。空位或不可速用物（弹药/武器）静默忽略。
+pub fn use_item_at(world: &mut World, eid: EntityId, index: usize) {
     let Some(item) = ({
         let Some(entity) = world.get_entity_mut(eid) else { return };
         let Some(bp) = entity.get_component_mut::<Backpack>() else { return };
@@ -309,321 +331,23 @@ pub fn use_item_at(world: &mut World, eid: EntityId, index: usize, origin: Vec3,
             let Some(entity) = world.get_entity_mut(eid) else { return };
             entity.armor = (entity.armor + amount).min(ARMOR_CAP);
         }
-        PickupKind::Grenade { element } => {
-            grenade::spawn_projectile(
-                world,
-                eid,
-                origin,
-                yaw,
-                element,
-                combatant::GRENADE_DAMAGE,
-                combatant::GRENADE_RADIUS,
-                SkillEffect::NONE,
-            );
+        PickupKind::Grenade { .. } => {
+            // 手雷取出即进入持握；已持雷则本次使用作废，把刚取出的这件**原样放回**背包
+            // （持握组件缺失同理——不能让它凭空消失）。
+            let taken = match world.get_entity_mut(eid).and_then(|e| e.get_component_mut::<HeldGrenade>()) {
+                Some(h) if !h.is_holding() => {
+                    h.item = Some(item.clone());
+                    true
+                }
+                _ => false,
+            };
+            if !taken {
+                let _ = push_item(world, eid, item);
+            }
         }
         _ => {}
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::element::{ElementConfig, ElementSystem};
-    use crate::entity::Entity;
-    use crate::items::{Backpack, ItemCategory};
-
-    /// 搭建最小战斗环境：空世界 + 权威结算器 + 战斗系统
-    struct CombatHarness {
-        world: World,
-        resolver: DamageResolver,
-        system: CombatSystem,
-        env: EntityElementState,
-    }
-
-    impl CombatHarness {
-        fn new() -> Self {
-            let element_system = std::sync::Arc::new(ElementSystem::new(ElementConfig::default()));
-            Self {
-                world: World::new(),
-                resolver: DamageResolver::new(element_system),
-                system: CombatSystem::new(),
-                env: EntityElementState::Normal,
-            }
-        }
-
-        /// 在 `pos` 放一个默认 AI（max_hp 80）
-        fn spawn_ai(&mut self, pos: Vec3) -> EntityId {
-            let e = Entity::new_ai(0, pos);
-            self.world.spawn(e)
-        }
-    }
-
-    fn count_grenades(world: &World) -> usize {
-        world.get_all_entities().iter().filter(|e| e.entity_type == EntityType::Grenade).count()
-    }
-
-    /// 玩家朝向 +Z，正前方放一个 AI：开火应命中、扣血、打出命中事件、消耗弹药。
-    #[test]
-    fn fire_hits_and_consumes_ammo() {
-        let mut h = CombatHarness::new();
-        let pid = spawn_player(&mut h.world, Vec3::default(), 0); // 焰狐：火步枪 12 伤
-        let aid = h.spawn_ai(Vec3::new(0.0, 0.0, 8.0));
-
-        let ammo_before = h.world.get_entity(pid).unwrap().get_component::<Combatant>().unwrap().active().ammo;
-
-        h.system.apply_input(
-            &mut h.world,
-            &h.resolver,
-            pid,
-            0.016,
-            &h.env,
-            CombatIntent { shoot: true, ..CombatIntent::default() },
-        );
-
-        let ammo_now = h.world.get_entity(pid).unwrap().get_component::<Combatant>().unwrap().active().ammo;
-        assert_eq!(ammo_now, ammo_before - 1, "开火应消耗一发弹药");
-
-        let ai_hp = h.world.get_entity(aid).unwrap().hp;
-        assert!(ai_hp < 80.0, "命中应使 AI 掉血，实际 {ai_hp}");
-
-        let events = h.system.drain_events();
-        assert!(events.iter().any(|e| matches!(e, CombatEvent::Hit { .. })), "应有命中事件");
-    }
-
-    /// 训练靶：开火命中靶机 → 消耗弹药、出命中事件、计分 +1，且靶机不致死。
-    #[test]
-    fn fire_hits_training_target() {
-        let mut h = CombatHarness::new();
-        let pid = spawn_player(&mut h.world, Vec3::default(), 0);
-        // 玩家朝向 +Z（默认 yaw=0），靶放在正前方 8m
-        let tid = super::range::spawn_target(&mut h.world, Vec3::new(0.0, 1.5, 8.0), "近距靶", None);
-
-        let ammo_before = h.world.get_entity(pid).unwrap().get_component::<Combatant>().unwrap().active().ammo;
-        h.system.apply_input(
-            &mut h.world,
-            &h.resolver,
-            pid,
-            0.016,
-            &h.env,
-            CombatIntent { shoot: true, ..CombatIntent::default() },
-        );
-
-        let ammo_now = h.world.get_entity(pid).unwrap().get_component::<Combatant>().unwrap().active().ammo;
-        assert_eq!(ammo_now, ammo_before - 1, "射靶也应消耗一发弹药");
-
-        let events = h.system.drain_events();
-        assert!(
-            events.iter().any(|e| matches!(e, CombatEvent::Hit { source, .. } if *source == pid.as_u64())),
-            "应有以玩家为 source 的命中事件"
-        );
-
-        let target = h.world.get_entity(tid).unwrap();
-        assert_eq!(target.get_component::<super::range::RangeTarget>().unwrap().hits, 1, "命中应计分置 1");
-        assert!(target.is_alive, "靶机命中后仍须存活");
-        assert!(target.hp == f32::MAX, "靶机血量不应被真实结算扣减");
-    }
-
-    /// 玩家连续开火直至击杀：AI 死亡、出 Kill 事件、尸体被回收。
-    #[test]
-    fn fire_kills_and_recycles() {
-        let mut h = CombatHarness::new();
-        let pid = spawn_player(&mut h.world, Vec3::default(), 0);
-        let aid = h.spawn_ai(Vec3::new(0.0, 0.0, 8.0));
-
-        for _ in 0..30 {
-            if let Some(cb) = h.world.get_entity_mut(pid).and_then(|e| e.get_component_mut::<Combatant>()) {
-                cb.shoot_cooldown = 0.0; // 测试里手动碾平冷却以便连发
-            }
-            h.system.apply_input(
-                &mut h.world,
-                &h.resolver,
-                pid,
-                0.016,
-                &h.env,
-                CombatIntent { shoot: true, ..CombatIntent::default() },
-            );
-        }
-
-        let events = h.system.drain_events();
-        assert!(
-            events.iter().any(|e| matches!(e, CombatEvent::Kill { killer, victim } if *killer == pid.as_u64() && *victim == aid.as_u64())),
-            "应产生含玩家与 AI 的击杀事件"
-        );
-        let alive = h.world.get_entity(aid).map(|e| e.is_alive).unwrap_or(false);
-        assert!(!alive, "AI 不应存活");
-    }
-
-    /// 技能冷却：Q 手雷触发后 CD 置位，同帧再次 Q 不再生成第二颗手雷。
-    #[test]
-    fn skill_cooldown_gates_spawn() {
-        let mut h = CombatHarness::new();
-        let pid = spawn_player(&mut h.world, Vec3::default(), 0); // 焰狐 Q=爆燃弹 Grenade
-
-        let skill = CombatIntent { skill_q: true, ..CombatIntent::default() };
-        h.system.apply_input(&mut h.world, &h.resolver, pid, 0.016, &h.env, skill);
-
-        let cd = h.world.get_entity(pid).unwrap().get_component::<Combatant>().unwrap().skill_q_cd;
-        assert!(cd > 0.0, "施放后 Q 应进入冷却");
-
-        let grenades_before = count_grenades(&h.world);
-        h.system.apply_input(&mut h.world, &h.resolver, pid, 0.016, &h.env, skill);
-        assert_eq!(grenades_before, count_grenades(&h.world), "冷却中的技能不应重复生效");
-        assert!(grenades_before >= 1, "Q 手雷应被生成");
-    }
-
-    /// E 技能范围爆发：附近 AI 受范围伤害。
-    #[test]
-    fn burst_damages_area() {
-        let mut h = CombatHarness::new();
-        let pid = spawn_player(&mut h.world, Vec3::default(), 0); // 焰狐 E=焦土爆发 Burst
-        let near = h.spawn_ai(Vec3::new(0.0, 0.0, 2.0));
-
-        h.system.apply_input(
-            &mut h.world,
-            &h.resolver,
-            pid,
-            0.016,
-            &h.env,
-            CombatIntent { skill_e: true, ..CombatIntent::default() },
-        );
-
-        let hp = h.world.get_entity(near).unwrap().hp;
-        assert!(hp < 80.0, "范围爆发应伤及圈内 AI，实际 {hp}");
-    }
-
-    /// 毒区：周期结算后圈内 AI 掉血、圈外不受影响、到期消散。
-    #[test]
-    fn zone_ticks_and_expires() {
-        let mut h = CombatHarness::new();
-        let inside = h.spawn_ai(Vec3::new(2.0, 0.0, 0.0)); // 圈内
-        let far = h.spawn_ai(Vec3::new(50.0, 0.0, 50.0));   // 圈外
-
-        super::zone::spawn_zone(&mut h.world, Vec3::default(), 6.0, 12.0, 0.5);
-
-        for _ in 0..120 {
-            h.system.tick_world(&mut h.world, &h.resolver, 1.0 / 60.0, &h.env);
-        }
-
-        let in_hp = h.world.get_entity(inside).map(|e| e.hp).expect("圈内 AI 仍在");
-        assert!(in_hp < 80.0, "毒区应让圈内 AI 掉血，实际 {in_hp}");
-        let far_hp = h.world.get_entity(far).unwrap().hp;
-        assert_eq!(far_hp, 80.0, "圈外 AI 不应受影响");
-
-        for _ in 0..360 {
-            h.system.tick_world(&mut h.world, &h.resolver, 1.0 / 60.0, &h.env);
-        }
-        let zone_gone = h.world
-            .get_all_entities()
-            .iter()
-            .all(|e| !e.has_component::<super::zone::ZoneState>());
-        assert!(zone_gone, "毒区到期应消散");
-    }
-
-    /// 背包内某速用类别的数量（3/4 号槽计数来源）。
-    fn category_count(world: &World, pid: EntityId, cat: ItemCategory) -> i32 {
-        world
-            .get_entity(pid)
-            .and_then(|e| e.get_component::<Backpack>())
-            .map(|bp| bp.count_category(cat))
-            .unwrap_or(0)
-    }
-
-    /// 背包内第一个属于 `cat` 类别的格位下标。
-    ///
-    /// 设计动机：速用测试要按"语义（哪个类别）"取格，而非硬编码下标——堆叠布局会随
-    /// 物品上限调整而变化（同类消耗品会并堆），硬编码下标极易随之失效。
-    fn first_slot_of(world: &World, pid: EntityId, cat: ItemCategory) -> Option<usize> {
-        world
-            .get_entity(pid)
-            .and_then(|e| e.get_component::<Backpack>())
-            .and_then(|bp| {
-                bp.slots
-                    .iter()
-                    .position(|s| s.as_ref().map(|it| it.kind.category()) == Some(Some(cat)))
-            })
-    }
-
-    /// 3 号消耗品（按格位）：开局医疗包回血并在用尽后清格，钳制到上限，空格不再生效。
-    #[test]
-    fn medkit_use_heals_and_consumes() {
-        let mut h = CombatHarness::new();
-        let pid = spawn_player(&mut h.world, Vec3::default(), 0);
-        h.world.get_entity_mut(pid).unwrap().hp = 20.0;
-        assert_eq!(category_count(&h.world, pid, ItemCategory::Consumable), 2, "开局应带 2 个恢复类");
-
-        let slot = first_slot_of(&h.world, pid, ItemCategory::Consumable).expect("应有恢复类格位");
-        h.system.apply_input(
-            &mut h.world,
-            &h.resolver,
-            pid,
-            0.016,
-            &h.env,
-            CombatIntent { use_slot: Some(slot as u8), ..CombatIntent::default() },
-        );
-        let e = h.world.get_entity(pid).unwrap();
-        assert!((e.hp - 70.0).abs() < 1e-3, "应回血一个医疗包量（开局医疗包 50），实际 {}", e.hp);
-        assert_eq!(category_count(&h.world, pid, ItemCategory::Consumable), 1, "背包计数应递减");
-
-        // 用尽剩余恢复类（同一格内的第二件）：血量钳制到上限，计数归零。
-        h.system.apply_input(
-            &mut h.world,
-            &h.resolver,
-            pid,
-            0.016,
-            &h.env,
-            CombatIntent { use_slot: Some(slot as u8), ..CombatIntent::default() },
-        );
-        // 再对已清空的格速用：应无任何反应、计数不为负。
-        h.system.apply_input(
-            &mut h.world,
-            &h.resolver,
-            pid,
-            0.016,
-            &h.env,
-            CombatIntent { use_slot: Some(slot as u8), ..CombatIntent::default() },
-        );
-        let e = h.world.get_entity(pid).unwrap();
-        assert!(e.hp <= e.max_hp + 1e-3, "回血不得越过上限，实际 {}", e.hp);
-        assert_eq!(category_count(&h.world, pid, ItemCategory::Consumable), 0, "背包不应为负");
-    }
-
-    /// 4 号消耗品（按格位）：开局手雷生成投射物并在用尽后清格，取尽后不再生成。
-    #[test]
-    fn grenade_use_throws_and_consumes() {
-        let mut h = CombatHarness::new();
-        let pid = spawn_player(&mut h.world, Vec3::default(), 0);
-        assert_eq!(category_count(&h.world, pid, ItemCategory::Tactical), 2, "开局应带 2 颗手雷");
-
-        let slot = first_slot_of(&h.world, pid, ItemCategory::Tactical).expect("应有手雷格位");
-        h.system.apply_input(
-            &mut h.world,
-            &h.resolver,
-            pid,
-            0.016,
-            &h.env,
-            CombatIntent { use_slot: Some(slot as u8), ..CombatIntent::default() },
-        );
-        assert_eq!(count_grenades(&h.world), 1, "应生成一颗手雷投射物");
-        assert_eq!(category_count(&h.world, pid, ItemCategory::Tactical), 1, "计数应递减");
-
-        // 用尽剩余手雷：恰好再生成 1 颗；再对已清空格速用不再有反应。
-        h.system.apply_input(
-            &mut h.world,
-            &h.resolver,
-            pid,
-            0.016,
-            &h.env,
-            CombatIntent { use_slot: Some(slot as u8), ..CombatIntent::default() },
-        );
-        h.system.apply_input(
-            &mut h.world,
-            &h.resolver,
-            pid,
-            0.016,
-            &h.env,
-            CombatIntent { use_slot: Some(slot as u8), ..CombatIntent::default() },
-        );
-        assert_eq!(count_grenades(&h.world), 2, "生成总数应恰好等于开局手雷数");
-        assert_eq!(category_count(&h.world, pid, ItemCategory::Tactical), 0, "背包不应为负");
-    }
-}
+mod tests;

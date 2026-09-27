@@ -51,6 +51,15 @@ pub fn build_snapshot(world: &World, seq: u64, observer: (f32, f32, f32)) -> Ser
                 }
                 _ => crate::model::ModelPreset::from_entity_type(e.entity_type),
             };
+            // 持握手雷：玩家处于"先瞄准后释放"的中间态时给出元素，客户端据此渲染持雷提示
+            // 与强制越肩；非玩家实体无此组件，恒为 None。
+            let held_grenade = e
+                .get_component::<crate::combat::HeldGrenade>()
+                .and_then(|h| h.item.as_ref())
+                .and_then(|it| match it.kind {
+                    crate::map::PickupKind::Grenade { element } => Some(element),
+                    _ => None,
+                });
             EntitySnapshot {
                 entity_id: e.id.as_u64(),
                 x: e.position.x,
@@ -76,6 +85,7 @@ pub fn build_snapshot(world: &World, seq: u64, observer: (f32, f32, f32)) -> Ser
                     .map(|it| it.info()),
                 backpack,
                 container,
+                held_grenade,
             }
         })
         .collect();
@@ -84,4 +94,52 @@ pub fn build_snapshot(world: &World, seq: u64, observer: (f32, f32, f32)) -> Ser
     entries.retain(|e| aoi::in_interest((e.x, e.y, e.z), observer, AOI_RADIUS));
 
     ServerMessage::Snapshot { seq, entries }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::combat;
+    use crate::element::ElementType;
+    use crate::entity::World;
+    use crate::items::{Backpack, ItemCategory};
+
+    /// 从快照里取某个实体的 `held_grenade`。
+    fn held_of(msg: &ServerMessage, id: u64) -> Option<ElementType> {
+        match msg {
+            ServerMessage::Snapshot { entries, .. } => {
+                entries.iter().find(|e| e.entity_id == id).and_then(|e| e.held_grenade)
+            }
+            _ => None,
+        }
+    }
+
+    /// 持雷是服务端权威：进入持握后快照带 `held_grenade` 元素，未持雷玩家恒为 `None`。
+    #[test]
+    fn snapshot_reports_held_grenade() {
+        let mut world = World::new();
+        let pid = combat::spawn_player(&mut world, crate::damage::Vec3::default(), 0);
+        let other = combat::spawn_player(&mut world, crate::damage::Vec3::default(), 1);
+
+        // 未持雷：两名玩家均 None。
+        let snap = build_snapshot(&world, 1, (0.0, 0.0, 0.0));
+        assert!(held_of(&snap, pid.as_u64()).is_none(), "未持雷时 held_grenade 应为 None");
+        assert!(held_of(&snap, other.as_u64()).is_none(), "另一玩家亦应为 None");
+
+        // 使用第一格手雷 → 进入持握 → 快照给出元素（开局手雷为火元素）。
+        let slot = world
+            .get_entity(pid)
+            .and_then(|e| e.get_component::<Backpack>())
+            .and_then(|bp| {
+                bp.slots
+                    .iter()
+                    .position(|s| s.as_ref().map(|it| it.kind.category()) == Some(Some(ItemCategory::Tactical)))
+            })
+            .expect("开局应携带手雷");
+        combat::use_item_at(&mut world, pid, slot);
+
+        let snap = build_snapshot(&world, 2, (0.0, 0.0, 0.0));
+        assert_eq!(held_of(&snap, pid.as_u64()), Some(ElementType::Fire), "持雷应上报元素");
+        assert!(held_of(&snap, other.as_u64()).is_none(), "未持雷玩家不受影响");
+    }
 }

@@ -27,11 +27,14 @@ pub fn input_system(
     out: Res<NetOut>,
     mut seq: ResMut<SeqCounter>,
     mut wheel: ResMut<ItemWheelState>,
+    held: Res<crate::hud::HeldGrenadeState>,
     mut last: Local<Option<PlayerInput>>,
 ) {
     // 径向轮盘打开期间冻结一切玩法意图（移动/开火/换弹/技能/切枪），但**保留视角朝向**——
     // 否则选格时鼠标位移会带着人物一起旋转。轮盘自身的选格由 `hud::item_wheel_input` 处理。
     let wheel_open = wheel.open;
+    // 持雷态（服务端权威下发）：决定左键语义是"投掷"还是"开火"，以及 Esc 是否上报取消。
+    let holding = held.element.is_some();
     let mut input = PlayerInput::default();
     input.move_forward = !wheel_open && keys.pressed(KeyCode::KeyW);
     input.move_backward = !wheel_open && keys.pressed(KeyCode::KeyS);
@@ -41,10 +44,19 @@ pub fn input_system(
     input.sprint = !wheel_open && keys.pressed(KeyCode::ControlLeft);
     // 跳跃（持续量，服务端仅在着地时消费一次）：报"按住 Space"意图，起跳/重力全在服务端结算。
     input.jump = !wheel_open && keys.pressed(KeyCode::Space);
-    // 越肩瞄准（按住右键）：既是相机取景切换，也是"压低移速换精度"的权威意图。
-    input.aim = !wheel_open && mouse.pressed(MouseButton::Right);
-    // 战斗意图：扳机为持续量（按住连发由服务端冷却节拍），换弹/技能为边沿量（按下即脉冲）。
-    input.shoot = !wheel_open && mouse.pressed(MouseButton::Left);
+    // 越肩瞄准：单一来源取 [`AimRig::aiming`]（由 `mouse_look_system` 写右键、`sync_grenade_aim`
+    // 叠加持雷态），保证"相机怎么取景就怎么上报"，消除表现与意图不一致。
+    input.aim = !wheel_open && rig.aiming;
+    // 战斗意图：常态扳机为持续量（按住连发由服务端冷却节拍）；**持雷时左键改为单帧脉冲**——
+    // 投出一颗后立即回到"空手"，若仍用持续量，投掷落地的同帧又会被服务端当成射击意图。
+    input.shoot = !wheel_open
+        && if holding {
+            mouse.just_pressed(MouseButton::Left)
+        } else {
+            mouse.pressed(MouseButton::Left)
+        };
+    // 取消持雷（边沿量）：Esc 按下瞬间上报一次，服务端把手雷原样放回背包（不消耗）。
+    input.grenade_cancel = !wheel_open && holding && keys.just_pressed(KeyCode::Escape);
     input.reload = !wheel_open && keys.just_pressed(KeyCode::KeyR);
     input.skill_q = !wheel_open && keys.just_pressed(KeyCode::KeyQ);
     input.skill_e = !wheel_open && keys.just_pressed(KeyCode::KeyE);

@@ -10,6 +10,21 @@ use crate::entity::{Component, Entity, EntityId, EntityType, World};
 use crate::operator::SkillEffect;
 use std::any::Any;
 
+/// 投掷水平初速（m/s）：客户端轨迹预览须与此**同源**，否则预览与实际弹道不一致。
+pub const THROW_SPEED: f32 = 12.0;
+/// 投掷竖直初速（m/s）：固定抬升分量（当前弹道不随俯仰角变化）。
+pub const THROW_UP: f32 = 6.0;
+/// 手雷重力加速度（m/s²）：飞行期间每 Tick 从竖直速度扣减。
+pub const GRAVITY: f32 = 12.0;
+/// 引信时长（秒）：超时无论是否落地都引爆。
+pub const FUSE_SECS: f32 = 1.5;
+/// 落地判定高度（米）：投射物中心低于此值即视为触地引爆。
+pub const GROUND_Y: f32 = 0.15;
+/// 出手点相对玩家脚底的高度（米）。
+pub const SPAWN_HEIGHT: f32 = 2.5;
+/// 出手点沿朝向前移的距离（米）。
+pub const SPAWN_FWD: f32 = 0.5;
+
 /// 飞行中手雷（组件）：携带速度、元素、伤害、半径与附加机制
 pub struct GrenadeState {
     pub velocity: Vec3,
@@ -71,18 +86,18 @@ pub fn spawn_projectile(
 ) {
     let fwd = Vec3::new(yaw.sin(), 0.0, yaw.cos());
     let mut entity = Entity::new_grenade(0, Vec3::new(
-        origin.x + fwd.x * 0.5,
-        origin.y + 2.5,
-        origin.z + fwd.z * 0.5,
+        origin.x + fwd.x * SPAWN_FWD,
+        origin.y + SPAWN_HEIGHT,
+        origin.z + fwd.z * SPAWN_FWD,
     ));
     entity.entity_type = EntityType::Grenade;
     entity.add_component(Box::new(GrenadeState {
-        velocity: Vec3::new(fwd.x * 12.0, 6.0, fwd.z * 12.0),
+        velocity: Vec3::new(fwd.x * THROW_SPEED, THROW_UP, fwd.z * THROW_SPEED),
         element,
         damage,
         radius,
         effect,
-        timer: 1.5,
+        timer: FUSE_SECS,
     }));
     world.spawn(entity);
 }
@@ -95,31 +110,34 @@ pub fn tick_grenades(
     events: &mut Vec<CombatEvent>,
     dt: f32,
 ) {
-    // 阶段1：只读积分，收集每个手雷的下一帧位姿与是否引爆
-    let mut plan: Vec<(EntityId, Vec3, Option<Vec3>)> = Vec::new();
+    // 阶段1：只读积分，收集每个手雷的下一帧位姿（位置 + **更新后的速度与剩余引信**）与是否引爆
+    let mut plan: Vec<(EntityId, Vec3, Vec3, f32, Option<Vec3>)> = Vec::new();
     for entity in world.get_all_entities() {
         if entity.entity_type != EntityType::Grenade {
             continue;
         }
         let Some(g) = entity.get_component::<GrenadeState>() else { continue };
+        // 重力必须**累积写回**组件：只在局部副本上扣减而不落盘，会让每 Tick 都从初速
+        // 重新起步、竖直速度恒定不衰减 → 手雷走直线（实测"投掷物为直线，无视了重力"）。
         let mut vel = g.velocity;
-        vel.y -= 12.0 * dt;
+        vel.y -= GRAVITY * dt;
         let pos = Vec3::new(
             entity.position.x + vel.x * dt,
             entity.position.y + vel.y * dt,
             entity.position.z + vel.z * dt,
         );
+        let timer_left = g.timer - dt;
         let mut impact: Option<Vec3> = None;
-        if pos.y <= 0.15 {
-            impact = Some(Vec3::new(pos.x, 0.15, pos.z));
-        } else if g.timer - dt <= 0.0 {
+        if pos.y <= GROUND_Y {
+            impact = Some(Vec3::new(pos.x, GROUND_Y, pos.z));
+        } else if timer_left <= 0.0 {
             impact = Some(pos);
         }
-        plan.push((entity.id, pos, impact));
+        plan.push((entity.id, pos, vel, timer_left, impact));
     }
-    // 阶段2：应用——引爆结算或推进位置
+    // 阶段2：应用——引爆结算或推进位置并写回速度/引信
     let mut to_despawn: Vec<EntityId> = Vec::new();
-    for (id, pos, impact) in plan {
+    for (id, pos, vel, timer_left, impact) in plan {
         if let Some(spot) = impact {
             if let Some(g) = world.get_entity(id).and_then(|e| e.get_component::<GrenadeState>()) {
                 let effect = g.effect;
@@ -128,6 +146,10 @@ pub fn tick_grenades(
             to_despawn.push(id);
         } else if let Some(e) = world.get_entity_mut(id) {
             e.position = pos;
+            if let Some(g) = e.get_component_mut::<GrenadeState>() {
+                g.velocity = vel;
+                g.timer = timer_left;
+            }
         }
     }
     for id in to_despawn {

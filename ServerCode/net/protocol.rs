@@ -61,6 +61,10 @@ pub struct EntitySnapshot {
     pub backpack: Option<Vec<Option<LootItem>>>,
     /// 场景物资箱的 4×3 容器格位内容（`None` = 非物资箱实体）。逐格转移面板的左侧来源。
     pub container: Option<Vec<Option<LootItem>>>,
+    /// 玩家当前**持握手雷**的元素（`Some` = 处于"先瞄准后释放"的持握态；`None` = 未持雷）。
+    /// 客户端据此渲染持雷提示与强制越肩视角——"手雷是否在手、是哪一颗"由服务端裁决。
+    #[serde(default)]
+    pub held_grenade: Option<ElementType>,
 }
 
 /// 客户端→服务端的玩家意图输入。
@@ -102,6 +106,10 @@ pub struct PlayerInput {
     /// 短按 3/4 = 该类首格的背包下标；长按径向轮盘 = 轮盘选中格的下标。
     /// "这一格是什么、用了要扣多少/回多少血"均由服务端按格位内容裁决。
     pub use_slot: Option<u8>,
+    /// 取消持握中的手雷（边沿量，服务端锁存消费一次）：手雷原样放回背包、不消耗。
+    /// 对应"先瞄准后释放"流程中的 Esc 退出；未持雷时为无操作。
+    #[serde(default)]
+    pub grenade_cancel: bool,
 }
 
 /// 客户端→服务端上行消息。
@@ -213,6 +221,7 @@ impl EntitySnapshot {
             interact: None,
             backpack: None,
             container: None,
+            held_grenade: None,
         }
     }
 }

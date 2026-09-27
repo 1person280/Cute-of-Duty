@@ -4,8 +4,10 @@
 //! 判定由服务端权威，本模块只按快照 model_preset 选体素网格、按稳定色板上材质。
 
 pub(crate) mod camera;
+pub(crate) mod grenade_preview;
 pub(crate) mod model;
 pub(crate) mod world_scene;
 
-pub(crate) use camera::{follow_system, mouse_look_system, spawn_camera};
+pub(crate) use camera::{follow_system, mouse_look_system, spawn_camera, sync_grenade_aim};
+pub(crate) use grenade_preview::draw_grenade_preview;
 pub(crate) use world_scene::spawn_world;

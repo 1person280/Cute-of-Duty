@@ -228,6 +228,7 @@ pub fn item_wheel_input(
     interact: Res<crate::hud::InteractState>,
     loot: Res<crate::hud::LootPanelState>,
     backpack: Res<crate::hud::BackpackPanelState>,
+    button: Res<crate::hud::ButtonPanelState>,
     mut announces: ResMut<Announcements>,
     mut state: ResMut<ItemWheelState>,
 ) {
@@ -238,7 +239,8 @@ pub fn item_wheel_input(
         || bigmap.0
         || interact.panel_open
         || loot.open
-        || backpack.open;
+        || backpack.open
+        || button.open;
 
     // —— 松开优先结算：本次按键会话的唯一出口，不受任何模态门控影响 ——
     if let Some(key) = state.held_key {

@@ -56,6 +56,10 @@ pub fn run(addr: &str) {
         .init_resource::<crate::hud::LootPanelState>()
         // 背包总览（Tab）门控资源常驻（默认关；`gameplay_input_active` 与光标锁定读其 open）。
         .init_resource::<crate::hud::BackpackPanelState>()
+        // 持雷派生资源常驻（默认未持雷；相机越肩/上行左键语义/Esc 门控共读）。
+        .init_resource::<crate::hud::HeldGrenadeState>()
+        // 可点击操作按钮组门控资源常驻（默认关；`gameplay_input_active` 与光标锁定读其 open）。
+        .init_resource::<crate::hud::ButtonPanelState>()
         // 「无 UI 时释放鼠标」软开关（Esc 主动交还光标；默认锁定）。
         .init_resource::<crate::menu::CursorReleased>()
         .init_state::<AppState>()
@@ -82,7 +86,13 @@ pub fn run(addr: &str) {
             (
                 crate::net::receive_snapshots,
                 crate::net::apply_entities,
+                // 持雷态同步须先于视角/相机/上行：三处都要读同一份结论。
+                crate::hud::sync_held_grenade,
                 crate::world::mouse_look_system.run_if(crate::hud::gameplay_input_active),
+                // 持雷强制越肩：紧随鼠标视角之后叠加（`AimRig::aiming` 单点写入）。
+                crate::world::sync_grenade_aim,
+                // 投掷轨迹预览：读同一份持雷态与朝向，用与服务器同源的弹道常数画预测抛物线。
+                crate::world::draw_grenade_preview,
                 crate::world::follow_system.run_if(crate::menu::pause_closed),
                 crate::flow::route_control_messages,
                 crate::shared::refresh_ui_ready,
@@ -130,6 +140,8 @@ pub fn run(addr: &str) {
                 crate::hud::reset_item_wheel,
                 crate::hud::reset_loot_panel,
                 crate::hud::reset_backpack_panel,
+                crate::hud::reset_held_grenade,
+                crate::hud::reset_button_panel,
             ),
         )
         .add_systems(
@@ -148,6 +160,8 @@ pub fn run(addr: &str) {
                     crate::hud::extract_interaction,
                     // 背包总览开关（Tab）：紧随其它模态开关之后，同帧生效的门控立即冻结下方输入。
                     crate::hud::backpack_toggle,
+                    // 操作按钮组开关（B）：同帧生效的门控立即冻结下方玩法输入。
+                    crate::hud::button_panel_toggle,
                     // 交互链：刷附近目标 → 轮盘/物资箱输入 → F/滚轮/点击输入 → 点击选项 → 上报 → 重建。
                     // 注意：交互输入本身**不**受 `gameplay_input_active` 门控（面板打开时
                     // 正是它负责响应选择/关闭），仅下游玩法输入（移动/开火/切枪）被面板状态冻结。
@@ -160,6 +174,9 @@ pub fn run(addr: &str) {
                     crate::hud::loot_panel_drag,
                     // 背包面板：R 使用悬停格物品（直接上报 use_slot 意图，服务端裁决）。
                     crate::hud::backpack_use_hovered,
+                    // 操作按钮组：处理点击 → 合成并上报一条 `PlayerInput`（不受 gameplay 门控）。
+                    crate::hud::button_panel_click,
+                    crate::hud::button_panel_emit,
                     crate::hud::interact_input,
                     crate::hud::interact_menu_click,
                     crate::hud::interact_commit,
@@ -181,6 +198,7 @@ pub fn run(addr: &str) {
                     crate::hud::update_item_wheel,
                     crate::hud::sync_loot_panel,
                     crate::hud::sync_backpack_panel,
+                    crate::hud::sync_button_panel,
                     // 玩法意图输入在暂停/全景图/交互二级面板/物资箱面板/径向轮盘打开时冻结。
                     crate::net::input_system.run_if(crate::hud::gameplay_input_active),
                 )

@@ -317,6 +317,7 @@ pub fn cursor_lock_system(
     interact: Res<crate::hud::InteractState>,
     loot: Res<crate::hud::LootPanelState>,
     backpack: Res<crate::hud::BackpackPanelState>,
+    button: Res<crate::hud::ButtonPanelState>,
     released: Res<CursorReleased>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
 ) {
@@ -326,6 +327,7 @@ pub fn cursor_lock_system(
         && !interact.panel_open
         && !loot.open
         && !backpack.open
+        && !button.open
         && !released.0;
     for mut window in &mut windows {
         let grab = if lock { CursorGrabMode::Locked } else { CursorGrabMode::None };
@@ -355,16 +357,22 @@ pub fn cursor_release_toggle(
     interact: Res<crate::hud::InteractState>,
     loot: Res<crate::hud::LootPanelState>,
     backpack: Res<crate::hud::BackpackPanelState>,
+    button: Res<crate::hud::ButtonPanelState>,
+    held: Res<crate::hud::HeldGrenadeState>,
     mut released: ResMut<CursorReleased>,
 ) {
     if !keys.just_pressed(KeyCode::Escape) {
         return;
     }
+    // 持雷时 Esc 的语义是"取消投掷"（`net::input_system` 上报 `grenade_cancel`），
+    // 不得被本软开关抢走，否则一次 Esc 既取消持雷又弹出光标，手感割裂。
     let any_ui = *pause != PauseMenu::Closed
         || open.0
         || interact.panel_open
         || loot.open
-        || backpack.open;
+        || backpack.open
+        || button.open
+        || held.element.is_some();
     if any_ui {
         return;
     }

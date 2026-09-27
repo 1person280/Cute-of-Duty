@@ -332,11 +332,15 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
 }
 
 /// 运行条件：游玩输入可用 = 未暂停 **且** 全景图未打开 **且** 交互二级面板/物资箱面板/径向轮盘/
-/// 背包面板均未打开。
+/// 背包面板/按钮面板均未打开 **且** 未按 Esc 主动交还光标。
 ///
-/// 把五个模态门控合成单一条件，避免在 `run_if` 处用 `Condition::and` 组合（bevy 0.14 的
+/// 把六个模态门控合成单一条件，避免在 `run_if` 处用 `Condition::and` 组合（bevy 0.14 的
 /// `Condition` 组合器不在 prelude，直接在函数项上调用 `.and` 无法解析）。
 /// 注意：**就近交互列表本身不冻结输入**——它是常显的提示性列表，玩家可边跑边看（对齐 legacy）。
+///
+/// `CursorReleased`（Esc「无 UI 时释放鼠标」）必须计入：光标交还后鼠标事件是给 UI 的，
+/// 若仍跑 [`crate::world::mouse_look_system`]，移动鼠标会带着视角乱转（实测反馈
+/// "释放鼠标会移动视角"）。
 pub fn gameplay_input_active(
     pause: Res<crate::menu::PauseMenu>,
     open: Res<BigMapOpen>,
@@ -344,6 +348,8 @@ pub fn gameplay_input_active(
     loot: Res<crate::hud::LootPanelState>,
     wheel: Res<crate::hud::ItemWheelState>,
     backpack: Res<crate::hud::BackpackPanelState>,
+    button: Res<crate::hud::ButtonPanelState>,
+    released: Res<crate::menu::CursorReleased>,
 ) -> bool {
     *pause == crate::menu::PauseMenu::Closed
         && !open.0
@@ -351,6 +357,8 @@ pub fn gameplay_input_active(
         && !loot.open
         && !wheel.open
         && !backpack.open
+        && !button.open
+        && !released.0
 }
 
 /// 离开训练场时复位全景图门控（否则下次进场会带着"已打开"状态冻结输入）。

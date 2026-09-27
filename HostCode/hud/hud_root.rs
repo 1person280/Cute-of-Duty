@@ -50,12 +50,16 @@ pub fn spawn_hud(mut commands: Commands, fonts: Res<CjkFont>, kills: Res<KillCou
             super::hud_crosshair::spawn_crosshair(p);
             super::hud_kill_counter::spawn_kill_counter(p, &fonts, &kills);
             spawn_extract_label(p, &fonts);
+            // 持雷提示（按本人快照 `held_grenade` 派生显隐，默认隐藏）。
+            super::hud_grenade_hint::spawn_grenade_hint(p, &fonts);
             // 交互提示 + 交互菜单（二级选项面板自带整屏遮罩，故置后生成以压住常规 HUD）。
             super::hud_interact::spawn_interact_ui(p, &fonts);
             // 模态覆盖层：消耗品径向轮盘 + 物资箱双向 4×3 格位面板 + 背包总览（Tab）。
             super::hud_item_wheel::spawn_item_wheel(p, &fonts);
             super::hud_loot_panel::spawn_loot_panel(p, &fonts);
             super::hud_backpack_panel::spawn_backpack_panel(p, &fonts);
+            // 可点击操作按钮组（B 开关的模态面板）。
+            super::hud_button_panel::spawn_button_panel(p, &fonts);
             // 低血告警层：压在所有常规 HUD 之上，但在全景图之下。
             super::hud_alert::spawn_alert_overlay(p);
             // 战术全景图覆盖层最后生成（同层内后者在上），确保展开时压住所有 HUD 元素。

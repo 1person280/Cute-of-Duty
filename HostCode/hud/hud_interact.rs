@@ -342,6 +342,7 @@ pub fn interact_input(
     mut state: ResMut<InteractState>,
     mut loot: ResMut<LootPanelState>,
     wheel_state: Res<ItemWheelState>,
+    button: Res<crate::hud::ButtonPanelState>,
 ) {
     // 滚轮累计（一次事件批可能多帧滚动）。先读完事件，避免让位时把事件留在队列里。
     let scroll: f32 = wheel.read().map(|e| e.y).sum();
@@ -353,7 +354,8 @@ pub fn interact_input(
         return;
     }
 
-    if loot.open || wheel_state.open {
+    // 按钮面板打开时让位（其 Esc 由 `button_panel_toggle` 优先消费，此处不再重复处理）。
+    if loot.open || wheel_state.open || button.open {
         return;
     }
 

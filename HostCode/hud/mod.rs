@@ -6,7 +6,9 @@
 pub(crate) mod hud_alert;
 pub(crate) mod hud_backpack_panel;
 pub(crate) mod hud_bigmap;
+pub(crate) mod hud_button_panel;
 pub(crate) mod hud_crosshair;
+pub(crate) mod hud_grenade_hint;
 pub(crate) mod hud_interact;
 pub(crate) mod hud_interact_panel;
 pub(crate) mod hud_item_wheel;
@@ -20,13 +22,20 @@ pub(crate) mod hud_vitals;
 pub(crate) use hud_alert::update_alert;
 pub(crate) use hud_backpack_panel::{
     backpack_toggle, backpack_use_hovered, reset_backpack_panel, sync_backpack_panel,
-    BackpackPanelState,
+    BackpackPanelRoot, BackpackPanelState,
 };
 pub(crate) use hud_bigmap::{
-    bigmap_toggle, gameplay_input_active, reset_bigmap, update_bigmap, BigMapOpen,
+    bigmap_toggle, gameplay_input_active, reset_bigmap, update_bigmap, BigMapOpen, BigMapRoot,
+};
+pub(crate) use hud_button_panel::{
+    button_panel_click, button_panel_emit, button_panel_toggle, reset_button_panel,
+    sync_button_panel, ButtonPanelState,
 };
 pub(crate) use hud_root::{extract_interaction, spawn_hud, update_extract};
 pub(crate) use hud_crosshair::update_crosshair;
+pub(crate) use hud_grenade_hint::{
+    reset_held_grenade, sync_held_grenade, HeldGrenadeState,
+};
 pub(crate) use hud_interact::{
     interact_commit, interact_input, interact_menu_click, reset_interact,
     update_interact_entries, InteractState,
