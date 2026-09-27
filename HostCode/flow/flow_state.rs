@@ -30,7 +30,7 @@ pub enum AppState {
     InGame,
 }
 
-/// 中文字体资源（`simhei.ttf` 以 include_bytes 内嵌，注册进 `Assets<Font>`）。
+/// 中文字体资源（`zcool_kuaile.ttf` 以 include_bytes 内嵌，注册进 `Assets<Font>`）。
 #[derive(Resource, Default)]
 pub struct CjkFont(pub Option<Handle<Font>>);
 
@@ -94,7 +94,7 @@ pub struct SeqCounter(pub u64);
 
 /// 初始化全局资源与中文字体（Startup；UI 系统在句柄就绪前会自担跳过本帧）。
 pub fn setup_global(mut commands: Commands, mut fonts: ResMut<Assets<Font>>) {
-    if let Ok(font) = Font::try_from_bytes(include_bytes!("../assets/simhei.ttf").to_vec()) {
+    if let Ok(font) = Font::try_from_bytes(include_bytes!("../assets/zcool_kuaile.ttf").to_vec()) {
         commands.insert_resource(CjkFont(Some(fonts.add(font))));
     }
     commands.insert_resource(LocalPlayer::default());
