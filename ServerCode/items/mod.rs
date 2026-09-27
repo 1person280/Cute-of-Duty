@@ -291,20 +291,32 @@ pub fn transfer(
     }
 }
 
-/// 物资箱战利品掉落池（对齐 legacy `supply_crate` 的 12 项候选）。
-const POOL: [fn() -> LootItem; 12] = [
+/// 物资箱战利品掉落池（对齐 legacy `supply_crate` 的候选项，并扩充物品种类）。
+///
+/// 设计动机（Why）：反馈"物品种类太少"的落点就在这张表——它是场景战利品的**唯一来源**，
+/// 扩充此处即可让每个箱子的 4×3 内容更有变化，且不改任何协议（[`PickupKind`] 语义未变）。
+/// 六种元素的手雷与步枪各占一项，另加弹药/医疗/护甲档位，兼顾"火力补充"与"元素收集"。
+const POOL: [fn() -> LootItem; 20] = [
+    || LootItem::new("步枪弹药 ×30", PickupKind::Ammo { amount: 30 }),
     || LootItem::new("步枪弹药 ×60", PickupKind::Ammo { amount: 60 }),
-    || LootItem::new("步枪弹药 ×60", PickupKind::Ammo { amount: 60 }),
-    || LootItem::new("医疗包", PickupKind::Health { amount: 25.0 }),
+    || LootItem::new("步枪弹药 ×90", PickupKind::Ammo { amount: 90 }),
     || LootItem::new("医疗包", PickupKind::Health { amount: 25.0 }),
     || LootItem::new("大型医疗包", PickupKind::Health { amount: 50.0 }),
+    || LootItem::new("急救包", PickupKind::Health { amount: 75.0 }),
     || LootItem::new("护甲片", PickupKind::Armor { amount: 20.0 }),
+    || LootItem::new("重型护甲板", PickupKind::Armor { amount: 50.0 }),
     || LootItem::new("烈焰手雷", PickupKind::Grenade { element: ElementType::Fire }),
     || LootItem::new("冰霜手雷", PickupKind::Grenade { element: ElementType::Ice }),
     || LootItem::new("雷电手雷", PickupKind::Grenade { element: ElementType::Electric }),
     || LootItem::new("毒素手雷", PickupKind::Grenade { element: ElementType::Poison }),
+    || LootItem::new("破片手雷", PickupKind::Grenade { element: ElementType::Physical }),
+    || LootItem::new("水压手雷", PickupKind::Grenade { element: ElementType::Water }),
     || LootItem::new("烈焰步枪", PickupKind::Weapon { element: ElementType::Fire }),
     || LootItem::new("冰霜步枪", PickupKind::Weapon { element: ElementType::Ice }),
+    || LootItem::new("雷电步枪", PickupKind::Weapon { element: ElementType::Electric }),
+    || LootItem::new("毒素步枪", PickupKind::Weapon { element: ElementType::Poison }),
+    || LootItem::new("制式步枪", PickupKind::Weapon { element: ElementType::Physical }),
+    || LootItem::new("潮汐步枪", PickupKind::Weapon { element: ElementType::Water }),
 ];
 
 /// 取掉落池第 `i` 项并克隆为一件物品。

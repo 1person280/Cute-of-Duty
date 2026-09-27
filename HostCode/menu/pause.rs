@@ -300,16 +300,28 @@ pub fn pause_menu_interaction(
 }
 
 /// 游戏内锁定鼠标（隐藏光标并锁定到窗口中心，供 [`crate::world::mouse_look_system`]
-/// 读鼠标位移做自由视角）；暂停浮层或主菜单打开时释放，让光标回到可点按状态。
+/// 读鼠标位移做自由视角）；主菜单、暂停浮层，或**任一指针型面板**打开时释放光标，
+/// 让光标回到可悬停/可拖拽状态。
 ///
-/// 设计动机（Why）：鼠标锁定是「游戏内输入模态」的表现层开关，与暂停同属一套门控
-/// —— 因此放在本模块，随 `pause_closed` 一并翻转，避免散落到相机系统里重复判态。
+/// 设计动机（Why）：鼠标锁定是「游戏内输入模态」的表现层开关。而 4×3 格位面板（物资箱/补给台）、
+/// 交互二级选项面板、战术大地图都是**依赖指针悬停/点击**的 UI——若仍锁死光标，bevy 的
+/// `ui_focus_system` 只会在窗口中心命中节点，玩家既无法拖拽格位、也点不到选项（实测反馈
+/// "没有呼出鼠标让我拖拽"）。故这四类面板打开时一律释放光标。三者本就把 `gameplay_input_active`
+/// 置假（相机不再跟随鼠标），释放光标不会引起视角乱转。
+/// 注意：**径向轮盘除外**——它靠鼠标**位移**而非指针位置选格，保持锁定更符合 legacy 手感。
 pub fn cursor_lock_system(
     state: Res<State<AppState>>,
     pause: Res<PauseMenu>,
+    bigmap: Res<crate::hud::BigMapOpen>,
+    interact: Res<crate::hud::InteractState>,
+    loot: Res<crate::hud::LootPanelState>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
 ) {
-    let lock = *state.get() == AppState::InGame && *pause == PauseMenu::Closed;
+    let lock = *state.get() == AppState::InGame
+        && *pause == PauseMenu::Closed
+        && !bigmap.0
+        && !interact.panel_open
+        && !loot.open;
     for mut window in &mut windows {
         let grab = if lock { CursorGrabMode::Locked } else { CursorGrabMode::None };
         if window.cursor.grab_mode != grab {

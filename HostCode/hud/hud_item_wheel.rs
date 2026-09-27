@@ -17,7 +17,7 @@ use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 use cute_of_duty_server::items::ItemCategory;
 
-use crate::flow::flow_state::{self as flow, CjkFont, LocalPlayer};
+use crate::flow::flow_state::{self as flow, Announcements, CjkFont, LocalPlayer};
 use crate::net::snapshot::SnapshotBuffer;
 use crate::shared::theme;
 
@@ -69,6 +69,25 @@ impl Default for ItemWheelState {
             cursor: Vec2::ZERO,
             pending_slot: None,
         }
+    }
+}
+
+impl ItemWheelState {
+    /// 复位本次按键会话，但**保留尚未上报的 `pending_slot`**。
+    ///
+    /// 设计动机（Why）：`pending_slot` 是"已决定用哪一格、待 `net::input_system` 取走上报"
+    /// 的边沿量。会话结束时若用 [`Default`] 整体覆盖，会把刚写入的 `pending_slot` 一并抹成
+    /// `None`——服务端因此永远收不到使用意图，表现为"左上角提示已出、但数量不减、无投掷"
+    /// （即 `3/4 计数不更新` 的根因）。故会话收尾一律走本方法，只清会话字段、不碰待上报量。
+    fn reset_session(&mut self) {
+        self.held_key = None;
+        self.held = 0.0;
+        self.open = false;
+        self.slots.clear();
+        self.labels.clear();
+        self.selected = 0;
+        self.cancel = false;
+        self.cursor = Vec2::ZERO;
     }
 }
 
@@ -191,8 +210,12 @@ pub fn spawn_item_wheel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
 
 /// 轮盘键鼠输入：长按呼出、方向选格、松开速用/取消；短按速用首件。
 ///
-/// 系统参数刻意包含各模态资源：其它模态打开时（暂停/全景图/交互面板/物资箱）忽略轮盘输入，
-/// 但若轮盘**已经**处于打开态则继续处理，避免中途弹窗导致轮盘卡在屏幕上。
+/// 门控修复（Why）：其它模态（暂停/全景图/交互二级面板/物资箱）打开时会夺走玩家的注意力与
+/// 鼠标，但**松开 3/4 的事件仍必须被结算**。此前实现把松开处理放在 `blocked` 提前返回之后，
+/// 一旦"按住 3/4 期间被模态打断"，松开事件被吞 → `held_key` 永久残留 → `held` 持续累积 →
+/// 轮盘在无按键时自发置真并卡死，`gameplay_input_active` 恒假（WASD/开火全灭，3/4 亦无响应）。
+/// 现改为：①**松开优先结算**（不受门控影响）；②被模态接管时整体丢弃本次会话；
+/// ③键已不再按住却仍在会话中（如失焦丢事件）时兜底复位。三条共同堵死残留路径。
 #[allow(clippy::too_many_arguments)]
 pub fn item_wheel_input(
     keys: Res<ButtonInput<KeyCode>>,
@@ -204,6 +227,7 @@ pub fn item_wheel_input(
     bigmap: Res<crate::hud::BigMapOpen>,
     interact: Res<crate::hud::InteractState>,
     loot: Res<crate::hud::LootPanelState>,
+    mut announces: ResMut<Announcements>,
     mut state: ResMut<ItemWheelState>,
 ) {
     // 先消费本帧鼠标事件（即使被门控丢弃），避免门控解除后第一帧突然跳到选。
@@ -213,17 +237,91 @@ pub fn item_wheel_input(
         || bigmap.0
         || interact.panel_open
         || loot.open;
-    if !state.open && blocked {
+
+    // —— 松开优先结算：本次按键会话的唯一出口，不受任何模态门控影响 ——
+    if let Some(key) = state.held_key {
+        let released = if key == 3 {
+            keys.just_released(KeyCode::Digit3)
+        } else {
+            keys.just_released(KeyCode::Digit4)
+        };
+        if released {
+            if state.open {
+                // 打开态：用选中格（中心死区则取消）。
+                if !state.cancel {
+                    if let Some(idx) = state.slots.get(state.selected).copied() {
+                        state.pending_slot = Some(idx as u8);
+                        announce_use(&mut announces, state.labels.get(state.selected));
+                    }
+                }
+            } else if !blocked {
+                // 短按速用首件；被模态打断时不结算（避免暂停中把药用了）。
+                let category = category_of(key);
+                let (slots, labels) = category_slots(&snap, &player, category);
+                match slots.first() {
+                    Some(idx) => {
+                        state.pending_slot = Some(*idx as u8);
+                        announce_use(&mut announces, labels.first());
+                    }
+                    // 该类别无物品时给出可见反馈（此前为静默，观感等同"无响应"）。
+                    None => announces.0.push(format!("{}：没有可用物品", category_name(key))),
+                }
+            }
+            state.reset_session();
+            return;
+        }
+        // 键已不再按住却仍在会话中（窗口失焦等导致松开事件丢失）：兜底复位。
+        let still_down = if key == 3 {
+            keys.pressed(KeyCode::Digit3)
+        } else {
+            keys.pressed(KeyCode::Digit4)
+        };
+        if !still_down {
+            state.reset_session();
+            return;
+        }
+    }
+
+    // 其它模态接管：整体丢弃本次会话（含已呼出的轮盘），不留任何残留。
+    if blocked {
+        if state.held_key.is_some() || state.open {
+            state.reset_session();
+        }
         return;
     }
 
     // 起始：按下 3 / 4 记录本次会话。
     if state.held_key.is_none() {
-        if keys.just_pressed(KeyCode::Digit3) {
-            state.held_key = Some(3);
-            state.held = 0.0;
+        let pressed = if keys.just_pressed(KeyCode::Digit3) {
+            Some(3u8)
         } else if keys.just_pressed(KeyCode::Digit4) {
-            state.held_key = Some(4);
+            Some(4u8)
+        } else {
+            None
+        };
+        if let Some(key) = pressed {
+            // 极短点按（按下与松开落在同一帧，如高刷新率下的一触）：本会话尚未来得及
+            // 建立就会被下一帧的"兜底复位"抹掉。此处在同一帧内直接按短按结算，避免丢按。
+            let same_frame_release = if key == 3 {
+                keys.just_released(KeyCode::Digit3)
+            } else {
+                keys.just_released(KeyCode::Digit4)
+            };
+            if same_frame_release {
+                let (slots, labels) = category_slots(&snap, &player, category_of(key));
+                match slots.first() {
+                    Some(idx) => {
+                        state.pending_slot = Some(*idx as u8);
+                        announce_use(&mut announces, labels.first());
+                    }
+                    None => announces
+                        .0
+                        .push(format!("{}：没有可用物品", category_name(key))),
+                }
+                state.reset_session();
+                return;
+            }
+            state.held_key = Some(key);
             state.held = 0.0;
         }
     }
@@ -232,11 +330,7 @@ pub fn item_wheel_input(
         return;
     };
     state.held += time.delta_seconds();
-    let category = if key == 3 {
-        ItemCategory::Consumable
-    } else {
-        ItemCategory::Tactical
-    };
+    let category = category_of(key);
 
     if state.open {
         // 打开中：累计方向 → 选扇区；靠中心 = 取消。
@@ -264,26 +358,30 @@ pub fn item_wheel_input(
         state.cancel = false;
         state.cursor = Vec2::ZERO;
     }
+}
 
-    // 松开：打开态 → 用选中格（中心死区则取消）；未打开 → 短按速用首件。
-    let released = if key == 3 {
-        keys.just_released(KeyCode::Digit3)
+/// 速用类别：3 = 恢复类、4 = 战术类。
+fn category_of(key: u8) -> ItemCategory {
+    if key == 3 {
+        ItemCategory::Consumable
     } else {
-        keys.just_released(KeyCode::Digit4)
-    };
-    if released {
-        if state.open {
-            if !state.cancel {
-                let picked = state.slots.get(state.selected).map(|i| *i as u8);
-                state.pending_slot = picked;
-            }
-        } else {
-            state.pending_slot = category_slots(&snap, &player, category)
-                .0
-                .first()
-                .map(|i| *i as u8);
-        }
-        *state = ItemWheelState::default();
+        ItemCategory::Tactical
+    }
+}
+
+/// 速用类别的中文名（用于无物品反馈文案）。
+fn category_name(key: u8) -> &'static str {
+    if key == 3 {
+        "恢复类(3)"
+    } else {
+        "战术类(4)"
+    }
+}
+
+/// 推送一条"使用物品"反馈（纯表现层提示；扣减与效果仍由服务端权威裁决）。
+fn announce_use(announces: &mut Announcements, label: Option<&String>) {
+    if let Some(label) = label {
+        announces.0.push(format!("使用 {label}"));
     }
 }
 
