@@ -5,22 +5,25 @@
 //! - 服务端是唯一真理源，客户端只发输入、只收服务端算好的结果（快照）；
 //! - `aoi` 兴趣区域剔除：每个客户端只收到其视野范围内的实体数据（根治 ESP 透视）。
 //!
-//! 线格式采用**统一固定 64KB 槽帧**（见 [`packet`]）：资源一资源一帧、控制指令
-//! （~256B）也打包进 64KB 帧，超长消息按 `continuation` 分片重组。客户端据此把资源帧
-//! 写入固定地址槽位池（见 HostCode `net::remote`），实体因 AOI 突现即复用、不等加载。
+//! 0.12 线格式为**小定长包 + 双通道**（见 [`packet`]）：
+//! - **主/控制通道**：每包恒定 256B = 32B 头 + 7×32B 单元，指令优先于数据组包（[`scheduler`]）；
+//! - **资源通道**：独立 TCP 连接，每包恒定 4096B，由 [`resource_stream`] 多次切片后落进客户端
+//!   64KB 固定槽位池（见 HostCode `net::remote`）。
+//!
+//! 两条通道同监听一个端口，按**首条绑定包**区分角色（见 [`session`]）。
 
-pub mod protocol;
 pub mod aoi;
 pub mod broadcaster;
+pub mod codec;
 pub mod packet;
 pub mod prefetch;
+pub mod protocol;
+pub mod resource_stream;
+pub mod scheduler;
 pub mod session;
 
 pub use broadcaster::build_snapshot;
-pub use packet::{
-    FrameHeader, FrameKind, FrameReader, FrameWriter, Region, ResourceKind, encode_client,
-    encode_server, decode_client, decode_server,
-};
+pub use packet::{Region, ResourceKind, ResourcePayload, Unit};
 pub use prefetch::predict_prefetch;
 pub use protocol::{ClientMessage, EntitySnapshot, PlayerInput, ServerMessage};
-pub use session::{NetCommand, NetRuntime, accept_loop};
+pub use session::{NetCommand, NetRuntime, ResourceJob, accept_loop};

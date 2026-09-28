@@ -9,6 +9,7 @@ pub(crate) mod latency;
 pub(crate) mod network;
 pub(crate) mod pilot;
 pub(crate) mod remote;
+pub(crate) mod resource_downlink;
 pub(crate) mod snapshot;
 pub(crate) mod uplink;
 

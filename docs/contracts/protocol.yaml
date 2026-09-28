@@ -17,50 +17,74 @@
 # =============================================================================
 
 contract: protocol
-version: 0.11.0
+version: 0.12.0
 status: draft
 owner_module: ServerCode/net
 authoritative_impl: ServerCode/net/protocol.rs
 compat:
-  previous: 0.10.0
+  previous: 0.11.0
   breaking: true
   migration_guide: |
-    NDJSON 行帧 → 统一固定 64KB 槽帧，**线格式不兼容**（老客户端与新服务端无法互通，反之亦然）。
+    统一 64KB 槽帧 → 小定长包 + 指令优先组包 + 双通道，**线格式不兼容**（老客户端与新服务端无法互通，反之亦然）。
     逐步迁移：
-      1. 服务端写侧：`session::write_loop` 由 `msg.to_line()` 改为 `packet::FrameWriter + encode_server`（一消息一/多帧，`ModelCatalog` 展开为"一资源一帧 + ResourceEnd"）；
-      2. 服务端读侧：`session::read_loop` 由 `read_line + from_line` 改为 `read_exact(64KB) + FrameReader + ChunkAssembler + decode_client`；
-      3. 客户端：拆 `downlink.rs`（下载线程）/`uplink.rs`（上传线程），各持 `try_clone` 独立句柄；下行按 `FrameKind` 分路（Resource→对象池、Snapshot→快照缓冲、Control/Event→控制通道）；
-      4. 客户端对象池：`HostCode/net/remote.rs` 固定 16MB（250 在用 + 6 预取，各 64KB 固定地址槽），资源按 `key` 落槽；`ModelCatalog` 由池增量解码而来；
-      5. 前后对照：老（`{"Snapshot":{...}}\n`）→ 新（64KB 定长帧，头 32B：magic/version/kind/flags/region/sub_kind/seq/key/payload_len，负载 JSON 或资源字节，尾部零填充）。
-    老端处置：老客户端连新服务端将无法解析（首帧魔数/长度不符即断），需同步升级到 0.11.0。
+      1. 服务端写侧：控制连接用 `scheduler::SendScheduler`（指令优先，每包 ≤7 个 32B 单元）逐包组包，
+         资源连接用 `resource_stream::encode_resource`（每包 4096B）分片；均经 `codec::encode_server/encode_client`；
+      2. 服务端读侧：`session` 由"一帧一消息"改为"同端口首条 256B 绑定包分角色"，控制连接恒 256B、
+         资源连接恒 4096B，分别用 `codec::units_from_payload + decode_client_units` 与 `ResourceAssembler`；
+         **单监听端口**同时接受两类连接，绑定包 `sub_kind` = 角色（0=Control / 1=Resource），负载 = 玩家档案名；
+      3. 客户端：控制连接（256B）恒 `PacketReader::new(256)`，资源连接（4096B）恒 `PacketReader::new(4096)`；
+         两条线程**不合并数据包**、各按固定包长读写；建连时各发一条 256B 绑定包声明角色；
+      4. 客户端对象池：`HostCode/net/remote.rs` 16MB（250 在用 + 6 预取，各 64KB 固定地址槽）**语义不变**，
+         资源 4096B 分片拼接后落槽；`ModelCatalog` 仍由池增量解码而来；淘汰经主通道上行 `PoolSync`；
+      5. 前后对照：老（恒 64KB 帧，头含 flags/region/sub_kind）→ 新（主通道恒 256B = 32B 头 + 7×32B 单元；
+         资源通道恒 4096B = 32B 头 + 4064B 负载）。
+    老端处置：老客户端连新服务端将在首条绑定包即因类别/魔数不符而断开，需同步升级到 0.12.0。
 
 # -----------------------------------------------------------------------------
-# 传输层：统一固定 64KB 槽帧（0.11.0 起取代 NDJSON）
+# 传输层：小定长包 + 指令优先组包 + 双通道（0.12.0 起取代统一 64KB 槽帧）
 # -----------------------------------------------------------------------------
 transport:
   authoritative_impl: ServerCode/net/packet.rs
-  frame:
-    bytes: 65536            # 每帧恒定 64KB（线上 64KB 对齐，尾部零填充）
-    header_bytes: 32
-    payload_max: 65504
-    magic: 0x434F4431       # "COD1"
-    wire_version: 11        # 与协议 y 位对齐（0.11 = 槽帧世代）
-    header_layout:          # (offset, width, little-endian)
+  channels:
+    # 两条通道各自固定包长，**不合并数据包**；同一监听端口由首条绑定包区分角色。
+    control:
+      packet_bytes: 256          # 恒定 256B = 32B 头 + 7×32B 单元
+      unit_bytes: 32
+      units_per_packet: 7
+      payload_bytes: 224
+      scheduler: ServerCode/net/scheduler.rs   # 指令优先：装满 7 指令再发数据切片
+    resource:
+      packet_bytes: 4096         # 恒定 4096B = 32B 头 + 4064B 负载
+      payload_bytes: 4064
+      stream: ServerCode/net/resource_stream.rs # 单份资源跨多包分片 + 收侧重组
+  bind:
+    packet_bytes: 256            # 首条绑定包恒 256B
+    sub_kind: 场景角色           # 0=Control（此后 256B）1=Resource（此后 4096B）
+    payload: 玩家档案名（UTF-8）  # 资源连接凭此关联控制连接的 conn_id
+  header:
+    bytes: 32
+    magic: 0x434F4431            # "COD1"
+    wire_version: 12             # 与协议 y 位对齐（0.12 = 小定长包世代）
+    header_layout:               # (offset, width, little-endian)
       - { offset: 0,  width: 4, name: magic }
       - { offset: 4,  width: 2, name: version }
-      - { offset: 6,  width: 1, name: kind }
-      - { offset: 7,  width: 1, name: flags,   doc: bit0 = continuation（大消息跨帧分片） }
-      - { offset: 8,  width: 1, name: region,  doc: 0=在用区 1=预取区（仅 Resource 帧有意义） }
-      - { offset: 9,  width: 1, name: sub_kind, doc: 资源子类 ResourceKind（非资源帧填 0） }
-      - { offset: 12, width: 8, name: seq,     doc: 帧序号（单调递增） }
-      - { offset: 20, width: 8, name: key,     doc: 资源键（FNV-1a；0=无） }
-      - { offset: 28, width: 4, name: payload_len }
-  kinds: [Control, Snapshot, Event, Resource, ResourceEnd]
-    # Control    ：≤256B 指令（握手/Pong/ReturnToMenu/全部上行意图），打包进 64KB
-    # Snapshot   ：每 Tick 权威快照（可跨帧分片）
-    # Event      ：瞬时事件（击杀/受击/拾取/通告）
-    # Resource   ：单份资源（一资源一帧；ModelCatalog 展开为该形态）
+      - { offset: 6,  width: 1, name: kind,       doc: 0=Bind 1=Command 2=Data 3=Resource 4=ResourceEnd }
+      - { offset: 7,  width: 1, name: flags,      doc: bit0 = continuation（数据/资源跨包分片） }
+      - { offset: 8,  width: 1, name: unit_count, doc: 本包单元数 1..=7（仅 Command） }
+      - { offset: 9,  width: 1, name: sub_kind,   doc: Bind=角色 / Data=DataKind / Resource=ResourceKind }
+      - { offset: 10, width: 1, name: region,     doc: 0=InUse 1=Prefetch（仅 Resource） }
+      - { offset: 11, width: 1, name: reserved }
+      - { offset: 12, width: 2, name: chunk_index, doc: 资源分片序号（仅 Resource） }
+      - { offset: 14, width: 2, name: payload_len }
+      - { offset: 16, width: 8, name: seq,        doc: 包序号（单调递增） }
+      - { offset: 24, width: 8, name: key,        doc: 资源/消息键（FNV-1a；0=无） }
+  kinds: [Bind, Command, Data, Resource, ResourceEnd]
+    # Bind       ：首条绑定包（恒 256B），sub_kind = 角色、负载 = 档案名
+    # Command    ：指令包，负载为 1..7 个自包含 32B 指令单元（二进制紧凑）
+    # Data       ：数据包，sub_kind 标明 Snapshot/Event/Control，负载为某条消息字节流的 32B 切片
+    # Resource   ：资源包（仅资源通道），单份资源的第 chunk_index 段（负载 ≤4064B）
     # ResourceEnd：一批资源下发完毕（客户端据此标记目录就绪）
+  data_kind: [Snapshot, Event, Control]   # Control=含字符串的超长控制消息降级数据流（仍属指令类）
   region: [InUse, Prefetch]
   resource_kind: [Model, Animation]
 
@@ -80,6 +104,12 @@ uplink:
           - { name: target, type: u64,  required: true, doc: 容器实体 ID }
           - { name: dir,    type: TransferDir, required: true, doc: 转移方向 }
           - { name: index,  type: usize, required: true, doc: 活动侧的格位下标 0..12 }
+      - name: PoolSync                # 0.12.0 新增
+        added_in: 0.12.0
+        doc: 客户端对象池淘汰上报（经**主通道**256B 小包；二进制紧凑，每单元最多 3 个键、可跨单元）
+        fields:
+          - { name: region,  type: u8,  required: true, doc: 0=在用区 1=预取区 }
+          - { name: evicted, type: "Vec<u64>", required: true, doc: 被淘汰的资源键；服务端据常驻集合移除 }
 
   PlayerInput:
     fields:

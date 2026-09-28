@@ -142,6 +142,12 @@ pub enum ClientMessage {
     LootTransfer { target: u64, dir: TransferDir, index: usize },
     /// 延迟探测：seq 原样回显于 `ServerMessage::Pong`
     Ping { seq: u64 },
+    /// 对象池同步（0.12.0 新增）：上报本端对象池的淘汰清单（定长 32B 指令单元，走主通道）。
+    ///
+    /// 设计动机（Why）：客户端对象池固定 256 槽，放不下时须淘汰；若服务端仍以为该资源常驻，
+    /// 就不会重发 → 客户端缺资源。故客户端主动上报 `evicted` 键，服务端从"该连接常驻集合"
+    /// 移除，未来该键需要时再经资源通道重发。`region` 标识淘汰发生在哪个区。
+    PoolSync { region: u8, evicted: Vec<u64> },
     /// 主动断开
     Disconnect,
 }

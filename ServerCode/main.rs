@@ -6,7 +6,7 @@
 //!
 //! 客户端只发输入、只收快照；本进程是游戏世界的唯一真理源。
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use tokio::sync::mpsc;
@@ -146,6 +146,9 @@ async fn serve_authoritative(
     // 上报意图，频率与网络批处理都不可控；服务端只保留"最新意图"，每 Tick 结算一次
     // （位移 = 速度 × dt），移速因而与客户端帧率/消息条数彻底解耦，天然确定性。
     let mut conn_input: HashMap<u64, PlayerInput> = HashMap::new();
+    // conn_id → 该连接**常驻资源集合**（已下发且客户端仍持有的资源键）。0.12：客户端对象池
+    // 淘汰时经主通道上报 `PoolSync`，服务端据此移除；未来该键需要时再经资源通道重发。
+    let mut conn_resident: HashMap<u64, HashSet<u64>> = HashMap::new();
     // 全局装备 ID 分配器（跨连接唯一，供背包 Craft 裁决）
     let mut next_equipment_id: u64 = 1000;
 
@@ -158,6 +161,7 @@ async fn serve_authoritative(
             &mut conn_profiles,
             &mut conn_loadout,
             &mut conn_input,
+            &mut conn_resident,
             repo,
             equipment,
             &mut next_equipment_id,
@@ -225,6 +229,7 @@ fn drain_commands(
     conn_profiles: &mut HashMap<u64, PlayerProfile>,
     conn_loadout: &mut HashMap<u64, Vec<String>>,
     conn_input: &mut HashMap<u64, PlayerInput>,
+    conn_resident: &mut HashMap<u64, HashSet<u64>>,
     repo: &mut JsonLogRepo,
     equipment: &Arc<EquipmentSystem>,
     next_equipment_id: &mut u64,
@@ -277,14 +282,19 @@ fn drain_commands(
                     },
                 );
                 // 模型目录：握手后一次性下发服务端权威的体素几何/动画（静态冷数据，
-                // 经 OnceLock 内缓存，多连接复用同一份，不进每帧快照通道）。
-                rt.send_to(
-                    conn_id,
-                    ServerMessage::ModelCatalog {
-                        models: cute_of_duty_server::model::catalog(),
-                        animations: cute_of_duty_server::model::animations(),
-                    },
-                );
+                // 经 OnceLock 内缓存，多连接复用同一份，不进每帧快照通道；经资源通道走 4096B 包）。
+                // 同步登记"常驻资源集合"，供后续 PoolSync 淘汰上报对账。
+                let models = cute_of_duty_server::model::catalog();
+                let animations = cute_of_duty_server::model::animations();
+                let mut resident = HashSet::new();
+                for m in &models {
+                    resident.insert(cute_of_duty_server::net::packet::model_key(m));
+                }
+                for a in &animations {
+                    resident.insert(cute_of_duty_server::net::packet::animation_key(a));
+                }
+                conn_resident.insert(conn_id, resident);
+                rt.send_to(conn_id, ServerMessage::ModelCatalog { models, animations });
             }
             NetCommand::Input { conn_id, player } => {
                 // 连续量（移动/朝向）只记最新；边沿量（换弹/技能）在一个 Tick 内可能被更晚
@@ -383,9 +393,20 @@ fn drain_commands(
                 // 延迟探测：原样回显，客户端据此算往返延迟
                 rt.send_to(conn_id, ServerMessage::Pong { seq });
             }
+            NetCommand::PoolSync { conn_id, region, evicted } => {
+                // 客户端对象池淘汰上报：从常驻集合移除，未来该键需要时再经资源通道重发。
+                let count = evicted.len();
+                if let Some(resident) = conn_resident.get_mut(&conn_id) {
+                    for key in evicted {
+                        resident.remove(&key);
+                    }
+                }
+                info!("连接 #conn {conn_id} 对象池同步：区{region} 淘汰 {count} 键");
+            }
             NetCommand::Disconnect { conn_id } => {
                 conn_loadout.remove(&conn_id);
                 conn_input.remove(&conn_id);
+                conn_resident.remove(&conn_id);
                 // 冷数据：先落盘档案（至少一次持久），再回收权威实体。
                 if let Some(profile) = conn_profiles.remove(&conn_id) {
                     if let Err(e) = repo.save(profile.player_id, &profile) {

@@ -1,6 +1,6 @@
 # ADR 0005 · 线格式改为统一 64KB 槽帧 + 客户端 16MB 远程对象池 + 双线单线程传输
 
-- **状态**：已接受（Accepted）
+- **状态**：**已被取代（Superseded by [ADR 0006](0006-small-fixed-packet-dual-channel.md)）** —— 0.12.0 起线格式改为"小定长包 + 指令优先组包 + 双通道"（256B 主通道 / 4096B 资源通道）。本 ADR 的**客户端 16MB 对象池与 AOI 预取语义仍有效**，被 0006 继承。
 - **日期**：2026-09-28
 - **决策者**：项目 owner
 - **影响范围**：`ServerCode/net`（`packet` **新增**、`session`、`main`、`prefetch` **新增**）、`HostCode/net`（`remote` **新增**、`downlink` **新增**、`uplink` **新增**、`network`、`snapshot`）、`HostCode/flow`、`HostCode/launcher`

@@ -1,12 +1,14 @@
-//! 客户端网络装配：连接服务端、起上行/下行两条线程、断线自动重连
+//! 客户端网络装配：连接服务端、起控制/资源两类线程、断线自动重连
 //!
 //! 服务器权威架构下，本模块只做：连接、转发 bevy 侧上行意图、接收下行消息并分发。
-//! **不做任何模拟/校订**。0.11 起线格式为统一固定 64KB 槽帧（见服务端 `net::packet`），
-//! 上下行分处**两条阻塞单线程**（[`super::downlink`] / [`super::uplink`]），各持
-//! `try_clone` 独立句柄，故上传不阻塞下载。下行分三路：
-//! - 资源帧 → 远程对象池（`net::remote`）；
-//! - 权威快照 → [`SnapshotBuffer`]（Bevy 场景对账用）；
-//! - 其它（握手/事件/延迟回显/撤离回程）→ [`ControlBuffer`]（Bevy 状态机/延迟面板用）。
+//! **不做任何模拟/校订**。0.12 起线格式为**小定长包 + 双通道**（见服务端 `net::packet`）：
+//!
+//! - **控制连接**（恒 256B 包）：上行经 [`super::uplink`]、下行经 [`super::downlink`]，
+//!   各持 `try_clone` 独立句柄，故上传不阻塞下载；
+//! - **资源连接**（独立 TCP，恒 4096B 包）：只下行，经 [`super::resource_downlink`] 重组落池。
+//!
+//! 两条连接**同监听一个端口**，各自首发一条 256B **绑定包**（见 [`send_bind`]）声明角色；
+//! 服务端据角色把该连接固定为对应包长。资源通道先于指令/快照抵达，实体突现即复用（`net::remote`）。
 
 use std::net::TcpStream;
 use std::sync::atomic::AtomicBool;
@@ -15,7 +17,9 @@ use std::time::{Duration, Instant};
 
 use bevy::prelude::Resource;
 
-use cute_of_duty_server::net::packet::{FrameWriter, encode_client};
+use cute_of_duty_server::net::packet::{
+    PacketHeader, PacketKind, PacketWriter, Region, Role, PACKET_BYTES,
+};
 use cute_of_duty_server::net::protocol::{ClientMessage, EntitySnapshot, ServerMessage};
 
 /// 下行快照通道类型（渲染对账消费）。
@@ -54,7 +58,7 @@ const RECONNECT_INTERVAL: Duration = Duration::from_secs(2);
 /// 常态 RTT 探测间隔（秒）。
 pub(crate) const PING_INTERVAL: Duration = Duration::from_secs(1);
 
-/// 网络装配循环：连接 → 起上下行双线程 → 等其结束 → 重连。
+/// 网络装配循环：建双连接 → 起控制/资源线程 → 等其结束 → 重连。
 ///
 /// 设计动机（Why）：客户端与服务端是两个独立进程，玩家先开客户端是常见操作。若首次连接
 /// 失败就永久退出，画面会停在没有本人实体的空场景里（相机无处跟随、WASD 无处上报），
@@ -62,8 +66,8 @@ pub(crate) const PING_INTERVAL: Duration = Duration::from_secs(1);
 /// 后重试；重连成功会再收一次握手，`route_control_messages` 以新 `assigned_id` 覆盖本人
 /// 实体（幂等），渲染层无需特殊处理。
 ///
-/// 线程模型（owner 拍板）：**上传/下载两条独立线程、双线单线程**，上传不得影响下载；
-/// 连接级 `shutdown` 标志与 `try_clone` 句柄共同保证断链时两线程同步退出后重连。
+/// 线程模型（owner 拍板）：控制通道**上传/下载两条独立线程、双线单线程**，上传不得影响下载；
+/// 资源通道再起一条**独立只下行**线程。二者同端口、各按固定包长读写，**互不合并包**。
 pub fn run_network(
     addr: &str,
     snapshot_tx: SnapshotChannel,
@@ -75,9 +79,9 @@ pub fn run_network(
     let up_rx = Arc::new(Mutex::new(up_rx));
 
     loop {
-        // 阶段1：建连（失败则等待后重试；不 panic、不退出线程）。
+        // 阶段1：建控制连接 + 首发角色绑定包（失败则等待后重试；不 panic、不退出线程）。
         let start = Instant::now();
-        let stream = match TcpStream::connect(addr) {
+        let control = match TcpStream::connect(addr) {
             Ok(stream) => stream,
             Err(e) => {
                 eprintln!("[网络] 连接服务器失败 {addr}: {e}（{RECONNECT_INTERVAL:?} 后重试；请确认已先启动 cod_server.exe）");
@@ -86,23 +90,37 @@ pub fn run_network(
             }
         };
         // TCP_NODELAY：禁用 Nagle 合并，避免上行输入/探测被攒包拖慢往返。
-        let _ = stream.set_nodelay(true);
-        let read_half = match stream.try_clone() {
+        let _ = control.set_nodelay(true);
+        let control_read = match control.try_clone() {
             Ok(half) => half,
             Err(e) => {
-                eprintln!("[网络] 复制读句柄失败: {e}");
+                eprintln!("[网络] 复制控制读句柄失败: {e}");
                 std::thread::sleep(RECONNECT_INTERVAL);
                 continue;
             }
         };
-
-        // 阶段2：先发握手，再起两个线程（读/写各自独立句柄）。
-        if send_handshake(&stream).is_err() {
-            eprintln!("[网络] 握手发送失败（{RECONNECT_INTERVAL:?} 后重试）");
+        if send_bind(&control, Role::Control, PROFILE_NAME).is_err() {
+            eprintln!("[网络] 控制绑定包发送失败（{RECONNECT_INTERVAL:?} 后重试）");
             std::thread::sleep(RECONNECT_INTERVAL);
             continue;
         }
-        println!("已连接服务器 {addr}，等待快照灌入场景...");
+
+        // 阶段2：建资源连接 + 首发资源绑定包（独立 TCP，恒 4096B 包）。
+        let resource = match TcpStream::connect(addr) {
+            Ok(stream) => stream,
+            Err(e) => {
+                eprintln!("[网络] 资源连接失败 {addr}: {e}（{RECONNECT_INTERVAL:?} 后重试）");
+                std::thread::sleep(RECONNECT_INTERVAL);
+                continue;
+            }
+        };
+        let _ = resource.set_nodelay(true);
+        if send_bind(&resource, Role::Resource, PROFILE_NAME).is_err() {
+            eprintln!("[网络] 资源绑定包发送失败（{RECONNECT_INTERVAL:?} 后重试）");
+            std::thread::sleep(RECONNECT_INTERVAL);
+            continue;
+        }
+        println!("已连接服务器 {addr}（控制 + 资源双通道），等待快照灌入场景...");
 
         let shutdown = Arc::new(AtomicBool::new(false));
         // Ping 打点：上传线程写入时刻，下载线程收 Pong 折现真实往返。
@@ -111,15 +129,13 @@ pub fn run_network(
         let down = std::thread::spawn({
             let snapshot_tx = snapshot_tx.clone();
             let control_tx = control_tx.clone();
-            let resource_tx = resource_tx.clone();
             let shutdown = Arc::clone(&shutdown);
             let pending = Arc::clone(&pending);
             move || {
                 crate::net::downlink::downlink_loop(
-                    read_half,
+                    control_read,
                     snapshot_tx,
                     control_tx,
-                    resource_tx,
                     start,
                     shutdown,
                     pending,
@@ -130,27 +146,42 @@ pub fn run_network(
             let up_rx = Arc::clone(&up_rx);
             let shutdown = Arc::clone(&shutdown);
             let pending = Arc::clone(&pending);
-            move || crate::net::uplink::uplink_loop(stream, up_rx, shutdown, pending)
+            move || crate::net::uplink::uplink_loop(control, up_rx, shutdown, pending)
+        });
+        let res = std::thread::spawn({
+            let resource_tx = resource_tx.clone();
+            let shutdown = Arc::clone(&shutdown);
+            move || crate::net::resource_downlink::resource_downlink_loop(resource, resource_tx, shutdown)
         });
 
-        // 下行先退出即视为断链：置位 shutdown 让上行随短超时退出，再重连。
+        // 控制下行先退出即视为断链：置位 shutdown 让其余线程随短超时退出，再重连。
         let _ = down.join();
         shutdown.store(true, std::sync::atomic::Ordering::Relaxed);
         let _ = up.join();
+        let _ = res.join();
         eprintln!("[网络] 连接断开（{RECONNECT_INTERVAL:?} 后重连）");
         std::thread::sleep(RECONNECT_INTERVAL);
     }
 }
 
-/// 发送握手控制帧（连接起点第一条上行，服务端据此建实体并回握手）。
-fn send_handshake(stream: &TcpStream) -> Result<(), String> {
-    let mut w = FrameWriter::new();
-    encode_client(
-        &mut w,
-        &ClientMessage::Connect {
-            profile: PROFILE_NAME.to_string(),
+/// 发送角色绑定包（连接起点首条上行，恒 256B）：声明本连接按 256B（控制）还是 4096B（资源）读取。
+///
+/// 负载为玩家档案名；服务端据 `sub_kind`（角色）决定包长，并用手档案名把资源连接关联到同名控制连接。
+fn send_bind(stream: &TcpStream, role: Role, profile: &str) -> Result<(), String> {
+    let mut w = PacketWriter::new(PACKET_BYTES);
+    w.push(
+        PacketHeader {
+            kind: PacketKind::Bind,
+            continuation: false,
+            unit_count: 0,
+            sub_kind: role as u8,
+            region: Region::InUse,
+            chunk_index: 0,
+            payload_len: 0,
+            seq: 0,
+            key: 0,
         },
-        0,
+        profile.as_bytes(),
     )?;
-    std::io::Write::write_all(&mut &*stream, &w.take()).map_err(|e| format!("握手写入失败: {e}"))
+    std::io::Write::write_all(&mut &*stream, &w.take()).map_err(|e| format!("绑定包写入失败: {e}"))
 }

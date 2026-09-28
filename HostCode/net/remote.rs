@@ -1,8 +1,8 @@
 //! 远程资源对象池（固定 16MB · 256 × 64KB 固定地址槽位）
 //!
 //! 设计动机（Why）：0.10 及以前，客户端要等资源随快照/握手消息抵达才知道"这个实体长什么样"，
-//! 实体因 AOI 突现时只能干等。0.11 起下行统一为 **64KB 槽帧**（见服务端 `net::packet`），
-//! 客户端据此维护一个**固定容量、固定地址**的对象池：
+//! 实体因 AOI 突现时只能干等。0.12 起资源走独立 4096B 包通道（见服务端 `net::resource_stream`），
+//! 客户端按 `key` 把重组后的整份负载落进**固定容量、固定地址**的对象池：
 //!
 //! - 总容量恒 [`POOL_BYTES`] = 16MB，切成 [`SLOT_COUNT`] = 256 个 [`SLOT_BYTES`] = 64KB 槽；
 //! - 单块连续分配、**永不重分配**，故第 `i` 槽的数据地址恒为 `base + i × 64KB`；
@@ -19,13 +19,13 @@ use std::sync::mpsc;
 use bevy::prelude::{ResMut, Resource};
 
 use cute_of_duty_server::net::packet::{
-    FRAME_BYTES, Region, ResourceKind, decode_animation, decode_model, resource_kind_from_byte,
+    Region, ResourceKind, decode_animation, decode_model, resource_kind_from_byte,
 };
 
 use crate::flow::ModelCatalog;
 
-/// 单槽字节数（等于一个固定帧的大小，故资源帧可整帧落槽）。
-pub const SLOT_BYTES: usize = FRAME_BYTES;
+/// 单槽字节数（64KB：一份资源在资源通道上跨 4096B 包重组后整体落槽）。
+pub const SLOT_BYTES: usize = 64 * 1024;
 /// 槽位总数（16MB / 64KB）。
 pub const SLOT_COUNT: usize = 256;
 /// 池总字节数（固定 16MB）。

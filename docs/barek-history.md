@@ -24,6 +24,26 @@
 
 ---
 
+## [0.12.0] · 2026-09-28 · 线格式改为小定长包 + 指令优先组包 + 双通道
+
+- **变更类型**：**Breaking**（线格式由恒定 64KB 槽帧改为 256B 主通道 + 4096B 资源通道，协议不兼容 → `y+1`）
+- **影响模块**：`net`（`packet` 改写、`scheduler` **新增**、`resource_stream` **新增**、`codec` **新增**、`session` 重写、`main`）；客户端 `net`（`network`/`uplink`/`downlink` 重写、`resource_downlink` **新增**、`remote`）
+- **兼容性**：**不兼容**
+  - 线上不再是"恒定 64KB 帧"。老客户端连新服务端会在**首条绑定包**即因类别（`Bind`）/魔数/包长不符而断开；老服务端同样无法解析新客户端的小定长包。双端须同升 `0.12.0`。
+  - `ServerMessage`/`ClientMessage` 的**数据模型不变**，仅**封装与传输方式**改变。客户端 16MB 对象池与 AOI 预取语义**不变**。
+- **迁移指南**：见 [契约 `protocol.yaml` 的 `compat.migration_guide`](contracts/protocol.yaml)（双通道各自固定包长、同端口绑定包分角色、指令优先组包、资源 4096B 分片）。核心五步：① 服务端控制连接用 `SendScheduler` 指令优先组包；② 服务端资源连接用 `resource_stream` 按 4096B 分片；③ 服务端 `session` 由"一帧一消息"改为"同端口首条 256B 绑定包分角色"；④ 客户端两条线程分别恒 256B / 恒 4096B，**不合并数据包**；⑤ 建连时各发一条 256B 绑定包声明角色。
+- **内容**：
+  - **主通道 256B · 32B 单元 · 指令优先**（`ServerCode/net/packet.rs` 改写 + `scheduler.rs` **新增**）：`PACKET_BYTES = 256`、`HEADER_BYTES = 32`、`UNIT_BYTES = 32`、`UNITS_PER_PACKET = 7`；`SendScheduler` 每轮**优先把指令装满 7 个单元**，无指令时才发数据切片，一条数据流连续发完——**指令永不被大数据饿死**。
+  - **指令二进制紧凑**（`ServerCode/net/codec.rs`，**新增**）：热路径 `PlayerInput` 把 15 个 bool 位打包进单 32B 单元；含字符串的控制消息降级为 `DataKind::Control` 数据流（仍属指令类、仍优先）。`PoolSync` 每单元 ≤3 个键、可跨单元（连续单元解码时收拢为一条）。
+  - **资源通道 4096B**（`ServerCode/net/resource_stream.rs`，**新增**）：`RES_PACKET_BYTES = 4096`、`RES_PAYLOAD_BYTES = 4064`；单份资源按 `chunk_index` 跨包分片，收侧 `ResourceAssembler` 按 `key` 重组；`ModelCatalog` 展开为"逐份资源 + `ResourceEnd`"。客户端 16MB / 256×64KB 定址池、250 在用 + 6 预取、`promote` 语义**全部保留**。
+  - **同端口双通道分角色**（`ServerCode/net/session.rs` 重写）：单一 `TcpListener`，首条 `read_exact(256)` 读**绑定包**（`kind == Bind`，`sub_kind` = 角色 0=Control / 1=Resource，负载 = 档案名）；判定后控制连接恒 256B、资源连接恒 4096B。资源连接凭档案名经 `profile_to_control` 关联控制 `conn_id`，早到则暂存 `pending_resources` 待补齐。
+  - **对象池淘汰上报**（`ClientMessage::PoolSync`，经主通道）：服务端 `main.rs` 维护 `conn_resident` 常驻资源集合，收到淘汰清单即移除（幂等）。
+  - **客户端双连接**（`HostCode/net/network.rs`/`uplink.rs`/`downlink.rs` 重写、`resource_downlink.rs` **新增**）：控制连接恒 256B（上下行单线程）、资源连接恒 4096B（下行单线程），**两条线程不合并数据包**；建连时各发一条 256B 绑定包声明角色。
+- **验证**：`cargo-wrap check -p cute_of_duty_server` / `-p cute_of_duty_host` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server` **138 passed**（新增 scheduler 组包 / resource_stream 分片重组 / codec 二进制往返 / PoolSync 跨单元 等单测）。
+- **关联**：[ADR 0006](adr/0006-small-fixed-packet-dual-channel.md)（取代 [ADR 0005](adr/0005-slot-frame-transport.md)）、[契约 `protocol.yaml`](contracts/protocol.yaml)
+
+---
+
 ## [0.11.0] · 2026-09-28 · 移除备弹中间池：换弹直抽背包弹药堆
 
 - **变更类型**：**Breaking**（快照删字段 `ammo_pool`；既有 `0.11.0` 不兼容窗口内一并收口）

@@ -88,7 +88,7 @@
 | `damage` | 伤害管线（packet → resolver → effect） | 伤害结算中间态 | 纯函数 + 事件 | 消费伤害包 | L1 |
 | `gamemode` | 玩法模式规则 | 模式状态 | 模式查询 | 无 | L0 |
 | `interact` | 站点/拾取交互与结算（`settle`、`InteractChoice`） | 交互目标与结算 | `INTERACT_RANGE`、`SupplyKind` | Event 回执 | **L1→L2 待定**（定级前按 L2 流程，见 [CONTRIBUTING 第九节](../../CONTRIBUTING.md)） |
-| `net` | 协议线格式、统一 64KB 槽帧（`packet`）、会话、AOI、广播、AOI 边缘预取（`prefetch`） | 连接会话 | `protocol`、`packet`、`session`、`broadcaster`、`prefetch` | 收发消息 | **L2（线格式）** |
+| `net` | 协议线格式、小定长包双通道（`packet` 256B 主通道 / 4096B 资源通道）、指令优先组包（`scheduler`）、资源分片流（`resource_stream`）、二进制编解码（`codec`）、会话、AOI、广播、AOI 边缘预取（`prefetch`） | 连接会话 | `protocol`、`packet`、`scheduler`、`resource_stream`、`codec`、`session`、`broadcaster`、`prefetch` | 收发消息 | **L2（线格式）** |
 | `storage` | 冷数据持久化（json_log / cold_repo） | 落盘数据 | `thiserror` 错误类型 | 无 | L1 |
 | `hal` | 硬件抽象（平台相关） | 无 | Trait | 无 | L0 |
 

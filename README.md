@@ -9,7 +9,7 @@
 
 [![License: GPL-3.0 (code)](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
 [![License: CC BY-NC-SA 4.0 (assets)](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-lightgrey.svg)](LICENSE-ASSETS)
-[![Version](https://img.shields.io/badge/Version-0.11.0-blue.svg)](#五版本历史)
+[![Version](https://img.shields.io/badge/Version-0.12.0-blue.svg)](#五版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
 
 **外部依赖 · 站在开源社区的肩膀上** · [![by Bevy](https://img.shields.io/badge/by-Bevy-E90000)](https://bevyengine.org)
@@ -250,20 +250,18 @@ TCP 的可靠传输更好保障**元素状态、技能效果、背包交互**等
 | AOI 剔除 | 控带宽 + 根治 ESP 透视外挂 |
 | 客户端全开源 | 服务器校验兜底，开源不破坏完整性，反哺 Mod 生态 |
 
-### 4.6 传输层 · 统一 64KB 槽帧 + 远程对象池（0.11.0 起）
+### 4.6 传输层 · 小定长包 + 指令优先组包 + 双通道（0.12.0 起）
 
-下行线格式由 NDJSON 行帧改为**统一固定 64KB 槽帧**（`ServerCode/net/packet.rs`）：
+0.11 的恒定 64KB 槽帧对"高频小控制帧"极不划算（一条 ~200B 上行意图占满 64KB）。0.12 改为**小定长包 + 指令优先组包 + 双通道**（`ServerCode/net/packet.rs`）：
 
-- **定长帧**：每帧恒定 64KB（尾部零填充对齐），头 32B：`magic/version/kind/flags/region/sub_kind/seq/key/payload_len`；
-  类别 `Control`（≤256B 指令也打包进 64KB）/`Snapshot`/`Event`/`Resource`/`ResourceEnd`；
-  超单帧容量的消息按 `flags.continuation` **跨帧分片**、接收侧重组；单份资源**一资源一帧**。
-- **客户端 16MB 固定地址远程对象池**（`HostCode/net/remote.rs`）：256 个 64KB 槽 —— 前 250 槽（16000KB）**在用缓冲**、
-  末 6 槽（384KB）**预取区**；资源按 `key` 落槽、命中即复用，实体因 AOI 突现时**零等待**。纯本地内存，**不引入共享内存**。
-- **双线单线程**（`HostCode/net/downlink.rs` / `uplink.rs`）：上传与下载各为阻塞单线程、各持 `try_clone` 独立句柄，
-  **上传不阻塞下载**；收/发完一帧立即处理下一帧，**不设传输时钟**。
+- **主通道恒 256B**：= 32B 头 + **7×32B 单元**，每个"指令或数据"占 1 个 32B 单元；`SendScheduler` **指令优先**——每轮先把指令装满 7 个单元，无指令时才发数据切片，一条数据流连续发完，**指令永不被大数据饿死**。
+- **指令二进制紧凑**（`codec.rs`）：热路径 `PlayerInput` 把 15 个 bool 位打包进单 32B 单元；含字符串的控制消息降级为 `DataKind::Control` 数据流（仍属指令类、仍优先）。
+- **资源通道恒 4096B**：走**独立第二条 TCP 连接**，= 32B 头 + 4064B 负载，单份资源跨多包分片、收侧按 `key` 重组；`ModelCatalog` 展开为"逐份资源 + `ResourceEnd`"。
+- **同端口双通道**：单一监听端口，连接**首条包恒为 256B 绑定包**（`sub_kind` = 角色 0=Control / 1=Resource、负载 = 档案名），据此决定此后按 256B 还是 4096B 读取；**两条线程不合并数据包**。
+- **客户端 16MB 固定地址远程对象池**（`HostCode/net/remote.rs`，语义不变）：256 个 64KB 槽 —— 前 250 槽（16000KB）**在用缓冲**、末 6 槽（384KB）**预取区**；资源命中即复用，实体因 AOI 突现时**零等待**。淘汰经主通道上行 `PoolSync`。
 - **AOI 边缘预取**（`ServerCode/net/prefetch.rs`）：按「到 AOI 边界距离 ÷ 速度」预测最可能进入视野的 6 个实体（算法就绪，端到端推送待接线）。
 
-> 决策记录：[ADR 0005](docs/adr/0005-slot-frame-transport.md)；线格式契约：[protocol.yaml](docs/contracts/protocol.yaml) `transport` 节。
+> 决策记录：[ADR 0006](docs/adr/0006-small-fixed-packet-dual-channel.md)（取代 [ADR 0005](docs/adr/0005-slot-frame-transport.md)）；线格式契约：[protocol.yaml](docs/contracts/protocol.yaml) `transport` 节。
 
 ---
 
@@ -275,6 +273,7 @@ TCP 的可靠传输更好保障**元素状态、技能效果、背包交互**等
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| **0.12.0** | 2026-09-28 | **更快传输（协议不兼容）**：线格式由恒定 64KB 槽帧改为**小定长包 + 指令优先组包 + 双通道**。①**主通道恒 256B**（32B 头 + 7×32B 单元），`SendScheduler` **指令优先**——装满 7 指令再发数据切片，指令永不被大数据饿死；②**指令二进制紧凑**——热路径 `PlayerInput` 15 个 bool 位打包进单 32B 单元，含字符串控制消息降级为 `DataKind::Control` 数据流；③**资源通道恒 4096B** 走独立第二条 TCP 连接，资源跨包分片、收侧按 `key` 重组，**客户端 16MB 定址对象池语义不变**；④**同端口双通道**——首条 256B 绑定包按 `sub_kind` 分角色（0=Control / 1=Resource），两条线程**不合并数据包**；⑤对象池淘汰经主通道 `PoolSync` 上报。**代码更改**：`ServerCode/net/packet.rs` 改小定长包、新增 `scheduler.rs`/`resource_stream.rs`/`codec.rs`、重写 `session.rs`（同端口分角色）；`HostCode/net` 重写 `network`/`uplink`/`downlink`、新增 `resource_downlink.rs`。**扁平化更新**：`HostCode/net/remote.rs` 槽位常量统一为 `SLOT_BYTES`、`ServerCode/net/mod.rs` 网关重导出新增子模块。**未做**：预取推送端到端接线、客户端 LRU 淘汰触发。详见 [ADR 0006](docs/adr/0006-small-fixed-packet-dual-channel.md)（取代 ADR 0005）。 |
 | **0.11.0** | 2026-09-28 | **通信优化（协议不兼容）**：线格式由 NDJSON 行帧改为**统一固定 64KB 槽帧**；客户端新增**固定 16MB（250 在用 + 6 预取，各 64KB 固定地址）远程对象池**，资源按 `key` 落槽、实体突现即复用；**上传/下载双线单线程**（各持 `try_clone` 句柄，上传不阻塞下载）；**传输不设时钟**；新增 AOI 边缘预取算法（预测 6 个即将进入视野的实体）。**代码更改**：移除 `Combatant::ammo_pool` 中间弹池，换弹改为计时耗尽后直接从背包弹药堆抽满 —— 修「备弹诡异归零 / 要多按一次 R」（协议 `ammo_pool` → `ammo_reserve`）。**扁平化更新**：`ServerCode/net/packet.rs` 统一帧编解码、`HostCode/net/remote.rs` 定址对象池、`downlink.rs`/`uplink.rs` 双线拆分。**未做**：预取推送端到端接线。**下一版本目标**：`0.6.1` 网游版本（①多玩家 → ②匹配机制 → ③无掩体竞技场）。详见 [ADR 0005](docs/adr/0005-slot-frame-transport.md)。 |
 | **0.10.0** | 2026-09-28 | **模型修复**：客户端首次可见本人「焰狐」体素模型。①**服务端下发模型目录**（几何+动画随握手一次性下行，协议 `0.10.0`，仅增不改、向后兼容）；②**焰狐几何重建**——修「四肢左右镜像颠倒 / 枪悬空 1.15m / 狐耳内折」三处硬伤，35→43 盒并优化造型；③**逐盒材质键**（`VoxelCube.mat`）——此前只按骨名着色致细节全被抹平、模型退化为一坨纯色方块，现按 0.3.2 色板逐盒上色；④**朝向随视线**（修「永远向北」）+ 相机按 3.52m 体型重新标定；⑤**扁平化**——解析器 `voxel_spec.rs`→`loader.rs`、两份 JSON 合并为单文件 `FireFox.json`、`mod.rs` 网关重导出保路径稳定。**未做**：多人联机 / 匹配机制 / 无掩体竞技场。**下一版本目标**：`0.6.1` 网游版本（①多玩家 → ②匹配机制 → ③无掩体竞技场）。**本轮冻结（下次修）**：无新增，遗留项见 [docs/frozen-tasks](docs/frozen-tasks/snapshot-8-playtest-feedback.md)。 |
 | **0.6（Release）** | 2026-09-27 | **单机落幕 · 正式发布**：收官补齐手雷「先瞄准后释放」持雷态、可点击操作按钮组（`B`）、legacy 操作表逐行核对；修复三条实机缺陷（手雷重力未写回致走直线、新增抛物线预览、释放光标后视角仍转）——协议 `0.9.1`。**下一版本目标：0.6.1 网游版本**（①多玩家 → ②匹配机制 → ③无掩体竞技场） |
