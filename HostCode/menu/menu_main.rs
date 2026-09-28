@@ -1,4 +1,4 @@
-﻿//! 主菜单：结构 + 完整 UI 树构建 + 共享样式助手与销毁。
+//! 主菜单：结构 + 完整 UI 树构建 + 共享样式助手与销毁。
 //!
 //! 设计动机（Why）：主菜单把玩家从「已连接」推进到可选模式、进场、设置、撤离返回。
 //! 本模块只构建 UI 树与持有各浮层/节点的句柄资源；交互与样式刷新收敛到
@@ -104,7 +104,7 @@ pub fn spawn_menu(
     let mut settings_overlay = Entity::PLACEHOLDER;
     let mut settings_backdrop = Entity::PLACEHOLDER;
 
-    let gear_texture: Handle<Image> = assets.load("ui/gear_icon.png");
+    let gear_texture: Handle<Image> = assets.load("menu/icon/settings.png");
     let (base_bg, base_border) = menu_button_palette(false);
 
     let root = commands

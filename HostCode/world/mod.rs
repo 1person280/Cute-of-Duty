@@ -6,8 +6,14 @@
 pub(crate) mod camera;
 pub(crate) mod grenade_preview;
 pub(crate) mod model;
+pub(crate) mod voxel_facing;
+pub(crate) mod voxel_idle;
+pub(crate) mod voxel_model;
 pub(crate) mod world_scene;
 
 pub(crate) use camera::{follow_system, mouse_look_system, spawn_camera, sync_grenade_aim};
 pub(crate) use grenade_preview::draw_grenade_preview;
+pub(crate) use voxel_facing::face_aim_direction;
+pub(crate) use voxel_idle::drive_idle;
+pub(crate) use voxel_model::VoxelMaterials;
 pub(crate) use world_scene::spawn_world;

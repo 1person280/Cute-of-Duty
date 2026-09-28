@@ -24,6 +24,43 @@
 
 ---
 
+## [0.10.0] · 2026-09-27 · 服务端下发体素模型目录（客户端可见焰狐模型）+ 客户端资源目录归位
+
+- **变更类型**：**Additive**（y+1 加性兼容：仅新增下行消息，无字段删改、无语义变更）
+- **影响模块**：`model`（服务端权威几何解析，**新增** `loader`）；`net/protocol`（服务端契约）；`main`（握手后下发）；客户端 `world`（**新增** `voxel_model`/`voxel_idle`/`voxel_facing`，改 `camera`）、`net/snapshot`、`flow`、`launcher`、`menu`、`shared`
+- **兼容性**：**兼容**
+  - `ServerMessage` **新增** `ModelCatalog { models, animations }`（握手后一次性下发；老客户端收到未知变体按既有 `_ => {}` 分支忽略即可，行为不变）。
+  - 无既有字段删改或语义改动；客户端资源目录搬迁不触线格式。
+- **迁移指南**：无需迁移。老客户端连新服务端：忽略 `ModelCatalog` 后仍按原 `ModelPreset` 方块回退渲染，功能不受影响。
+- **内容**：
+  - **模型源文件归位与合并**：`ServerCode/assets/model/yanhu.{geometry,animation}.json` → `ServerCode/model/`，再**合并为单份** `ServerCode/model/FireFox.json`（几何在顶层 `minecraft:geometry`、动画在顶层 `animations`），删除空目录 `ServerCode/assets/`（模型属服务端易变内容，对齐既有约定）。
+  - **加载器重命名**（`model/voxel_spec.rs` → `model/loader.rs`，**新增**）：以 `include_str!` 编译期嵌入**单份** `FireFox.json`，解析为可序列化的
+    `VoxelModelSpec`（骨/枢轴/旋转/盒）与 `VoxelAnimationSpec`（clip/时长/骨名→旋转表达式），`OnceLock` 缓存；
+    `catalog()` 当前仅 `OperativeFire → firefox`。附解析单测（12 骨 / 43 盒 / 3 clip，并断言**每盒均标注 `mat`** 与**左右侧位不颠倒**）。
+    **命名免责声明**：`FireFox` 为本作我方火系干员「焰狐」（Flame Fox）之建模命名，与 Mozilla Firefox 浏览器无关；clip/几何 identifier 由 `yanhu` 统一改为 `firefox`（客户端 `IDLE_CLIP` 同步）。
+  - **逐盒材质键**（`VoxelCube.mat`，**新增可选字段**）：几何 JSON 每个盒子新增 `mat`（语义名 `skin`/`green`/`dark`/`armor`/`boot`/`hair`/`hair_dark`/`cream`/`eye`/`gun`/`accent`），
+    随模型目录下行。**根因修复**：此前客户端只按**骨名**着色，同一根骨上的发冠/刘海/腰带/护甲/靴子等细节全被抹成同色，
+    模型退化为一坨纯色方块（0.3.2 参考实现是逐盒材质，故有层次）；现客户端按 `mat` 取 0.3.2 色板（`_ref/.../palette.rs`）逐盒上色，缺 `mat` 时仍按骨名兜底。
+  - **焰狐几何重建**（`model/FireFox.json`）：修正三处与 0.3.2 参考不符的缺陷——①**四肢左右镜像颠倒**（`arm_right`/`leg_right` 误置于 -X，
+    与动画摆臂相位「右臂与右腿反相」自相矛盾）；②**枪挂错骨**（`gun` 挂 `arm_right` 却把盒子放在 +X，导致枪悬空约 1.15m）；
+    ③**狐耳倾角内折**（`-15/+15` 应为外张 `+12/-12`）。同时优化造型：狐吻 + 鼻头、眼高光、腮毛、尾巴加粗。骨名与父子关系保持不变，动画不受影响。
+  - **协议下发**（`net/protocol.rs` + `main.rs`）：`ServerMessage` 新增 `ModelCatalog`，`NetCommand::Connect` 握手帧之后向该连接下发一次目录（静态数据，不进每帧快照）。
+  - **客户端渲染**（`world/voxel_model.rs` + `voxel_idle.rs`，**新增**）：复用 `spawn_scene` 的单位 `CubeMesh`，按骨建 `SpatialBundle` 枢轴树、
+    盒作子实体缩放着色（坐标 `S = 0.11`、`z` 取负，对齐 0.3.2 参考实现）；`voxel_idle` 求值 `idle` clip 表达式驱动枢轴旋转。
+    `snapshot::spawn_body` 对**本人实体**改用体素模型（目录未到时暂缓本人生成），敌人/靶机/道具仍走方块回退。
+    另加两处时序修复：`route_control_messages` 提到 `apply_entities` 之前（否则首帧快照会把本人按方块落成且此后不再重建），
+    并以 `VoxelRendered` 标记做**幂等升级**（目录迟到时把已落成的方块本人拆掉重建），二者保证本人必为体素模型。
+  - **朝向同步**（`world/voxel_facing.rs`，**新增**）：每帧把本人模型根旋转对齐 `AimRig.yaw`（视线偏航），
+    **修复「角色永远向北」**——此前根旋转只在生成时写死一次 `from_rotation_y(π)`，此后无人更新，镜头转动角色不转。
+  - **相机按 3.52m 体型标定**（`world/camera.rs`）：`CAMERA_DIST` 4.2→**6.5**、`PIVOT_Y` 1.55→**2.6**、`SHOULDER_OFFSET` 0.65→**0.55**，
+    回到 0.3.2 为 3.5m 体型标定的取值。原值是按旧方块回退角色（≈2.67m）调的，套到 32px×0.11≈3.52m 的焰狐身上会过近、仰视，模型怼满屏幕。
+  - **客户端资源目录归位**：取消 `HostCode/assets/`——`ui/gear_icon.png` → `menu/icon/settings.png`，
+    `zcool_kuaile.ttf` / `zcool_kuaile_OFL.txt` → `HostCode/menu/`；`AssetPlugin.file_path` 改指 HostCode 根；同步 `LICENSE` / `LICENSE-ASSETS` / `README` / skill 文档路径引用。
+- **验证**：`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server` 通过（新增 loader 解析 + 协议往返用例）；`cargo-wrap build --release --workspace` 产出双端 exe；实机进训练场可见本人完整焰狐模型。
+- **关联**：[契约 `protocol.yaml`](contracts/protocol.yaml)
+
+---
+
 ## [0.9.1] · 2026-09-27 · 修手雷直线飞行 + 投掷轨迹预览 + 释放光标冻结视角
 
 - **变更类型**：**Fix**（z+1 兼容性修复；无字段增删、无语义变更）

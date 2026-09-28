@@ -1,0 +1,218 @@
+{
+	"format_version": "1.12.0",
+	"minecraft:geometry": [
+		{
+			"description": {
+				"identifier": "geometry.firefox",
+				"texture_width": 64,
+				"texture_height": 64,
+				"visible_bounds_width": 5,
+				"visible_bounds_height": 4.5,
+				"visible_bounds_offset": [0, 1.75, 0]
+			},
+			"bones": [
+				{
+					"name": "body",
+					"pivot": [0, 12, 0],
+					"cubes": [
+						{"origin": [-4, 12, -2], "size": [8, 12, 4], "mat": "green"},
+						{"origin": [-4.2, 12.5, -2.2], "size": [8.4, 2, 4.4], "mat": "dark"},
+						{"origin": [-4, 16, -3], "size": [8, 6, 1], "mat": "dark"},
+						{"origin": [-1, 17, -3.3], "size": [2, 2, 0.3], "mat": "accent"},
+						{"origin": [-6, 21.5, -3], "size": [3, 2.5, 3], "mat": "armor"},
+						{"origin": [3, 21.5, -3], "size": [3, 2.5, 3], "mat": "armor"}
+					]
+				},
+				{
+					"name": "head",
+					"parent": "body",
+					"pivot": [0, 24, 0],
+					"cubes": [
+						{"origin": [-4, 24, -4], "size": [8, 8, 8], "mat": "skin"},
+						{"origin": [-2, 25, -4.8], "size": [4, 2.5, 1.2], "mat": "cream"},
+						{"origin": [-0.8, 26.4, -5.1], "size": [1.6, 1, 0.5], "mat": "dark"},
+						{"origin": [-3, 27, -4.35], "size": [2, 2, 0.35], "mat": "eye"},
+						{"origin": [1, 27, -4.35], "size": [2, 2, 0.35], "mat": "eye"},
+						{"origin": [-2.9, 27.7, -4.55], "size": [0.7, 0.7, 0.2], "mat": "cream"},
+						{"origin": [1.1, 27.7, -4.55], "size": [0.7, 0.7, 0.2], "mat": "cream"},
+						{"origin": [-4.5, 30, -4.5], "size": [9, 2.5, 9], "mat": "hair"},
+						{"origin": [-4, 29.5, -5], "size": [8, 2.5, 0.6], "mat": "hair"},
+						{"origin": [-2, 30, -5.3], "size": [2, 2, 0.3], "mat": "accent"},
+						{"origin": [-4.5, 24, 3.5], "size": [9, 6, 1], "mat": "hair_dark"},
+						{"origin": [-5.5, 24.5, -4], "size": [1, 5, 8], "mat": "hair_dark"},
+						{"origin": [4.5, 24.5, -4], "size": [1, 5, 8], "mat": "hair_dark"},
+						{"origin": [-5, 24.5, -3], "size": [1, 2.5, 3], "mat": "cream"},
+						{"origin": [4, 24.5, -3], "size": [1, 2.5, 3], "mat": "cream"}
+					]
+				},
+				{
+					"name": "ear_left",
+					"parent": "head",
+					"pivot": [-2.5, 32, -1],
+					"rotation": [0, 0, 12],
+					"cubes": [
+						{"origin": [-4, 31.5, -2], "size": [3, 3.5, 2], "mat": "hair"},
+						{"origin": [-3.2, 32.3, -2.4], "size": [1.6, 1.8, 0.4], "mat": "cream"}
+					]
+				},
+				{
+					"name": "ear_right",
+					"parent": "head",
+					"pivot": [2.5, 32, -1],
+					"rotation": [0, 0, -12],
+					"cubes": [
+						{"origin": [1, 31.5, -2], "size": [3, 3.5, 2], "mat": "hair"},
+						{"origin": [1.6, 32.3, -2.4], "size": [1.6, 1.8, 0.4], "mat": "cream"}
+					]
+				},
+				{
+					"name": "arm_right",
+					"parent": "body",
+					"pivot": [6, 23, 0],
+					"cubes": [
+						{"origin": [4, 19, -2], "size": [4, 5, 4], "mat": "green"},
+						{"origin": [3.9, 19.8, -2.1], "size": [4.2, 1.8, 4.2], "mat": "accent"},
+						{"origin": [4, 13.5, -2], "size": [4, 5.5, 4], "mat": "skin"},
+						{"origin": [4, 11, -2], "size": [4, 2.5, 4], "mat": "dark"}
+					]
+				},
+				{
+					"name": "arm_left",
+					"parent": "body",
+					"pivot": [-6, 23, 0],
+					"cubes": [
+						{"origin": [-8, 19, -2], "size": [4, 5, 4], "mat": "green"},
+						{"origin": [-8, 13.5, -2], "size": [4, 5.5, 4], "mat": "skin"},
+						{"origin": [-8, 11, -2], "size": [4, 2.5, 4], "mat": "dark"}
+					]
+				},
+				{
+					"name": "leg_right",
+					"parent": "body",
+					"pivot": [2, 12, 0],
+					"cubes": [
+						{"origin": [0, 3, -2], "size": [4, 9, 4], "mat": "green"},
+						{"origin": [0, 0, -3], "size": [4, 3, 5], "mat": "boot"}
+					]
+				},
+				{
+					"name": "leg_left",
+					"parent": "body",
+					"pivot": [-2, 12, 0],
+					"cubes": [
+						{"origin": [-4, 3, -2], "size": [4, 9, 4], "mat": "green"},
+						{"origin": [-4, 0, -3], "size": [4, 3, 5], "mat": "boot"}
+					]
+				},
+				{
+					"name": "tail_a",
+					"parent": "body",
+					"pivot": [0, 14.5, 2],
+					"rotation": [25, 0, 0],
+					"cubes": [
+						{"origin": [-2, 13, 2], "size": [4, 4, 7], "mat": "hair"}
+					]
+				},
+				{
+					"name": "tail_b",
+					"parent": "tail_a",
+					"pivot": [0, 16, 8],
+					"rotation": [15, 0, 0],
+					"cubes": [
+						{"origin": [-1.5, 14.5, 8], "size": [3, 3, 6], "mat": "hair"}
+					]
+				},
+				{
+					"name": "tail_c",
+					"parent": "tail_b",
+					"pivot": [0, 17, 13],
+					"cubes": [
+						{"origin": [-1.5, 16.5, 13], "size": [3, 3, 5], "mat": "cream"}
+					]
+				},
+				{
+					"name": "gun",
+					"parent": "arm_right",
+					"pivot": [4.5, 16.5, -1],
+					"cubes": [
+						{"origin": [4.2, 16, -6], "size": [1, 1, 7], "mat": "gun"},
+						{"origin": [4.3, 14.5, -3], "size": [0.7, 1.5, 2], "mat": "dark"},
+						{"origin": [4.3, 15.8, 0], "size": [0.7, 0.8, 2], "mat": "dark"},
+						{"origin": [4.3, 17, -3], "size": [0.4, 1, 1], "mat": "accent"}
+					]
+				}
+			]
+		}
+	],
+	"animations": {
+		"animation.firefox.idle": {
+			"loop": true,
+			"animation_length": 2.0,
+			"bones": {
+				"body": {
+					"rotation": ["math.sin(query.anim_time * 180) * 0.8", 0, 0]
+				},
+				"head": {
+					"rotation": ["math.sin(query.anim_time * 180 + 40) * 1.5", 0, 0]
+				},
+				"ear_left": {
+					"rotation": [0, 0, "12 + math.sin(query.anim_time * 240) * 3"]
+				},
+				"ear_right": {
+					"rotation": [0, 0, "-12 + math.sin(query.anim_time * 240 + 60) * 3"]
+				},
+				"tail_a": {
+					"rotation": ["25 + math.sin(query.anim_time * 120) * 6", 0, 0]
+				},
+				"tail_b": {
+					"rotation": ["15 + math.sin(query.anim_time * 120 + 50) * 8", 0, 0]
+				},
+				"tail_c": {
+					"rotation": ["math.sin(query.anim_time * 120 + 100) * 10", 0, 0]
+				}
+			}
+		},
+		"animation.firefox.walk": {
+			"loop": true,
+			"anim_time_update": "query.modified_distance_moved",
+			"animation_length": 1.0,
+			"bones": {
+				"leg_right": {
+					"rotation": ["math.sin(query.anim_time * 380) * 35", 0, 0]
+				},
+				"leg_left": {
+					"rotation": ["math.sin(query.anim_time * 380 + 180) * 35", 0, 0]
+				},
+				"arm_right": {
+					"rotation": ["math.sin(query.anim_time * 380 + 180) * 25", 0, 0]
+				},
+				"arm_left": {
+					"rotation": ["math.sin(query.anim_time * 380) * 25", 0, 0]
+				},
+				"tail_a": {
+					"rotation": ["25 + math.sin(query.anim_time * 380) * 8", 0, 0]
+				},
+				"tail_b": {
+					"rotation": ["15 + math.sin(query.anim_time * 380 + 60) * 10", 0, 0]
+				},
+				"tail_c": {
+					"rotation": ["math.sin(query.anim_time * 380 + 120) * 12", 0, 0]
+				}
+			}
+		},
+		"animation.firefox.hold_gun": {
+			"loop": true,
+			"bones": {
+				"arm_right": {
+					"rotation": [-70, 0, 0]
+				},
+				"arm_left": {
+					"rotation": [-60, 0, -25]
+				},
+				"gun": {
+					"rotation": [0, 0, 0]
+				}
+			}
+		}
+	}
+}

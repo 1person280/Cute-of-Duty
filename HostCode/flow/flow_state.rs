@@ -6,6 +6,7 @@
 //! 并把状态机推向正确的一环。
 
 use bevy::prelude::*;
+use cute_of_duty_server::model::{VoxelAnimationSpec, VoxelModelSpec};
 use cute_of_duty_server::net::protocol::{EventKind, ServerMessage};
 
 use crate::net::network::{ClientInbound, ControlBuffer};
@@ -38,6 +39,19 @@ pub struct CjkFont(pub Option<Handle<Font>>);
 #[derive(Resource, Default)]
 pub struct LocalPlayer {
     pub entity_id: u64,
+}
+
+/// 服务端下发的体素模型目录（握手后一次性灌入的内存副本）。
+///
+/// 设计动机（Why）：几何/动画属服务端易变内容，客户端不持有源文件；本资源保存
+/// `ServerMessage::ModelCatalog` 下发的规格，供 `world::voxel_model` 渲染本人模型、
+/// `world::voxel_idle` 求值动画。"谁用哪个模型"仍由快照 `model_preset` 裁决。
+#[derive(Resource, Default)]
+pub struct ModelCatalog {
+    /// 体素模型几何（骨/盒/枢轴）。
+    pub models: Vec<VoxelModelSpec>,
+    /// 体素动画 clip（骨名 → 旋转表达式）。
+    pub animations: Vec<VoxelAnimationSpec>,
 }
 
 /// 本端视角姿态（鼠标自由视角的偏航/俯仰）。
@@ -94,7 +108,7 @@ pub struct SeqCounter(pub u64);
 
 /// 初始化全局资源与中文字体（Startup；UI 系统在句柄就绪前会自担跳过本帧）。
 pub fn setup_global(mut commands: Commands, mut fonts: ResMut<Assets<Font>>) {
-    if let Ok(font) = Font::try_from_bytes(include_bytes!("../assets/zcool_kuaile.ttf").to_vec()) {
+    if let Ok(font) = Font::try_from_bytes(include_bytes!("../menu/zcool_kuaile.ttf").to_vec()) {
         commands.insert_resource(CjkFont(Some(fonts.add(font))));
     }
     commands.insert_resource(LocalPlayer::default());
@@ -132,6 +146,7 @@ pub fn route_control_messages(
     mut live: ResMut<LiveLatency>,
     mut announces: ResMut<Announcements>,
     mut kills: ResMut<KillCount>,
+    mut catalog: ResMut<ModelCatalog>,
     mut load_timer: Local<f32>,
     time: Res<Time>,
 ) {
@@ -164,6 +179,11 @@ pub fn route_control_messages(
                 }
                 ClientInbound::Server(ServerMessage::ReturnToMenu) => {
                     next_state.set(AppState::MainMenu);
+                }
+                ClientInbound::Server(ServerMessage::ModelCatalog { models, animations }) => {
+                    // 握手后一次性灌入体素模型/动画目录（本人模型渲染 + idle 动画求值的数据源）。
+                    catalog.models = models;
+                    catalog.animations = animations;
                 }
                 _ => {}
             }

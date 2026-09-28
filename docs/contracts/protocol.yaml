@@ -1,7 +1,7 @@
 # =============================================================================
 # Cute Of Duty · 线格式契约（machine-readable contract）
 # =============================================================================
-# 状态：草案 v0.9.1 —— 【尚不是权威源】
+# 状态：草案 v0.10.0 —— 【尚不是权威源】
 #   本文件目前是「手工整理的意图」，权威实现仍是 ServerCode/net/protocol.rs。
 #   权威源反转（YAML 为准、代码由 YAML 校验）是后续独立任务，见 docs/stop-doing.md。
 #
@@ -17,14 +17,15 @@
 # =============================================================================
 
 contract: protocol
-version: 0.9.1
+version: 0.10.0
 status: draft
 owner_module: ServerCode/net
 authoritative_impl: ServerCode/net/protocol.rs
 compat:
-  previous: 0.9.0
+  previous: 0.9.1
   breaking: false
-  migration_guide: null   # z+1 兼容性修复：不改字段，仅修手雷弹道/预览；0.9.0 的加性字段见 barek-history
+  migration_guide: null   # y+1 加性兼容：新增下行 ServerMessage::ModelCatalog，且 VoxelCube 新增可选字段 mat（逐盒材质键）；
+                          #   均为只增不改；老客户端忽略 ModelCatalog 即可，缺 mat 时按骨名兜底着色，行为不劣化
 
 # -----------------------------------------------------------------------------
 # 上行：客户端 → 服务端
@@ -101,6 +102,22 @@ downlink:
     removed_fields:
       - { name: medkit,  removed_in: 0.8.0, replaced_by: backpack }
       - { name: grenade, removed_in: 0.8.0, replaced_by: backpack }
+
+  ServerMessage:
+    # TODO(核对): 下列变体清单仅覆盖本次变更涉及项，需与 protocol.rs 全量对齐
+    variants:
+      - name: Handshake
+      - name: Snapshot
+      - name: Event
+      - name: Pong
+      - name: ReturnToMenu
+      - name: ModelCatalog          # 0.10.0 新增
+        added_in: 0.10.0
+        doc: 握手后一次性下发体素模型目录（几何骨/盒 + 动画 clip 表达式），供客户端渲染本人干员模型；
+             静态数据，仅在连接时发送一次，不进每帧快照
+        fields:
+          - { name: models,     type: "Vec<VoxelModelSpec>",     required: true, doc: "体素模型几何（骨/盒/枢轴）；盒含可选 mat 材质键（语义名，客户端据此逐盒取色）" }
+          - { name: animations, type: "Vec<VoxelAnimationSpec>", required: true, doc: 体素动画 clip（骨名 → 旋转表达式） }
 
 # -----------------------------------------------------------------------------
 # 共享值类型

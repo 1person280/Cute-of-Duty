@@ -1,11 +1,11 @@
-//! HUD 贴图资源：一次性把 `assets/ui/` 剩余贴图交给 AssetServer 加载，供 HUD 作为底图。
+//! HUD 贴图资源：一次性把 `menu/icon/` 剩余贴图交给 AssetServer 加载，供 HUD 作为底图。
 //!
 //! 设计动机（贴图+过程化混合）：HUD 数值**不依赖任何贴图**——贴图未就绪时对应
 //! `ImageNode` 不显示，过程化彩色条/文本照样出画，绝不让玩家卡死或崩掉。
 //!
 //! 精简说明（为何只剩 gear）：旧版遗留的多张 1920² 概念美术底图（血条底/头像/小地图框/
 //! 撤离图标）既与体素低模美术方向相悖，又徒增显存与加载耗时，已整体废弃；仅保留体积极小的
-//! `gear_icon.png`（装备页图标），其余 HUD 一律走过程化绘制。
+//! `settings.png`（装备/设置页图标），其余 HUD 一律走过程化绘制。
 
 use bevy::asset::AssetServer;
 use bevy::prelude::*;
@@ -27,7 +27,7 @@ impl UiAssets {
     /// 以 `AssetServer` 请求加载全部贴图（句柄立即返回，资源后台异步就绪）。
     fn begin_load(asset_server: &AssetServer) -> Self {
         Self {
-            gear: Some(asset_server.load("ui/gear_icon.png")),
+            gear: Some(asset_server.load("menu/icon/settings.png")),
             ready: false,
         }
     }

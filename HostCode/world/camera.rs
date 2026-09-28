@@ -42,10 +42,14 @@ pub struct ChaseCamera {
     pub arm_dist: f32,
 }
 
-/// 镜头到角色的臂长（米，旧版 `ARM_LEN_NORMAL` 的收敛值）。
-const CAMERA_DIST: f32 = 4.2;
-/// 越肩机位的右肩水平偏移（米）：镜头右移后角色落于画面偏左，形成越肩观感。
-const SHOULDER_OFFSET: f32 = 0.65;
+/// 镜头到角色的臂长（米，沿 0.3.2 `ARM_LEN_NORMAL` 标定值）。
+///
+/// 设计动机（Why）：该值按角色实际身高标定。焰狐体素模型 32 设计像素 × `YANHU_S=0.11`
+/// ≈ **3.52m**，与 0.3.2 的 3.5m 体型一致，故直接沿用旧版 6.5m 臂长；此前 4.2m 是给
+/// 旧方块回退角色（约 2.67m）调的，套到焰狐身上会让模型怼满屏幕（"外观怪异"）。
+const CAMERA_DIST: f32 = 6.5;
+/// 越肩机位的右肩水平偏移（米，0.3.2 `ARM_SHOULDER_X_NORMAL`）：镜头右移后角色落于画面偏左。
+const SHOULDER_OFFSET: f32 = 0.55;
 /// 瞄准时的臂长（米，镜头贴近右肩，旧版 `ARM_LEN_AIM`）。
 const AIM_DIST: f32 = 2.4;
 /// 瞄准时的右肩偏移（米）：比常态更外扩，避免贴脸时角色糊住画面。
@@ -54,8 +58,9 @@ const AIM_SHOULDER: f32 = 1.0;
 const AIM_BLEND_SECS: f32 = 0.22;
 /// 瞄准时 FOV 收窄比例（28%），由投影侧读取（见 [`ChaseCamera::aim_blend`]）。
 pub const AIM_FOV_NARROW: f32 = 0.28;
-/// 视线锚点高度（角色肩颈处；角色整体高约 2.67m，取肩部保证全身在框）。
-const PIVOT_Y: f32 = 1.55;
+/// 视线锚点高度（米，沿 0.3.2 `PIVOT_HEIGHT` 标定值）：落在角色肩颈处（焰狐头中心约 3.0m），
+/// 保证 3.52m 全身在框。此前 1.55 是按旧方块回退角色身高取的，套到焰狐身上会仰视、只见下半身。
+const PIVOT_Y: f32 = 2.6;
 /// 俯仰限位：抬头不高于 +0.55（约 31°）、低头不低于 -0.75（约 -43°），
 /// 避免镜头钻到角色脚下/贴地。瞄准用 `AimRig.pitch` 另有更宽的限位。
 const ORBIT_PITCH_MIN: f32 = -0.75;

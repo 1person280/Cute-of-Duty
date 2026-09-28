@@ -1,6 +1,6 @@
 ---
 name: game-art-creation
-description: Cute Of Duty 游戏美术创作指南——用 PowerShell + System.Drawing 程序化生成与游戏「3D 像素可爱风」一致的美术资产（图标/贴图/占位图），统一使用游戏内色板；角色建模遵循 [YSM] 是，史蒂夫模型 (Yes Steve Model) mod 的方块人美学。凡用户要求画图、生成图标、贴图、纹理、立绘、角色模型、建模（如"按史蒂夫模型美学做角色"）、UI 元素、配色/调色板，或为角色、武器、环境、UI 新增或修改美术资产时使用——即使用户没说"美术"二字，或只说"画一个""做个图标""这个颜色不对"。
+description: Cute Of Duty 游戏美术创作指南——用 PowerShell + System.Drawing 程序化生成与游戏「3D 像素可爱风」一致的美术资产（图标/贴图/占位图），统一使用游戏内色板；角色建模遵循 [YSM] 是，史蒂夫模型 (Yes Steve Model) mod 的方块人美学。内置「量化美学规范」把圆润/Q 弹/描边等形容词转成比例、圆角、描边宽度、用色占比、动画时长等具体数字。凡用户要求画图、生成图标、贴图、纹理、立绘、角色模型、建模（如"按史蒂夫模型美学做角色"）、UI 元素、配色/调色板，或为角色、武器、环境、UI 新增或修改美术资产，或要求统一/量化美术规范、给具体设计数值时使用——即使用户没说"美术"二字，或只说"画一个""做个图标""这个颜色不对"。
 ---
 
 # Cute Of Duty 美术创作
@@ -38,7 +38,53 @@ description: Cute Of Duty 游戏美术创作指南——用 PowerShell + System.
 [references/style-guide.md](references/style-guide.md) 的「角色建模规范」+
 steve-model-mod-reference.webp（YSM 的 Alt+Y 模型浏览器截图）。
 
-## 第二步：用 PowerShell + System.Drawing 生成
+## 第二步：先量化，再动手（把形容词变成数字）
+
+「圆润」「Q 弹」「轻描边」「小而精」这类形容词不可执行，落到脚本里必须是数字。
+**生成任何资产前，先把下表的数字写进脚本常量**；完整表与推导见
+[references/style-guide.md](references/style-guide.md) 的「量化美学规范」。
+
+几何（128px 画布基准，其他尺寸按画布短边等比缩放）：
+
+- 主体包围盒占画布 **70–80%**（128 画布即 90–102px），居中偏差 ≤ 2px。
+- 外描边宽 **3–5px**（≈ 画布短边 2.5–4%），只描最外轮廓一刀，别里外双描。
+- 圆角半径 = 画布短边 **8–15%**（可爱偏圆取上限）；体素单块保留直角，靠整体轮廓圆。
+- 内边距 ≥ 画布短边 **10%**（128 画布即 ≥12.8px），主体不得贴边。
+
+色彩：
+
+- 单张图用色 **≤ 6 种**：主色 **60–70%** / 次色 **20–30%** / 元素点缀 **5–10%**（60-30-10 法则）。
+- 军事底色饱和度 **S ≤ 0.40**；元素色饱和度 **S ≥ 0.75**——靠饱和度差拉辨识度，不靠加色块。
+- 明暗分三层（亮/基/暗），相邻层明度差 **≥ 0.12**；暗部不低于基色明度 −0.25，避免死黑。
+- 主体与 UI 深底 #1F242E 的对比度 **≥ 3:1**（图标可辨下限）；正文文字分级按 WCAG AA 4.5:1。
+
+像素 / 体素：
+
+- 网格 1 格 = 1 单位；贴图基准 **16×16 或 32×32**，放大一律最近邻（Nearest），禁止模糊插值。
+- 轮廓线宽 **1 单位**；禁止孤立 1×1 细节像素（会糊成噪点）。
+
+比例（角色，1 单位 = 0.056m）：
+
+- 原版骨架头 : 身 : 肢高比 ≈ 1 : 1.5 : 1.5；Q 版把**头放大到身高 1/4–1/3**，肩窄、四肢短粗。
+- 总高 **32 单位 ≈ 1.8m**，与现有 voxel 角色同尺度共存。
+
+节奏（UI / 留白）：
+
+- 全局 **8px 网格**，间距只取 4 / 8 / 12 / 16；面板内边距 ≥ 12px。
+
+动画：
+
+- 时长：待机呼吸 **2–4s**、走路循环 **0.8–1.0s**、抬枪/瞄准 **0.15–0.25s**。
+- 幅度：摆臂 **±25°**、呼吸起伏 ≤ 身高 **5%**；耳朵/尾巴滞后本体 **1–2 帧**。
+- 缓动统一 **ease-in-out**（Bevy 用平滑插值或 `smoothstep`），别用线性。
+
+光照（3D 场景）：
+
+- 主光与水平面夹角 **35–55°**；环境光/补光占比 **≥ 30%**，避免暗面死黑。
+
+> 数字是**默认起点**而非铁律：有意偏离时必须在交付汇报里写明偏离项与理由。
+
+## 第三步：用 PowerShell + System.Drawing 生成
 
 本机**没有 Python、没有 Node、没有 ImageMagick/ffmpeg**，不要尝试这些。
 已验证的美术生成路径是 PowerShell 的 System.Drawing——项目先例
@@ -66,7 +112,7 @@ steve-model-mod-reference.webp（YSM 的 Alt+Y 模型浏览器截图）。
 powershell -NoProfile -Command "$p='tools\xxx.ps1'; $t=[System.IO.File]::ReadAllText($p,[System.Text.Encoding]::UTF8); [System.IO.File]::WriteAllText($p,$t,(New-Object System.Text.UTF8Encoding $true))"
 ```
 
-补完 BOM 再运行生成，并按第四步目检。
+补完 BOM 再运行生成，并按第五步目检。
 
 **其余 PowerShell 陷阱（实测踩过）：**
 
@@ -77,27 +123,25 @@ powershell -NoProfile -Command "$p='tools\xxx.ps1'; $t=[System.IO.File]::ReadAll
   数组成员里的算术表达式要加括号：`@(($x + 8), 60)`。
 - **函数第一参传负数字面量**会被当成参数名（`PX -4 32 -4` 报错）；用变量传参。
 
-## 第三步：落盘与命名
+## 第四步：落盘与命名
 
 | 目录 | 内容 |
 |---|---|
-| assets/ui/ | HUD、菜单、图标（代码引用形如 `assets.load("ui/xxx.png")`） |
-| assets/weapons/ | 武器 |
-| assets/characters/ | 角色 |
-| assets/environment/ | 环境 |
-| assets/elements/ | 元素相关（当前为空） |
+| HostCode/menu/icon/ | 菜单/HUD 图标（代码引用形如 `assets.load("menu/icon/xxx.png")`；`AssetPlugin` 根 = HostCode 包根） |
+| HostCode/menu/ | 中文字体等客户端冷资源（`zcool_kuaile.ttf`） |
+| ServerCode/model/ | 体素模型几何/动画 JSON（**易变内容归服务端**，握手后经 `ModelCatalog` 下发，客户端不持有） |
 
 - 文件名全小写 snake_case；UI/物品图标统一 128×128。
-- 需要透明的图（图标、HUD 元素）**必须 PNG**——JPG 没有透明通道，现有 .jpg 全是方形概念图。
-- 游戏内代码引用路径相对 `assets/`，如 `assets.load("ui/gear_icon.png")`，见 demo3d/src/main.rs:464。
-- 注意：assets/ 下现有 .jpg（角色/武器/环境/element_icons）是早期 AI 概念图，
-  **没有任何代码引用**。要把美术真正接进游戏：用 PNG，并在 demo3d/src/main.rs 里
-  `assets.load()` 加载（仅 demo 壳持有 bevy，核心库 src/ 永远不引用资产）。
+- 需要透明的图（图标、HUD 元素）**必须 PNG**——JPG 没有透明通道。
+- 游戏内代码引用路径相对 `HostCode/` 包根，如 `assets.load("menu/icon/settings.png")`，见 [menu_main.rs](../../../HostCode/menu/menu_main.rs)。
+- 角色/武器/环境等造型已改由**服务端体素模型 + 过程化配色**生成（见 [voxel_model.rs](../../../HostCode/world/voxel_model.rs)），
+  不再依赖客户端概念美术贴图；旧 `assets/` 目录已废弃。
 
-## 第四步：自检后再交付
+## 第五步：自检后再交付
 
 生成完必须用 Read 工具打开 PNG 亲眼检查——形状是否可辨、透明是否生效、
 颜色是否落在色板上——再向用户汇报。汇报包含：文件路径、尺寸、用了哪些色板值。
+**并按第二步的量化表逐项核数**（主体占比、描边宽、用色数、对比度），偏离项要写明理由。
 
 ## Bevy 0.14 集成陷阱（把美术接进游戏时）
 
@@ -105,4 +149,4 @@ powershell -NoProfile -Command "$p='tools\xxx.ps1'; $t=[System.IO.File]::ReadAll
 - 特效网格/材质必须入池共享（MaterialPool），逐发新建会复现已修复过的爆炸 OOM。
 - UI 默认用 NodeBundle + BackgroundColor 纯色而不是贴图；只有图标类才需要 Image 资产。
 - `Color::srgb(r, g, b)` 收 0~1 浮点；半透明用 `Color::srgba(..., a)` 或 `.with_alpha(a)`。
-- 中文字体用 assets/zcool_kuaile.ttf（站酷快乐体，SIL OFL 1.1，圆润可爱风）。
+- 中文字体用 HostCode/menu/zcool_kuaile.ttf（站酷快乐体，SIL OFL 1.1，圆润可爱风）。

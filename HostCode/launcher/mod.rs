@@ -25,10 +25,10 @@ pub fn run(addr: &str) {
     });
 
     App::new()
-        // 贴图/资源根目录固定在 HostCode/assets（编译期绝对路径），
-        // 摆脱「exe 所在目录/cwd」依赖 —— 否则 bevy 会去 target\debug\assets 找不到旧 UI 贴图。
+        // 资源根目录固定在 HostCode 包根（编译期绝对路径），摆脱「exe 所在目录/cwd」依赖
+        // —— 否则 bevy 会去 target\release 找不到 `menu/` 下的图标/字体。
         .add_plugins(DefaultPlugins.set(AssetPlugin {
-            file_path: concat!(env!("CARGO_MANIFEST_DIR"), "/assets").to_string(),
+            file_path: env!("CARGO_MANIFEST_DIR").to_string(),
             ..default()
         }))
         .insert_resource(crate::net::SnapshotBuffer::new(snapshot_rx))
@@ -36,6 +36,10 @@ pub fn run(addr: &str) {
         .insert_resource(crate::net::NetOut(up_tx))
         // 造型材质缓存：避免实体随 AOI 进出视野反复 spawn 时材质资源单调累积。
         .init_resource::<crate::net::EntityMaterials>()
+        // 体素材质缓存（颜色 → 句柄）：本人焰狐模型的盒按色复用材质。
+        .init_resource::<crate::world::VoxelMaterials>()
+        // 服务端下发的体素模型/动画目录（握手后由 route_control_messages 灌入）。
+        .init_resource::<crate::flow::ModelCatalog>()
         // 中文字体句柄默认缺失（Default=None）但资源恒存在，避免任何 UI 系统
         // 在字体注入前的首帧对 `Res<CjkFont>` 取值 panic。
         .init_resource::<crate::flow::CjkFont>()
@@ -85,7 +89,14 @@ pub fn run(addr: &str) {
             Update,
             (
                 crate::net::receive_snapshots,
+                // 控制消息路由须先于实体对账：本人实体 ID 与体素模型目录均在此灌入，
+                // 若晚于 `apply_entities`，首帧快照会把本人按方块回退落成（随后不再重建）。
+                crate::flow::route_control_messages,
                 crate::net::apply_entities,
+                // 体素 idle 动画：对本人模型枢轴按服务端下发的表达式写入旋转。
+                crate::world::drive_idle,
+                // 本人模型朝向：每帧对齐视线偏航（第三人称「人随视线转」，修复"永远向北"）。
+                crate::world::face_aim_direction,
                 // 持雷态同步须先于视角/相机/上行：三处都要读同一份结论。
                 crate::hud::sync_held_grenade,
                 crate::world::mouse_look_system.run_if(crate::hud::gameplay_input_active),
@@ -94,7 +105,6 @@ pub fn run(addr: &str) {
                 // 投掷轨迹预览：读同一份持雷态与朝向，用与服务器同源的弹道常数画预测抛物线。
                 crate::world::draw_grenade_preview,
                 crate::world::follow_system.run_if(crate::menu::pause_closed),
-                crate::flow::route_control_messages,
                 crate::shared::refresh_ui_ready,
                 crate::net::caps_toggle,
                 crate::net::spawn_panel,

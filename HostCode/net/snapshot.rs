@@ -10,7 +10,9 @@ use bevy::prelude::*;
 use cute_of_duty_server::model::ModelPreset;
 use cute_of_duty_server::net::protocol::EntitySnapshot;
 
+use crate::flow::{LocalPlayer, ModelCatalog};
 use crate::world::model::{tint_code, tint_colors, voxel_for};
+use crate::world::voxel_model::{spawn_voxel_body, VoxelMaterials, VoxelRendered};
 
 /// 已渲染实体的根标记：记住服务端实体 ID，供跨帧对账。
 #[derive(Component)]
@@ -114,32 +116,53 @@ pub fn apply_entities(
     mut commands: Commands,
     buffer: Res<SnapshotBuffer>,
     cube: Res<CubeMesh>,
+    local: Res<LocalPlayer>,
+    catalog: Res<ModelCatalog>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut entity_mats: ResMut<EntityMaterials>,
-    mut query: Query<(Entity, &mut Transform, &RenderedEntity)>,
+    mut voxel_mats: ResMut<VoxelMaterials>,
+    mut query: Query<(Entity, &mut Transform, &RenderedEntity, Option<&VoxelRendered>)>,
 ) {
     // 快照里仍然存活/可见的 ID（AOI 过滤后仅服务端下发的就是应渲染的）
     let present: HashSet<u64> = buffer.current.iter().map(|e| e.entity_id).collect();
 
     // 1) 同步既有实体的坐标；收集本地 ID 以便随后判定缺失
     let mut local_ids: HashSet<u64> = HashSet::new();
-    for (_, mut tf, rendered) in query.iter_mut() {
-        local_ids.insert(rendered.id);
+    for (entity, mut tf, rendered, voxel) in query.iter_mut() {
         if let Some(entry) = buffer.current.iter().find(|e| e.entity_id == rendered.id) {
             // 位置以服务端权威为准，直接套用
             tf.translation = Vec3::new(entry.x, entry.y, entry.z);
+            // 本人模型补齐：目录已抵达、且此前是按方块回退落成的 → 拆掉重建为体素模型。
+            // 「握手/模型目录」与「首帧快照」分属两路通道、抵达次序不定，本人实体可能先以方块
+            // 落成并从此不再重建（本地集合已记住该 ID），故此处做幂等对账予以升级。
+            let is_local = local.entity_id != 0 && rendered.id == local.entity_id;
+            let has_spec = catalog.models.iter().any(|m| m.preset == entry.model_preset);
+            if is_local && voxel.is_none() && has_spec {
+                commands.entity(entity).despawn_recursive();
+                continue; // 不入 local_ids → 下一步按体素模型重新生成
+            }
         }
+        local_ids.insert(rendered.id);
     }
 
     // 2) 生成快照里有、本地还没有的实体
     for entry in &buffer.current {
         if !local_ids.contains(&entry.entity_id) {
-            spawn_body(&mut commands, &cube, &mut materials, &mut entity_mats, entry);
+            spawn_body(
+                &mut commands,
+                &cube,
+                &local,
+                &catalog,
+                &mut materials,
+                &mut entity_mats,
+                &mut voxel_mats,
+                entry,
+            );
         }
     }
 
     // 3) 销毁本地已有、但快照里已消失的实体（不留幽灵）
-    for (entity, _, rendered) in query.iter() {
+    for (entity, _, rendered, _) in query.iter() {
         if !present.contains(&rendered.id) {
             // 必须**递归**销毁：造型根下挂着躯干/头部子方块，bevy 0.14 的 `despawn()`
             // 是非递归的（`EntityCommands::despawn` 只删单个实体、且不动父子关系），
@@ -160,13 +183,39 @@ pub fn apply_entities(
 /// 玩家在出生点自然"看不见自己、也看不见靶机"（此前被误判为 AOI 遮蔽）。
 /// 故此处用 `SpatialBundle` 一次性补齐 Transform / GlobalTransform /
 /// Visibility / InheritedVisibility / ViewVisibility。
+#[allow(clippy::too_many_arguments)]
 fn spawn_body(
     commands: &mut Commands,
     cube: &CubeMesh,
+    local: &LocalPlayer,
+    catalog: &ModelCatalog,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     entity_mats: &mut ResMut<EntityMaterials>,
+    voxel_mats: &mut ResMut<VoxelMaterials>,
     entry: &EntitySnapshot,
 ) {
+    // 本人实体：优先用服务端下发的体素模型渲染（目录未到则本帧跳过、留待下一帧带模型生成，
+    // 避免先出方块再重建）。敌人/靶机/道具仍走下方方块回退。
+    if local.entity_id != 0 && entry.entity_id == local.entity_id {
+        if let Some(spec) = catalog.models.iter().find(|m| m.preset == entry.model_preset) {
+            let mut root = commands.spawn((
+                RenderedEntity { id: entry.entity_id },
+                VoxelRendered,
+                SpatialBundle {
+                    transform: Transform::from_translation(Vec3::new(entry.x, entry.y, entry.z))
+                        .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
+                    ..default()
+                },
+            ));
+            spawn_voxel_body(&mut root, cube, materials, voxel_mats, spec);
+            return;
+        }
+        if catalog.models.is_empty() {
+            // 模型目录尚未到达：先不生成本人实体，待目录抵达后一次性带模型生成。
+            return;
+        }
+    }
+
     let body = voxel_for(entry.model_preset);
     // 配色变体由服务端下发的可交互语义折算（弹药/医疗/元素手雷/站点各一色）。
     let tint = tint_code(entry.interact.as_ref().map(|i| &i.kind));

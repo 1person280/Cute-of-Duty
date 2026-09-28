@@ -7,5 +7,7 @@
 pub(crate) mod flow_state;
 pub(crate) mod loading;
 
-pub(crate) use flow_state::{AppState, CjkFont, route_control_messages, setup_global};
+pub(crate) use flow_state::{
+    route_control_messages, setup_global, AppState, CjkFont, LocalPlayer, ModelCatalog,
+};
 pub(crate) use loading::{loading_tick, spawn_loading};

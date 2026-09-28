@@ -31,9 +31,9 @@ Cute Of Duty 1: Simple — 项目许可范围声明
 
 4. 第三方组件
    项目依赖的第三方库、字体等，许可归各自权利人；其许可不因本文件而改变。
-   中文字体：`HostCode/assets/zcool_kuaile.ttf`（站酷快乐体 ZCOOL KuaiLe），
+   中文字体：`HostCode/menu/zcool_kuaile.ttf`（站酷快乐体 ZCOOL KuaiLe），
    以 SIL Open Font License 1.1 授权（**非**本项目授权），随附许可证全文见
-   `HostCode/assets/zcool_kuaile_OFL.txt`；第三方字体不适用本文件与 `LICENSE-ASSETS`。
+   `HostCode/menu/zcool_kuaile_OFL.txt`；第三方字体不适用本文件与 `LICENSE-ASSETS`。
 
 =======================================================================
 

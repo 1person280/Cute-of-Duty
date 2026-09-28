@@ -10,7 +10,7 @@ use crate::element::{ElementType, EntityElementState};
 use crate::equipment::{EquipmentElement, EquipmentTier, EquipmentType};
 use crate::interact::{InteractChoice, InteractInfo};
 use crate::items::{LootItem, TransferDir};
-use crate::model::ModelPreset;
+use crate::model::{ModelPreset, VoxelAnimationSpec, VoxelModelSpec};
 
 /// 权威快照中的单个实体条目。
 ///
@@ -185,6 +185,15 @@ pub enum EventKind {
 pub enum ServerMessage {
     /// 握手应答：告知分配的权威实体 ID 与 Tick 率
     Handshake { assigned_id: u64, tick_rate_hz: u32 },
+    /// 模型目录（0.10.0 新增）：服务端权威的体素几何/动画，握手后一次性下发。
+    ///
+    /// 设计动机（Why）：造型源文件属服务端易变内容，客户端不持有几何；本消息把骨/盒/
+    /// 动画表达式灌入客户端内存，客户端据此渲染（"谁用哪个模型"仍由快照 preset 裁决）。
+    /// 静态数据、仅连接时发一次，不进每帧快照通道。
+    ModelCatalog {
+        models: Vec<VoxelModelSpec>,
+        animations: Vec<VoxelAnimationSpec>,
+    },
     /// 每固定 Tick 下发的权威快照（已按 AOI 兴趣区域过滤）
     Snapshot { seq: u64, entries: Vec<EntitySnapshot> },
     /// 瞬时事件（击杀/受击/拾取/通告），与快照独立、各自按序下发
@@ -268,6 +277,11 @@ mod tests {
         let server_cases: Vec<ServerMessage> = vec![
             ServerMessage::Pong { seq: 7 },
             ServerMessage::ReturnToMenu,
+            // 模型目录（0.10.0 加性变体）：几何/动画随协议下行必须可往返。
+            ServerMessage::ModelCatalog {
+                models: crate::model::catalog(),
+                animations: crate::model::animations(),
+            },
         ];
         for msg in &server_cases {
             let line = msg.to_line();

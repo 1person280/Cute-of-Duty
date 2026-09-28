@@ -6,6 +6,16 @@
 //!
 //! 本模块不含任何渲染代码，只产出被称为 `ModelPreset` 的身份标记——它是客户端
 //! 渲染器与服务端世界之间的一份"冷映射"契约：preset 稳定、客户端据此选网格。
+//!
+//! 体素几何/动画的权威解析见子模块 [`loader`]：造型内容（骨/盒/表达式）由服务端
+//! 从编译期嵌入的 `FireFox.json` 解析，并经协议下发到客户端内存供渲染。
+
+pub mod loader;
+
+pub use loader::{
+    animations, catalog, RotationExpr, VoxelAnimationSpec, VoxelBone, VoxelBoneTrack, VoxelCube,
+    VoxelModelSpec,
+};
 
 use crate::entity::EntityType;
 

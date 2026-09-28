@@ -276,6 +276,15 @@ fn drain_commands(
                         tick_rate_hz: 60,
                     },
                 );
+                // 模型目录：握手后一次性下发服务端权威的体素几何/动画（静态冷数据，
+                // 经 OnceLock 内缓存，多连接复用同一份，不进每帧快照通道）。
+                rt.send_to(
+                    conn_id,
+                    ServerMessage::ModelCatalog {
+                        models: cute_of_duty_server::model::catalog(),
+                        animations: cute_of_duty_server::model::animations(),
+                    },
+                );
             }
             NetCommand::Input { conn_id, player } => {
                 // 连续量（移动/朝向）只记最新；边沿量（换弹/技能）在一个 Tick 内可能被更晚

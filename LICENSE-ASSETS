@@ -9,9 +9,9 @@ Cute Of Duty 1: Simple — 非代码资产许可（项目范围声明）
   `tools/` 下的 `.rs` / `.toml` / `.yaml` 等）。源代码的许可见仓库根目录 `LICENSE`
   （GNU GPLv3 + Linking Exception）。
 · 第三方素材不适用本文件，权利归各自权利人，须遵守其自身许可条款。当前已知的
-  第三方素材：中文字体 `HostCode/assets/zcool_kuaile.ttf`（站酷快乐体 ZCOOL KuaiLe），
+  第三方素材：中文字体 `HostCode/menu/zcool_kuaile.ttf`（站酷快乐体 ZCOOL KuaiLe），
   以 **SIL Open Font License 1.1** 授权，许可证全文见随附的
-  `HostCode/assets/zcool_kuaile_OFL.txt`，不在本项目 CC BY-NC-SA 授权范围之内。
+  `HostCode/menu/zcool_kuaile_OFL.txt`，不在本项目 CC BY-NC-SA 授权范围之内。
 
 以下为 Creative Commons BY-NC-SA 4.0 官方标准法律文本（原文照录，未作修改）。
 官方源：https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode

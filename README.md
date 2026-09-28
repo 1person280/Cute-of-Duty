@@ -9,7 +9,7 @@
 
 [![License: GPL-3.0 (code)](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
 [![License: CC BY-NC-SA 4.0 (assets)](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-lightgrey.svg)](LICENSE-ASSETS)
-[![Version](https://img.shields.io/badge/Version-0.6-blue.svg)](#五版本历史)
+[![Version](https://img.shields.io/badge/Version-0.10-blue.svg)](#五版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
 
 **外部依赖 · 站在开源社区的肩膀上** · [![by Bevy](https://img.shields.io/badge/by-Bevy-E90000)](https://bevyengine.org)
@@ -193,9 +193,9 @@ cargo-wrap build --release --workspace      # 发布构建，产出 cod_server.e
 
 | 目录 | 用途 | 说明 |
 |---|---|---|
-| `assets/` | 美术资源（游戏内加载） | `characters/` `environment/` `fonts/` `ui/` `weapons/`；中文字体 `zcool_kuaile.ttf`（附 OFL 许可） |
+| `HostCode/menu/` | 客户端美术资源（随 exe 相对包根加载） | `icon/settings.png`（菜单齿轮图标）、中文字体 `zcool_kuaile.ttf`（附 OFL 许可） |
 | `ServerCode/config/` | **配置表（含加载器，与核心代码物理相邻）** | `element_reactions.yaml`：**单一事实来源**——默认值由 `include_str!` 编译期嵌入，运行时同路径文件作为设计师热改覆盖 |
-| `ServerCode/model/` | 模型文件（易变化资源） | 经快照 `ModelPreset` 下发客户端 |
+| `ServerCode/model/` | 模型文件（易变化资源） | 体素几何/动画 JSON；握手后经 `ModelCatalog` 下发客户端渲染本人模型 |
 | `tools/` | 开发辅助 | `cargo-wrap`（编译封装，产物不入库）+ PowerShell 辅助脚本 |
 | `.agents/skills/` | AI 协作工作流文档 | 美术创作 / 地图验收等技能说明 |
 | `.github/workflows/rust.yml` | CI | push/PR 到 `main` 自动跑 `cargo build` + `cargo test` |
@@ -261,6 +261,7 @@ TCP 的可靠传输更好保障**元素状态、技能效果、背包交互**等
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| **0.10（Release）** | 2026-09-28 | **模型修复**：客户端首次可见本人「焰狐」体素模型。①**服务端下发模型目录**（几何+动画随握手一次性下行，协议 `0.10.0`，y+1 加性）；②**焰狐几何重建**——修「四肢左右镜像颠倒 / 枪悬空 1.15m / 狐耳内折」三处硬伤，35→43 盒并优化造型；③**逐盒材质键**（`VoxelCube.mat`）——此前只按骨名着色致细节全被抹平、模型退化为一坨纯色方块，现按 0.3.2 色板逐盒上色；④**朝向随视线**（修「永远向北」）+ 相机按 3.52m 体型重新标定；⑤**扁平化**——解析器 `voxel_spec.rs`→`loader.rs`、两份 JSON 合并为单文件 `FireFox.json`、`mod.rs` 网关重导出保路径稳定。**未做**：多人联机 / 匹配机制 / 无掩体竞技场。**下一版本目标**：`0.6.1` 网游版本（①多玩家 → ②匹配机制 → ③无掩体竞技场）。**本轮冻结（下次修）**：无新增，遗留项见 [docs/frozen-tasks](docs/frozen-tasks/snapshot-8-playtest-feedback.md)。 |
 | **0.6（Release）** | 2026-09-27 | **单机落幕 · 正式发布**：收官补齐手雷「先瞄准后释放」持雷态、可点击操作按钮组（`B`）、legacy 操作表逐行核对；修复三条实机缺陷（手雷重力未写回致走直线、新增抛物线预览、释放光标后视角仍转）——协议 `0.9.1`。**下一版本目标：0.6.1 网游版本**（①多玩家 → ②匹配机制 → ③无掩体竞技场） |
 | 0.6-Snapshot-1…10（Pre-Release） | 2026-09-25 ~ 09-27 | **由单 crate 迁移为双 crate workspace，并逐快照还原玩法**：确立 `ServerCode`（服务端权威模拟 + TCP 网络层）/ `HostCode`（客户端表现层）物理分离；训练场迁移至 0.3.2 `map::lawn` 1×1km 露天搜打撤大场 + `~` 暂停菜单 + 断线自动重连；越肩瞄准全套（SpringArm + 撞墙避障 + 越肩取景）；地图交互端到端（`F` 交互面板 / 物资箱 / 补给台 4×3 双向格位 / Tab 背包总览）；消耗品 `3`/`4`（医疗包 / 手雷）与手雷「先瞄准后释放」；备用子弹改为可堆叠背包物品（弹药 ×64 / 恢复·战术 ×16 / 工具不可堆叠）；HUD 图标化 + 战术大地图；架构边界体系落地（ADR 0001–0004 / 模块边界 / 契约 YAML / 冻结区）。逐快照完整记录见 [barek-history.md](docs/barek-history.md) |
 
