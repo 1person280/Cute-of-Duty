@@ -5,13 +5,13 @@
 #   本文件目前是「手工整理的意图」，权威实现仍是 ServerCode/net/protocol.rs。
 #   权威源反转（YAML 为准、代码由 YAML 校验）是后续独立任务，见 docs/stop-doing.md。
 #
-# 版本规则（与 CONTRIBUTING 一致）：
-#   x+1 = 不兼容变更，必须附迁移指南（写入 docs/barek-history.md）
-#   y+1 = 加性兼容变更（只增字段/只增消息）
-#   z+1 = 仅兼容性修复，语义不变
+# 统一版本号 x.y.z（协议 = 游戏 = 发布号，与 CONTRIBUTING 第六节一致）：
+#   x+1 = 游戏内核严重破坏（老客户端整体不可用），y、z 归零
+#   y+1 = 协议不兼容（删字段/改语义/改类型），z 归零，必须附迁移指南（写入 docs/barek-history.md）
+#   z+1 = 无兼容性变化的细节（加性/修 bug/造型），老端必须能忽略新字段继续运行
 #
 # 变更纪律：
-#   1. 字段只增不减、语义不可改；删字段/改语义 = x+1。
+#   1. 字段只增不减、语义不可改；删字段/改语义 = y+1。
 #   2. 每次改动必须同步 docs/barek-history.md 一条记录。
 #   3. L2 及以上模块（net / 契约层）的改动需 ≥2 名 reviewer，maintainer 必须参与。
 # =============================================================================
@@ -24,8 +24,8 @@ authoritative_impl: ServerCode/net/protocol.rs
 compat:
   previous: 0.9.1
   breaking: false
-  migration_guide: null   # y+1 加性兼容：新增下行 ServerMessage::ModelCatalog，且 VoxelCube 新增可选字段 mat（逐盒材质键）；
-                          #   均为只增不改；老客户端忽略 ModelCatalog 即可，缺 mat 时按骨名兜底着色，行为不劣化
+  migration_guide: null   # 加性兼容：新增下行 ServerMessage::ModelCatalog，且 VoxelCube 新增可选字段 mat（逐盒材质键）；
+                          #   均为只增不改、无语义变更；老客户端忽略 ModelCatalog 即可，缺 mat 时按骨名兜底着色，行为不劣化
 
 # -----------------------------------------------------------------------------
 # 上行：客户端 → 服务端

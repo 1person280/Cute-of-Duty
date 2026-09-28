@@ -29,7 +29,7 @@ description: Cute Of Duty 合规交付技能——把改动按「三闸门」合
 |---|---|---|
 | **洁癖** | 单文件 ≤ 600 行；禁循环依赖；禁 `common.rs`/`utils.rs`/`misc.rs`/`helpers.rs`；核心业务模块深度 ≤ 2 层；公开项有 **Why** Rustdoc（不是复述代码） | 逐文件核对 + `git diff --stat` |
 | **架构** | 禁跨模块直接调用（三层判据：①`use crate::<别模块>::` ②`HostCode/Cargo.toml` 不得含 `cute_of_duty_server` ③同层横向 `use crate::menu::`）；数据所有权唯一（他人只持快照/句柄）；依赖无环、只许 `表现层→契约层→领域层→基础设施层`；跨 crate/跨进程先写 `XxxPort` trait | 搜引用 + `grep`；新增依赖必须贴依赖图 |
-| **协议** | 碰 L2+ / 线格式 / 配置语义 / 公共 Trait → 必须同 PR 追加 [docs/barek-history.md](../../../docs/barek-history.md) 条目；`x+1` 必附迁移指南；契约同步 `docs/contracts/*.yaml` | 对照 [模块边界](../../../docs/architecture/module-boundaries.md) 的 L2 集合 |
+| **协议** | 碰 L2+ / 线格式 / 配置语义 / 公共 Trait → 必须同 PR 追加 [docs/barek-history.md](../../../docs/barek-history.md) 条目；`y+1`（协议不兼容）必附迁移指南；契约同步 `docs/contracts/*.yaml` | 对照 [模块边界](../../../docs/architecture/module-boundaries.md) 的 L2 集合 |
 | **文档** | 碰某模块 → 同 PR 补该模块 `module.md`（现状 0，"碰到就补"）；改代码同更 BarekHistory / 契约 YAML；破坏性 L1 变更写 ADR | 见 CONTRIBUTING 第九节 |
 | **测试** | 任何改动 `cargo-wrap check --workspace`；服务端逻辑 `cargo-wrap test -p cute_of_duty_server`；线格式/契约 另加契约一致性；客户端表现 `cargo-wrap build --workspace --release` | 编译**一律走 `tools/cargo-wrap/target/release/cargo-wrap.exe`**，禁裸 `cargo` |
 
