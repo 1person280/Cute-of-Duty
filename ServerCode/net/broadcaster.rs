@@ -21,25 +21,30 @@ pub fn build_snapshot(world: &World, seq: u64, observer: (f32, f32, f32)) -> Ser
         .iter()
         .map(|e| {
             // 战斗展示字段：玩家实体读权威 Combatant，其余实体无战斗态则占位
-            let (weapon_elements, active_slot, ammo, ammo_max, ammo_pool, reload_remaining, operator_id, skill_cd_q, skill_cd_e) =
+            let (weapon_elements, active_slot, ammo, ammo_max, reload_remaining, operator_id, skill_cd_q, skill_cd_e) =
                 match e.get_component::<Combatant>() {
                     Some(cb) => (
                         Some([cb.weapons[0].element, cb.weapons[1].element]),
                         cb.active_slot as u8,
                         cb.active().ammo,
                         cb.active().max_ammo,
-                        cb.ammo_pool,
                         cb.reload_timer,
                         cb.operator_idx as u32,
                         cb.skill_q_cd,
                         cb.skill_e_cd,
                     ),
-                    None => (None, 0u8, -1, -1, -1, 0.0, 0u32, 0.0, 0.0),
+                    None => (None, 0u8, -1, -1, 0.0, 0u32, 0.0, 0.0),
                 };
             // 格位内容：玩家背包 / 物资箱容器（各自权威，客户端只画两个 4×3 网格）。
             let backpack = e
                 .get_component::<crate::items::Backpack>()
                 .map(|bp| bp.slots.clone());
+            // 权威备用弹药总量 = 背包内全部弹药堆合计（备弹唯一宿主是背包格位；无战斗态的
+            // 实体置 -1，客户端显示 `--`）。
+            let ammo_reserve = match (e.get_component::<crate::items::Backpack>(), e.get_component::<Combatant>()) {
+                (Some(bp), Some(_)) => bp.ammo_total(),
+                _ => -1,
+            };
             let container = e
                 .get_component::<crate::items::Container>()
                 .map(|ct| ct.slots.clone());
@@ -74,7 +79,7 @@ pub fn build_snapshot(world: &World, seq: u64, observer: (f32, f32, f32)) -> Ser
                 active_slot,
                 ammo,
                 ammo_max,
-                ammo_pool,
+                ammo_reserve,
                 reload_remaining,
                 operator_id,
                 skill_cd_q,
@@ -112,6 +117,33 @@ mod tests {
             }
             _ => None,
         }
+    }
+
+    /// 权威备用弹药总量 = 背包内全部弹药堆合计（开局两叠 64 → 128；从背包抽弹后随格位同步下降）。
+    #[test]
+    fn snapshot_reports_true_ammo_reserve() {
+        let mut world = World::new();
+        let pid = combat::spawn_player(&mut world, crate::damage::Vec3::default(), 0);
+
+        let reserve_of = |msg: &ServerMessage| match msg {
+            ServerMessage::Snapshot { entries, .. } => {
+                entries.iter().find(|e| e.entity_id == pid.as_u64()).map(|e| e.ammo_reserve)
+            }
+            _ => None,
+        };
+
+        // 开局：背包 2×64 = 128（备弹唯一宿主是背包格位）。
+        let snap = build_snapshot(&world, 1, (0.0, 0.0, 0.0));
+        assert_eq!(reserve_of(&snap), Some(128), "开局备用弹药应为 128");
+
+        // 模拟一次换弹抽走 30 发（直接读背包格位，无中间池）：128 - 30 = 98。
+        {
+            let e = world.get_entity_mut(pid).unwrap();
+            let got = e.get_component_mut::<Backpack>().unwrap().draw_ammo(30);
+            assert_eq!(got, 30, "应从背包抽出 30 发");
+        }
+        let snap = build_snapshot(&world, 2, (0.0, 0.0, 0.0));
+        assert_eq!(reserve_of(&snap), Some(98), "抽弹后备用弹药应降到 98");
     }
 
     /// 持雷是服务端权威：进入持握后快照带 `held_grenade` 元素，未持雷玩家恒为 `None`。

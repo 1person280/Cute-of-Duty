@@ -8,29 +8,84 @@ use crate::combat::range::TARGET_HIT_RADIUS;
 use crate::damage::{DamagePacket, DamageResolver, Vec3};
 use crate::element::{ElementType, EntityElementState};
 use crate::entity::{EntityId, EntityType, World};
+use crate::items::Backpack;
 
-/// 尝试换弹：满足条件才开始，计时完成后由 `Combatant::on_tick` 补弹。
+/// 尝试换弹：弹夹未满且背包尚有弹药时起计时；计时完成后由 [`tick_reloads`] 直接从背包补满。
+///
+/// 设计动机（Why）：备用子弹的权威宿主是背包弹药堆，**不经任何中间弹池**——这样"能不能换弹"
+/// 只取决于背包是否有弹，且一次换弹必然按 `max_ammo - ammo` 全额抽弹，不会出现"池不满导致弹夹
+/// 差几发、要再按一次 R"的中转残留。
 pub fn try_reload(world: &mut World, eid: EntityId) {
-    let (ammo, max_ammo, pool) = {
-        let Some(cb) = world.get_entity(eid).and_then(|e| e.get_component::<Combatant>()) else {
-            return;
-        };
+    let (ammo, max_ammo, reserve) = {
+        let Some(entity) = world.get_entity(eid) else { return };
+        let Some(cb) = entity.get_component::<Combatant>() else { return };
+        let reserve = entity
+            .get_component::<Backpack>()
+            .map(|bp| bp.ammo_total())
+            .unwrap_or(0);
         let slot = cb.active();
-        (slot.ammo, slot.max_ammo, cb.ammo_pool)
+        (slot.ammo, slot.max_ammo, reserve)
     };
-    // 备弹的权威存储是背包弹药堆（可堆叠物品）：换弹前把"补齐弹夹所缺、且池里没有的"
-    // 那部分从背包折现入池，否则"池空即换不了弹"，备用子弹形同虚设。
-    if ammo < max_ammo {
-        let want = (max_ammo - ammo - pool).max(0);
-        if want > 0 {
-            crate::combat::pull_ammo_from_backpack(world, eid, want);
-        }
-    }
     let Some(cb) = world.get_entity_mut(eid).and_then(|e| e.get_component_mut::<Combatant>()) else {
         return;
     };
-    if cb.reload_timer <= 0.0 && ammo < max_ammo && cb.ammo_pool > 0 {
+    if cb.reload_timer <= 0.0 && ammo < max_ammo && reserve > 0 {
         cb.reload_timer = RELOAD_TIME_SECS;
+    }
+}
+
+/// 每 Tick 推进换弹计时；计时耗尽则从背包弹药堆直接抽弹补满当前弹夹。
+///
+/// 落点放在世界级（而非组件 `on_tick`）的原因（Why）：补弹需要读写的 `Backpack` 是玩家实体的
+/// **兄弟组件**，而组件 `on_tick` 期间 `Entity::tick` 已把组件表临时取出，拿不到兄弟组件。
+pub fn tick_reloads(world: &mut World, dt: f32) {
+    let ids: Vec<EntityId> = world
+        .get_all_entities()
+        .iter()
+        .filter(|e| e.get_component::<Combatant>().is_some())
+        .map(|e| e.id)
+        .collect();
+    for id in ids {
+        let Some(timer) = world
+            .get_entity(id)
+            .and_then(|e| e.get_component::<Combatant>())
+            .map(|cb| cb.reload_timer)
+        else {
+            continue;
+        };
+        if timer <= 0.0 {
+            continue;
+        }
+        let remaining = (timer - dt).max(0.0);
+        if let Some(cb) = world.get_entity_mut(id).and_then(|e| e.get_component_mut::<Combatant>()) {
+            cb.reload_timer = remaining;
+        }
+        if remaining <= 0.0 {
+            reload_from_backpack(world, id);
+        }
+    }
+}
+
+/// 把当前手持槽的弹夹补满：从背包抽不足部分装入弹夹（换弹耗时的终点动作）。
+fn reload_from_backpack(world: &mut World, eid: EntityId) {
+    let Some(entity) = world.get_entity_mut(eid) else { return };
+    let Some(needed) = entity.get_component::<Combatant>().map(|cb| {
+        let a = cb.active();
+        (a.max_ammo - a.ammo).max(0)
+    }) else {
+        return;
+    };
+    if needed == 0 {
+        return;
+    }
+    let got = entity
+        .get_component_mut::<Backpack>()
+        .map(|bp| bp.draw_ammo(needed))
+        .unwrap_or(0);
+    if got > 0 {
+        if let Some(cb) = entity.get_component_mut::<Combatant>() {
+            cb.active_mut().ammo += got;
+        }
     }
 }
 
@@ -49,19 +104,12 @@ pub fn try_fire(
     pitch: f32,
     element: ElementType,
 ) {
-    // 阶段0：备弹池见底时从背包弹药堆折现一个弹夹量——打空自动换弹同样依赖池里有弹。
-    // 只在池已耗尽时折现，避免每开一枪都把背包子弹倒进池里（浪费且语义错位）。
-    let (pool_empty, mag_size) = world
+    // 阶段0：只读背包弹药存量——打空自动换弹的可用性判定基准（备弹权威宿主是背包，无中间池）。
+    let has_reserve = world
         .get_entity(eid)
-        .and_then(|e| e.get_component::<Combatant>())
-        .map(|cb| {
-            let a = cb.active();
-            (cb.ammo_pool <= 0, a.max_ammo.max(1))
-        })
-        .unwrap_or((false, 0));
-    if pool_empty {
-        crate::combat::pull_ammo_from_backpack(world, eid, mag_size);
-    }
+        .and_then(|e| e.get_component::<Backpack>())
+        .map(|bp| bp.ammo_total() > 0)
+        .unwrap_or(false);
 
     // 阶段1：射手状态裁决（冷却 / 换弹 / 弹药），只改射手本身（作用于当前手持武器槽）
     let profile = crate::operator::rifle_profile(element);
@@ -74,8 +122,8 @@ pub fn try_fire(
         } else if cb.shoot_cooldown > 0.0 {
             (false, Vec3::default())
         } else if cb.active().ammo <= 0 {
-            // 打空自动换弹
-            if cb.ammo_pool > 0 {
+            // 打空自动换弹：背包尚有余弹才起计时（计时结束后由 `tick_reloads` 直接补满弹夹）
+            if has_reserve {
                 cb.reload_timer = RELOAD_TIME_SECS;
             }
             (false, Vec3::default())

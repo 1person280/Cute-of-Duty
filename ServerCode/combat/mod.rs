@@ -160,6 +160,8 @@ impl CombatSystem {
     ) {
         grenade::tick_grenades(world, resolver, env, &mut self.events, dt);
         zone::tick_zones(world, resolver, env, dt);
+        // 换弹推进：计时耗尽后直接从背包抽弹补满弹夹（无中间弹池）。
+        shooter::tick_reloads(world, dt);
     }
 
     /// 出队所有未播报的战斗事件（主循环 drain 后转为 `ServerMessage::Event`）。
@@ -266,34 +268,6 @@ pub fn equip_weapon(world: &mut World, eid: EntityId, element: ElementType) {
     let Some(entity) = world.get_entity_mut(eid) else { return };
     let Some(cb) = entity.get_component_mut::<Combatant>() else { return };
     cb.equip_active(element);
-}
-
-/// 备弹池追加（补给/内部流转的权威落点）；无战斗组件的实体静默忽略。
-pub fn add_ammo_pool(world: &mut World, eid: EntityId, amount: i32) {
-    let Some(entity) = world.get_entity_mut(eid) else { return };
-    let Some(cb) = entity.get_component_mut::<Combatant>() else { return };
-    cb.ammo_pool += amount;
-}
-
-/// 从背包弹药堆抽出至多 `want` 发倒入备弹池，返回实际抽出数。
-///
-/// 设计动机（Why）：备用子弹的**权威存储是背包格位**（可堆叠物品），弹药池只是换弹时的
-/// 中转量。换弹/自动换弹前调用本函数把背包子弹折现入池，避免"池空即打不出子弹"。
-pub fn pull_ammo_from_backpack(world: &mut World, eid: EntityId, want: i32) -> i32 {
-    if want <= 0 {
-        return 0;
-    }
-    let Some(entity) = world.get_entity_mut(eid) else { return 0 };
-    let got = match entity.get_component_mut::<Backpack>() {
-        Some(bp) => bp.draw_ammo(want),
-        None => 0,
-    };
-    if got > 0 {
-        if let Some(cb) = entity.get_component_mut::<Combatant>() {
-            cb.ammo_pool += got;
-        }
-    }
-    got
 }
 
 /// 把一件可携带物品放回玩家背包（拾取医疗/护甲/手雷的权威落点）。

@@ -119,7 +119,7 @@ pub fn spawn_backpack_panel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                     TextBundle::from_section("", flow::style(fonts, 15.0, theme::TEXT_WHITE)),
                 ));
                 col.spawn(TextBundle::from_section(
-                    "弹药池",
+                    "备用弹药",
                     flow::style(fonts, 18.0, theme::ACCENT_CYAN),
                 ));
                 col.spawn((
@@ -348,13 +348,13 @@ pub fn sync_backpack_panel(
         };
     }
 
-    // 备用弹药池。
+    // 备用弹药总量（弹池 + 背包弹药合计，服务端权威合计）。
     if let Ok(mut t) = texts.p2().get_single_mut() {
-        let pool = me.map(|e| e.ammo_pool).unwrap_or(-1);
-        t.sections[0].value = if pool < 0 {
+        let reserve = me.map(|e| e.ammo_reserve).unwrap_or(-1);
+        t.sections[0].value = if reserve < 0 {
             "—".to_string()
         } else {
-            format!("备用 {pool}")
+            format!("备用 {reserve}")
         };
     }
 

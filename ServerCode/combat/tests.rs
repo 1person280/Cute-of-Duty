@@ -426,3 +426,61 @@ fn thrown_grenade_follows_parabola() {
     }
     assert!(peak > start_y, "重力弹道应出现上升段（顶点 {peak} 应高于出手 {start_y}）");
 }
+
+/// 回归复现：背包出现**第 3 叠弹药**后按 R 应一次换弹到位（直抽背包、无中间弹池残留）。
+#[test]
+fn reload_works_with_third_ammo_stack() {
+    let mut h = CombatHarness::new();
+    let pid = spawn_player(&mut h.world, Vec3::default(), 0);
+    // 开局两叠各 64（已满）→ 再补 30 会另占一格，形成第 3 叠（合计 158 发）。
+    {
+        let e = h.world.get_entity_mut(pid).unwrap();
+        let bp = e.get_component_mut::<Backpack>().unwrap();
+        assert!(
+            bp.push(crate::items::LootItem::with_count(
+                "步枪弹药",
+                crate::map::PickupKind::Ammo { amount: 30 },
+                30,
+            )),
+            "第 3 叠弹药应能入格"
+        );
+        let stacks = bp
+            .slots
+            .iter()
+            .flatten()
+            .filter(|i| matches!(i.kind, crate::map::PickupKind::Ammo { .. }))
+            .count();
+        assert_eq!(stacks, 3, "背包内应有 3 叠弹药");
+        assert_eq!(bp.ammo_total(), 158, "备用弹药合计应为 158");
+    }
+    // 打空当前弹夹。
+    {
+        let e = h.world.get_entity_mut(pid).unwrap();
+        let cb = e.get_component_mut::<Combatant>().unwrap();
+        cb.active_mut().ammo = 0;
+    }
+    h.system.apply_input(
+        &mut h.world,
+        &h.resolver,
+        pid,
+        0.016,
+        &h.env,
+        CombatIntent { reload: true, ..CombatIntent::default() },
+    );
+    // 一次按 R 即应起计时（能换弹的判据是背包有余弹）。
+    let cb = h.world.get_entity(pid).unwrap().get_component::<Combatant>().unwrap();
+    assert!(cb.reload_timer > 0.0, "有第 3 叠弹药时应能换弹（reload_timer={}）", cb.reload_timer);
+    let max_ammo = cb.active().max_ammo;
+    // 走完换弹计时（世界级 tick_reloads 直接抽背包补满弹夹）。
+    let dt = 1.0 / 60.0;
+    for _ in 0..(RELOAD_TIME_SECS / dt) as usize + 5 {
+        h.system.tick_world(&mut h.world, &h.resolver, dt, &h.env);
+    }
+    let e = h.world.get_entity(pid).unwrap();
+    let cb = e.get_component::<Combatant>().unwrap();
+    assert_eq!(cb.active().ammo, max_ammo, "换弹结束后弹夹应一次补满");
+    assert_eq!(cb.reload_timer, 0.0, "换弹计时应归零");
+    // 弹夹补满 30 发来自背包：158 - 30 = 128（无中间池残留、无需再按一次 R）。
+    let reserve = e.get_component::<Backpack>().unwrap().ammo_total();
+    assert_eq!(reserve, 128, "换弹应恰好从背包抽走补齐弹夹的 30 发（剩余 {reserve}）");
+}

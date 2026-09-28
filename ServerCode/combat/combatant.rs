@@ -4,8 +4,12 @@
 //! 具体结算（开火/技能/投射物）由 `CombatSystem` 调度，这里只做“状态在哪里、何时衰减”。
 //!
 //! 双武器设计（对齐 legacy `Inventory.weapons`）：玩家默认携带两把独立步枪（火/冰），
-//! `active_slot` 决定当前手持；`ammo_pool` 为两把武器共享的备弹池。武器与干员彻底解耦——
-//! 射击元素取当前武器槽（`weapons[active_slot].element`），技能元素仍取干员（`roster()`）。
+//! `active_slot` 决定当前手持。武器与干员彻底解耦——射击元素取当前武器槽
+//! （`weapons[active_slot].element`），技能元素仍取干员（`roster()`）。
+//!
+//! 备弹（Why）：备用子弹的**唯一权威宿主是背包弹药堆**（可堆叠物品），本组件不再持有任何
+//! 中间弹池——换弹时由 `combat::shooter::tick_reloads` 直接从背包抽弹补满弹夹，避免"池空/
+//! 池不满即换不出弹、需多按一次 R"的中转缓冲，也为将来多种子弹省去无谓的池区分。
 
 use crate::element::ElementType;
 use crate::entity::{Component, Entity};
@@ -14,12 +18,6 @@ use std::any::Any;
 
 /// 武器槽数量（对齐 legacy 双主武器：1/2 两把）
 pub const WEAPON_SLOTS: usize = 2;
-/// 共享备弹池初始值。
-///
-/// 设计动机（Why）：备用子弹改为**背包可堆叠物品**后，池不再是初始储备的宿主——
-/// 开局备弹由 [`crate::items::Backpack::starting`] 以两叠 64 发弹药给出；池初值置 0，
-/// 仅作为换弹时从背包折现的中转量（见 `combat::pull_ammo_from_backpack`）。
-pub const DEFAULT_AMMO_POOL: i32 = 0;
 
 /// 手雷爆炸基础伤害 / 半径（服务端权威数值）。
 pub const GRENADE_DAMAGE: f32 = 70.0;
@@ -58,8 +56,6 @@ pub struct Combatant {
     pub weapons: [WeaponSlot; WEAPON_SLOTS],
     /// 当前手持槽索引（[`Self::weapons`] 下标）
     pub active_slot: usize,
-    /// 共享备弹池（换弹时从池中取弹补满当前槽）
-    pub ammo_pool: i32,
     /// 距下次可开火的剩余冷却
     pub shoot_cooldown: f32,
     /// 换弹剩余时间（>0 表示正在换弹）
@@ -75,7 +71,7 @@ pub struct Combatant {
 }
 
 impl Combatant {
-    /// 新建战斗状态：默认携带火/冰两把制式步枪、共享备弹池、手持槽 0。
+    /// 新建战斗状态：默认携带火/冰两把制式步枪、手持槽 0。
     pub fn new(operator_idx: usize) -> Self {
         Self {
             operator_idx,
@@ -84,7 +80,6 @@ impl Combatant {
                 WeaponSlot::from_element(ElementType::Ice),
             ],
             active_slot: 0,
-            ammo_pool: DEFAULT_AMMO_POOL,
             shoot_cooldown: 0.0,
             reload_timer: 0.0,
             skill_q_cd: 0.0,
@@ -156,18 +151,8 @@ impl Component for Combatant {
         if self.shoot_cooldown > 0.0 {
             self.shoot_cooldown = (self.shoot_cooldown - delta_time).max(0.0);
         }
-        // 换弹计时耗尽 → 从共享备弹池补满当前手持槽
-        if self.reload_timer > 0.0 {
-            self.reload_timer -= delta_time;
-            if self.reload_timer <= 0.0 {
-                self.reload_timer = 0.0;
-                let idx = self.active_slot.min(WEAPON_SLOTS - 1);
-                let needed = self.weapons[idx].max_ammo - self.weapons[idx].ammo;
-                let take = needed.min(self.ammo_pool);
-                self.weapons[idx].ammo += take;
-                self.ammo_pool -= take;
-            }
-        }
+        // 换弹计时由 `combat::shooter::tick_reloads` 推进（需访问背包组件，组件 on_tick 拿不到
+        // 兄弟组件），此处不再处理。
         if self.skill_q_cd > 0.0 {
             self.skill_q_cd = (self.skill_q_cd - delta_time).max(0.0);
         }

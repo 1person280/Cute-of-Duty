@@ -298,18 +298,11 @@ mod tests {
         )));
         let lid = world.spawn(loot);
 
-        // 统计背包内弹药总发数（弹药已不再进 `ammo_pool`，而是背包格位里的可堆叠物品）。
-        let ammo_of = |w: &World| -> u32 {
+        // 统计背包内弹药总发数（弹药的权威宿主是背包格位里的可堆叠物品，无中间弹池）。
+        let ammo_of = |w: &World| -> i32 {
             w.get_entity(pid)
                 .and_then(|e| e.get_component::<crate::items::Backpack>())
-                .map(|bp| {
-                    bp.slots
-                        .iter()
-                        .flatten()
-                        .filter(|it| matches!(it.kind, PickupKind::Ammo { .. }))
-                        .map(|it| it.count)
-                        .sum()
-                })
+                .map(|bp| bp.ammo_total())
                 .unwrap_or(0)
         };
         let before = ammo_of(&world);

@@ -248,6 +248,19 @@ impl Backpack {
         got
     }
 
+    /// 背包内**全部弹药堆**的总发数（备用弹的权威合计）。
+    ///
+    /// 设计动机（Why）：备用子弹的权威宿主就是背包格位（可堆叠物品）——换弹直接从背包抽弹补满
+    /// 弹夹，不经任何中间弹池。HUD 的「备用」由服务端用本方法合计后下发，客户端只显示。
+    pub fn ammo_total(&self) -> i32 {
+        self.slots
+            .iter()
+            .flatten()
+            .filter(|it| matches!(it.kind, PickupKind::Ammo { .. }))
+            .map(|it| it.count as i32)
+            .sum()
+    }
+
     /// 把物品放回指定格（转移失败回滚用）。
     fn put_back(&mut self, index: usize, item: LootItem) {
         if let Some(s) = self.slots.get_mut(index) {

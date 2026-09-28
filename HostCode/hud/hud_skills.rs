@@ -3,7 +3,7 @@
 //! 设计动机：右下面板对齐旧版"武器槽 → 大字弹药 → 状态行"的三段结构（[1]/[2] 槽位、
 //! `当前 / 容量` 大字、`RELOADING` 提示），但配色/字号仍走本项目的 `theme` 过程化风格。
 //! 所有数值（弹药/弹夹容量/备用池/换弹剩余/武器归属/元素附着）都来自**权威快照**——
-//! `ammo`/`ammo_max`/`ammo_pool`/`reload_remaining`/`operator_id`/`element_state`，
+//! `ammo`/`ammo_max`/`ammo_reserve`/`reload_remaining`/`operator_id`/`element_state`，
 //! 客户端只做显示，绝不推演（换弹进度条也照读服务端剩余秒数）。
 //!
 //! 低弹告警（[`LOW_AMMO`] 以下）在此就地做红色闪烁：它同时需要弹药值与文本句柄，
@@ -29,7 +29,7 @@ pub enum RightText {
     AmmoMain,
     /// 大字弹药分母 ` / 容量`
     AmmoMax,
-    /// 备用弹药池
+    /// 备用弹药总量（弹池 + 背包弹药合计，服务端权威合计）
     AmmoPool,
     /// 换弹提示行（`RELOADING x.xs`）
     Reload,
@@ -174,11 +174,11 @@ pub fn update_skills(
     mut texts: Query<(&RightText, &mut Text)>,
 ) {
     let snapshot = snap.current.iter().find(|e| e.entity_id == player.entity_id);
-    let (ammo, ammo_max, ammo_pool, reload, weapons, active_slot, elem_state) = match snapshot {
+    let (ammo, ammo_max, ammo_reserve, reload, weapons, active_slot, elem_state) = match snapshot {
         Some(e) => (
             e.ammo,
             e.ammo_max,
-            e.ammo_pool,
+            e.ammo_reserve,
             e.reload_remaining,
             e.weapon_elements,
             e.active_slot,
@@ -227,7 +227,7 @@ pub fn update_skills(
             }
             RightText::AmmoPool => {
                 text.sections[0].value =
-                    if ammo_pool < 0 { "备用 --".to_string() } else { format!("备用 {ammo_pool}") };
+                    if ammo_reserve < 0 { "备用 --".to_string() } else { format!("备用 {ammo_reserve}") };
             }
             RightText::Reload => {
                 text.sections[0].value = if reload > 0.0 {
