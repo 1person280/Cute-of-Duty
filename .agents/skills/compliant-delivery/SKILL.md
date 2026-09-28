@@ -1,6 +1,6 @@
 ---
 name: compliant-delivery
-description: Cute Of Duty 合规交付技能——把改动按「三闸门」合规地走完 提交(commit) → 推送(push) → 发布(release)：提交前过 CLA 声明 + 洁癖/架构/协议/文档/测试五道红线；推送遵循分支与"不重写历史"纪律；发布采用**统一版本号 `x.y.z`**——协议版本与游戏版本不再分离（`x` 游戏内核 · `y` 协议 · `z` 细节），并同步 README 版本表 + BarekHistory + tag + GitHub Release + 双端 exe 二进制 zip 五件套。凡用户要求提交、commit、推送、push、开 PR、打 tag、发版本、写 release note、打包 exe / 发分发包 / 补发 release 资产，或问"这个改动能不能提交/合规吗"时使用——即使用户只说"帮我提交""推一下""发个版本""把这个 release 做了""把 exe 打包装上"。
+description: Cute Of Duty 合规交付技能——把改动按「三闸门」合规地走完 提交(commit) → 推送(push) → 发布(release)：提交前过 CLA 声明 + 洁癖/架构/协议/文档/测试五道红线；推送遵循分支与"不重写历史"纪律；发布采用**统一版本号 `x.y.z`**——协议版本与游戏版本不再分离（`x` 游戏内核 · `y` 协议 · `z` 细节），Release 标题格式 `x.y.z：<4字简述>`（**版本信息必须 4 个汉字**），并同步 README 版本表 + BarekHistory + tag + GitHub Release + 双端 exe 二进制 zip 五件套。凡用户要求提交、commit、推送、push、开 PR、打 tag、发版本、写 release note、打包 exe / 发分发包 / 补发 release 资产，或问"这个改动能不能提交/合规吗"时使用——即使用户只说"帮我提交""推一下""发个版本""把这个 release 做了""把 exe 打包装上"。
 ---
 
 # Cute Of Duty 合规交付（提交 / 推送 / 发布）
@@ -138,6 +138,7 @@ git push -u origin <branch>          # origin = https://github.com/1person280/Cu
 
 1. **README 版本表**：[README.md](../../../README.md)「六、版本历史」**顶部**加一行 ——
    `| **x.y.z** | YYYY-MM-DD | 说明… |`
+   **硬规约（版本信息 4 个字）**：版本信息（Release 标题、README 版本行开头）**必须是 4 个汉字**，简洁点明本版干了什么（如 `通信优化`、`换弹精简`）。**不得**多字/少字/用英文/写空泛口号。卡片推送、README 版本表、release note 一处不得漂移。
    **硬规约（每次 release 必带代码更改）**：说明**必须**包含**简短的代码更改** —— 一句话讲清"**做了什么**"与"**做了什么扁平化更新**"（如文件重命名 / 合并 / 结构收敛），再覆盖：**未做**、**下一版本目标（roadmap）**、**本轮冻结（下次修）**。
 2. **BarekHistory**：协议 / L2 改动时在 [docs/barek-history.md](../../../docs/barek-history.md) 顶部追加条目（最新在最上）。
 3. **打 tag**：
@@ -146,9 +147,9 @@ git push -u origin <branch>          # origin = https://github.com/1person280/Cu
    git push origin x.y.z
    ```
    （早期历史线 `0.3.x` / `0.5.x` 曾用 `v0.3.2` 形式；当前一律以统一版本号 `x.y.z` 为准。）
-4. **GitHub Release**：以该 tag 建 Release。**正式版本（Release）不加 `--prerelease`**；确需预发布时才加：
+4. **GitHub Release**：以该 tag 建 Release，**标题格式 `x.y.z：<4字简述>`**（版本信息 = 4 个汉字，如 `0.11.0：通信优化`）。**正式版本（Release）不加 `--prerelease`**；确需预发布时才加：
    ```
-   gh release create x.y.z --title "x.y.z" --notes-file <说明文件>
+   gh release create x.y.z --title "x.y.z：<4字简述>" --notes-file <说明文件>
    ```
 5. **二进制分发包（zip 资产）**：把 `--release` 产出的双端 exe 打包成 zip 挂到该 Release —— 见 3.4。
 
@@ -197,6 +198,7 @@ Remove-Item $stage -Recurse -Force; Remove-Item $zip -Force   # 省磁盘：GitH
 ### 3.5 发布红线
 
 - **统一版本号 `x.y.z`**：`x`（内核）严重破坏 +1、`y`（协议）不兼容 +1、`z`（细节）无兼容变化可 +1；三段判据不得用错 —— 不兼容变更只升 `z`、或内核破坏只升 `y`，均属违规。
+- **版本信息必须 4 个字**：Release 标题 / README 版本行开头的版本信息**必须是 4 个汉字**（如 `通信优化`），简洁点明本版干了什么；不得多字/少字/英文/空泛口号。
 - **每次 release 必带代码更改**：release note / README 版本行必须含**简短代码更改**（做了什么 + 做了什么扁平化更新），不得只写空泛口号。
 - tag 名严格为 `x.y.z`（如 `0.10.0`），**无 v 前缀**（历史曾误写 `v0.6-SnapShot-1`，大小写错乱，**不要复现**）。
 - **不得启用已冻结的历史 WIP 号**（如 `0.7-Snapshot-7` / `0.8.0-Snapshot-8` 那批未发布快照）。
@@ -224,6 +226,6 @@ Remove-Item $stage -Recurse -Force; Remove-Item $zip -Force   # 省磁盘：GitH
 - 提交前：CLA 已签？`user.name/email` 对？五道红线过了？`git status` 无该入库之外的杂物？
 - 提交信息：`<type>(<scope>): 为什么`，一次一件事，重构≠功能。
 - 推送：分支语义化，`main` 不 force-push、不重写历史；L2 先开 Issue + ≥2 reviewer。
-- 发布：统一版本号 `x.y.z`（`x` 内核 · `y` 协议 · `z` 细节，各按判据 +1），**无 v 前缀**；五件套（README 版本表 / BarekHistory / tag / GitHub Release / 双端 exe 二进制 zip）一次对齐；**每次 release 必带简短代码更改 + 扁平化更新**；冻结项不写"已完成"。
+- 发布：统一版本号 `x.y.z`（`x` 内核 · `y` 协议 · `z` 细节，各按判据 +1），**无 v 前缀**；**版本信息必须 4 个汉字**（Release 标题 `x.y.z：<4字简述>`，如 `0.11.0：通信优化`）；五件套（README 版本表 / BarekHistory / tag / GitHub Release / 双端 exe 二进制 zip）一次对齐；**每次 release 必带简短代码更改 + 扁平化更新**；冻结项不写"已完成"。
 - 打包：只打 `--release` 双端 exe；zip 含 exe + `menu/` + 三份许可 + 使用说明；命名 `CuteOfDuty-<版本号>-win64.zip`；补发用 `gh release upload --clobber`，上传后删本地 zip；说明须写明资源绝对路径限制。
 - 编译一律 `cargo-wrap`；发布构建一律 `--release`。

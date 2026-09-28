@@ -17,15 +17,52 @@
 # =============================================================================
 
 contract: protocol
-version: 0.10.0
+version: 0.11.0
 status: draft
 owner_module: ServerCode/net
 authoritative_impl: ServerCode/net/protocol.rs
 compat:
-  previous: 0.9.1
-  breaking: false
-  migration_guide: null   # 加性兼容：新增下行 ServerMessage::ModelCatalog，且 VoxelCube 新增可选字段 mat（逐盒材质键）；
-                          #   均为只增不改、无语义变更；老客户端忽略 ModelCatalog 即可，缺 mat 时按骨名兜底着色，行为不劣化
+  previous: 0.10.0
+  breaking: true
+  migration_guide: |
+    NDJSON 行帧 → 统一固定 64KB 槽帧，**线格式不兼容**（老客户端与新服务端无法互通，反之亦然）。
+    逐步迁移：
+      1. 服务端写侧：`session::write_loop` 由 `msg.to_line()` 改为 `packet::FrameWriter + encode_server`（一消息一/多帧，`ModelCatalog` 展开为"一资源一帧 + ResourceEnd"）；
+      2. 服务端读侧：`session::read_loop` 由 `read_line + from_line` 改为 `read_exact(64KB) + FrameReader + ChunkAssembler + decode_client`；
+      3. 客户端：拆 `downlink.rs`（下载线程）/`uplink.rs`（上传线程），各持 `try_clone` 独立句柄；下行按 `FrameKind` 分路（Resource→对象池、Snapshot→快照缓冲、Control/Event→控制通道）；
+      4. 客户端对象池：`HostCode/net/remote.rs` 固定 16MB（250 在用 + 6 预取，各 64KB 固定地址槽），资源按 `key` 落槽；`ModelCatalog` 由池增量解码而来；
+      5. 前后对照：老（`{"Snapshot":{...}}\n`）→ 新（64KB 定长帧，头 32B：magic/version/kind/flags/region/sub_kind/seq/key/payload_len，负载 JSON 或资源字节，尾部零填充）。
+    老端处置：老客户端连新服务端将无法解析（首帧魔数/长度不符即断），需同步升级到 0.11.0。
+
+# -----------------------------------------------------------------------------
+# 传输层：统一固定 64KB 槽帧（0.11.0 起取代 NDJSON）
+# -----------------------------------------------------------------------------
+transport:
+  authoritative_impl: ServerCode/net/packet.rs
+  frame:
+    bytes: 65536            # 每帧恒定 64KB（线上 64KB 对齐，尾部零填充）
+    header_bytes: 32
+    payload_max: 65504
+    magic: 0x434F4431       # "COD1"
+    wire_version: 11        # 与协议 y 位对齐（0.11 = 槽帧世代）
+    header_layout:          # (offset, width, little-endian)
+      - { offset: 0,  width: 4, name: magic }
+      - { offset: 4,  width: 2, name: version }
+      - { offset: 6,  width: 1, name: kind }
+      - { offset: 7,  width: 1, name: flags,   doc: bit0 = continuation（大消息跨帧分片） }
+      - { offset: 8,  width: 1, name: region,  doc: 0=在用区 1=预取区（仅 Resource 帧有意义） }
+      - { offset: 9,  width: 1, name: sub_kind, doc: 资源子类 ResourceKind（非资源帧填 0） }
+      - { offset: 12, width: 8, name: seq,     doc: 帧序号（单调递增） }
+      - { offset: 20, width: 8, name: key,     doc: 资源键（FNV-1a；0=无） }
+      - { offset: 28, width: 4, name: payload_len }
+  kinds: [Control, Snapshot, Event, Resource, ResourceEnd]
+    # Control    ：≤256B 指令（握手/Pong/ReturnToMenu/全部上行意图），打包进 64KB
+    # Snapshot   ：每 Tick 权威快照（可跨帧分片）
+    # Event      ：瞬时事件（击杀/受击/拾取/通告）
+    # Resource   ：单份资源（一资源一帧；ModelCatalog 展开为该形态）
+    # ResourceEnd：一批资源下发完毕（客户端据此标记目录就绪）
+  region: [InUse, Prefetch]
+  resource_kind: [Model, Animation]
 
 # -----------------------------------------------------------------------------
 # 上行：客户端 → 服务端
@@ -98,10 +135,16 @@ downlink:
         type: "Option<ElementType>"
         added_in: 0.9.0
         doc: 该实体当前持有的手雷元素类型；未持雷为 None。客户端据此强制越肩并显示持雷提示
+      - name: ammo_reserve           # 0.11.0 新增（同版本移除 ammo_pool）
+        type: i32
+        added_in: 0.11.0
+        doc: 权威备用弹药总量 = 背包内全部弹药堆合计（-1=非玩家）。备弹唯一宿主是背包格位，
+             换弹直接从背包抽弹补满弹夹；HUD「备用」读本字段（不再有换弹后归零的瞬时池）
     # TODO(核对): 其余既有字段（位置/朝向/model_preset/interact 等）待与 protocol.rs 对齐后补全
     removed_fields:
       - { name: medkit,  removed_in: 0.8.0, replaced_by: backpack }
       - { name: grenade, removed_in: 0.8.0, replaced_by: backpack }
+      - { name: ammo_pool, removed_in: 0.11.0, replaced_by: ammo_reserve }   # 中间弹池已移除
 
   ServerMessage:
     # TODO(核对): 下列变体清单仅覆盖本次变更涉及项，需与 protocol.rs 全量对齐

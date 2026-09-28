@@ -24,6 +24,43 @@
 
 ---
 
+## [0.11.0] · 2026-09-28 · 移除备弹中间池：换弹直抽背包弹药堆
+
+- **变更类型**：**Breaking**（快照删字段 `ammo_pool`；既有 `0.11.0` 不兼容窗口内一并收口）
+- **影响模块**：`combat`（`combatant`/`shooter`/`mod`）、`net`（`protocol`/`broadcaster`）、`items`；客户端 `hud`
+- **兼容性**：**不兼容**
+  - `EntitySnapshot` **删除** `ammo_pool`，**新增** `ammo_reserve`（`#[serde(default)]`）：老客户端读不到 `ammo_pool`、也拿不到 `ammo_reserve`。双端须同升 `0.11.0`。
+- **迁移指南**：HUD「备用」改读 `ammo_reserve`（= 背包内全部弹药堆合计）；服务端不再维护 `Combatant::ammo_pool`。
+- **内容**：
+  - **删除中间弹池**：移除 `Combatant::ammo_pool` 字段、`DEFAULT_AMMO_POOL`、`combat::add_ammo_pool`、`combat::pull_ammo_from_backpack`。备弹的**唯一权威宿主回归背包弹药堆**（可堆叠物品）。
+  - **换弹改为直抽背包**：换弹计时与补弹从组件 `on_tick` 迁到世界级 `combat::shooter::tick_reloads`（组件 `on_tick` 期间组件表被临时取出、拿不到兄弟组件 `Backpack`）。计时耗尽即按 `max_ammo - ammo` 从背包 `draw_ammo` 直接补满弹夹；`try_reload`/打空自动换弹的判据改为「背包 `ammo_total() > 0`」。
+  - **修复「多按一次 R」**：旧实现每开一枪会把**整弹夹量**折进池，而换弹只消耗"池里现有"的量；池不满时一次换弹只补一部分弹夹，须再按一次 R 补足。直抽背包后一次换弹必然全额补满，也省去了将来多种子弹时无谓的池区分。
+  - **HUD 语义修正**：`ammo_reserve` 由服务端按 `Backpack::ammo_total()` 合计下发，右下 HUD 与背包面板的「备用」改读它——不再显示换弹后归零的瞬时池。
+- **验证**：`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server` **通过**（含 `reload_works_with_third_ammo_stack`：3 叠弹药一次按 R 补满弹夹、背包恰好减 30；`snapshot_reports_true_ammo_reserve`）。
+- **关联**：[契约 `protocol.yaml`](contracts/protocol.yaml)
+
+---
+
+## [0.11.0] · 2026-09-28 · 线格式改为统一 64KB 槽帧 + 客户端 16MB 远程对象池 + 双线单线程传输
+
+- **变更类型**：**Breaking**（线格式由 NDJSON 行帧改为统一固定 64KB 槽帧，协议不兼容 → `y+1`）
+- **影响模块**：`net`（`packet` **新增**、`prefetch` **新增**、`session`、`main`）；客户端 `net`（`remote`/`downlink`/`uplink` **新增**，改 `network`/`snapshot`）、`flow`、`launcher`
+- **兼容性**：**不兼容**
+  - 线上不再是"每行一条 JSON"。老客户端（NDJSON）连新服务端会在首帧即因魔数/长度不符而断开；老服务端同样无法解析新客户端的 64KB 帧。双端须同升 `0.11.0`。
+  - `ServerMessage`/`ClientMessage` 的**数据模型与 JSON 载荷不变**，仅**封装与传输方式**改变。
+- **迁移指南**：见 [契约 `protocol.yaml` 的 `compat.migration_guide`](contracts/protocol.yaml)（服务端写/读循环改帧、客户端拆双线程 + 对象池、前后帧格式对照）。核心五步：① `session::write_loop` 改 `FrameWriter + encode_server`；② `session::read_loop` 改 `read_exact(64KB) + FrameReader + ChunkAssembler + decode_client`；③ 客户端拆 `downlink`/`uplink` 两线程（各持 `try_clone` 句柄）；④ 下行资源帧写 16MB 固定地址对象池；⑤ `ModelCatalog` 由池增量解码。
+- **内容**：
+  - **统一 64KB 槽帧**（`ServerCode/net/packet.rs`，**新增**）：`FRAME_BYTES = 64KB`、`HEADER_BYTES = 32`、`PAYLOAD_MAX = 65504`；定长头 `FrameHeader{ magic/version/kind/flags/region/sub_kind/seq/key/payload_len }`；`FrameKind = Control | Snapshot | Event | Resource | ResourceEnd`。超单帧容量的消息按 `flags.continuation` **跨帧分片**、接收侧 `ChunkAssembler` 重组；单份资源**一资源一帧**、一批资源以 `ResourceEnd` 收尾。`ModelCatalog` 被展开为"一资源一帧 + ResourceEnd"下发。附 10 项单测（64KB 对齐、小控制帧入 64KB、超长分片重组、资源帧往返、目录展开、坏帧拒绝等）。
+  - **客户端 16MB 远程对象池**（`HostCode/net/remote.rs`，**新增**）：`POOL_BYTES = 16MB`、`SLOT_COUNT = 256`、`SLOT_BYTES = 64KB`；**一次性分配、永不重分配**，第 `i` 槽地址恒为 `base + i×64KB`。区划：前 `IN_USE_SLOTS = 250`（16000KB）在用缓冲、末 `PREFETCH_SLOTS = 6`（384KB）预取区（250+6=256、16000KB+384KB=16MB）。API `insert/get/get_in/promote/clear_region/slot_ptr`；资源按 `key`（FNV-1a）落槽、命中即复用，预取命中经 `promote` 提升进在用区。**纯客户端本地内存，不引入共享内存**。
+  - **池 → 视图**：`sync_catalog_from_pool` 把池中在用区资源**增量解码**进 `ModelCatalog`（下游 `apply_entities`/`voxel_model`/`voxel_idle` 的消费视图），实体突现即命中、不必等加载。`route_control_messages` 的 `ModelCatalog` 分支随之移除（目录不再经控制通道抵达）。
+  - **双线单线程传输**（`HostCode/net/downlink.rs`、`uplink.rs`，**新增**）：下载/上传各为**阻塞单线程**，各持 `try_clone` 独立 socket 句柄 —— **上传不阻塞下载**。收/发完一帧立即处理下一帧，**无 sleep、无传输时钟**；仅上传线程以极短 `recv_timeout` 兼顾每秒 Ping 探测（延迟面板数据源）。连接级 `shutdown` 标志保证断链时两线程同步退出，`run_network` 统一 2s 重连（保留原 `RECONNECT_INTERVAL`）。
+  - **服务端会话改帧**（`ServerCode/net/session.rs`）：`write_loop` 由 `to_line` 改为 `FrameWriter + encode_server`；`read_loop` 由 `read_line + from_line` 改为 `read_exact(64KB) + FrameReader + ChunkAssembler + decode_client`；客户端消息投递抽为 `dispatch_client_message`。
+  - **AOI 边缘预取算法**（`ServerCode/net/prefetch.rs`，**新增**）：对 AOI 外实体按「到 AOI 边界距离 ÷ max(速度, ε)」升序取前 6，产预取资源集（`PREFETCH_COUNT = 6`、`MIN_SPEED = 0.5`）。**注**：端到端推送接线（Tick 内按预测标 `region=1` 下发 + 客户端 `promote`）留待后续版本。
+- **验证**：`cargo-wrap check -p cute_of_duty_server -p cute_of_duty_host` 退出码 **0**（无警告）；`cargo-wrap test -p cute_of_duty_server` **127 passed**（既有 114 + 新增帧编解码/对象池/预取）；`cargo-wrap test -p cute_of_duty_host` 通过。
+- **关联**：[ADR 0005](adr/0005-slot-frame-transport.md)、[契约 `protocol.yaml`](contracts/protocol.yaml)
+
+---
+
 ## [0.10.0] · 2026-09-27 · 服务端下发体素模型目录（客户端可见焰狐模型）+ 客户端资源目录归位
 
 - **变更类型**：**Additive**（仅新增下行消息，无字段删改、无语义变更，向后兼容）

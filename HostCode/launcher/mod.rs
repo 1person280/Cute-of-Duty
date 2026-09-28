@@ -15,13 +15,14 @@ use crate::flow::AppState;
 ///
 /// `addr` 为服务端监听地址（如 `127.0.0.1:8888`）。
 pub fn run(addr: &str) {
-    // 三路通道：快照（渲染对账）、下行控制（握手/事件/延迟/撤离回程）、上行意图。
+    // 四路通道：快照（渲染对账）、下行控制（握手/事件/延迟/撤离回程）、远程资源池、上行意图。
     let (snapshot_tx, snapshot_rx) = mpsc::channel::<Vec<EntitySnapshot>>();
     let (control_tx, control_rx) = mpsc::channel::<crate::net::ClientInbound>();
+    let (resource_tx, resource_rx) = mpsc::channel::<crate::net::PoolMessage>();
     let (up_tx, up_rx) = mpsc::channel::<ClientMessage>();
     let net_addr = addr.to_string();
     std::thread::spawn(move || {
-        crate::net::run_pull_loop(&net_addr, snapshot_tx, control_tx, up_rx);
+        crate::net::run_network(&net_addr, snapshot_tx, control_tx, resource_tx, up_rx);
     });
 
     App::new()
@@ -34,11 +35,13 @@ pub fn run(addr: &str) {
         .insert_resource(crate::net::SnapshotBuffer::new(snapshot_rx))
         .insert_resource(crate::net::ControlBuffer(std::sync::Mutex::new(control_rx)))
         .insert_resource(crate::net::NetOut(up_tx))
+        // 远程资源对象池（固定 16MB · 256×64KB 固定地址）：资源帧落池，实体突现即复用。
+        .insert_resource(crate::net::RemoteObjects::new(resource_rx))
         // 造型材质缓存：避免实体随 AOI 进出视野反复 spawn 时材质资源单调累积。
         .init_resource::<crate::net::EntityMaterials>()
         // 体素材质缓存（颜色 → 句柄）：本人焰狐模型的盒按色复用材质。
         .init_resource::<crate::world::VoxelMaterials>()
-        // 服务端下发的体素模型/动画目录（握手后由 route_control_messages 灌入）。
+        // 服务端下发的体素模型/动画目录视图（由远程对象池增量解码灌入，见 sync_catalog_from_pool）。
         .init_resource::<crate::flow::ModelCatalog>()
         // 中文字体句柄默认缺失（Default=None）但资源恒存在，避免任何 UI 系统
         // 在字体注入前的首帧对 `Res<CjkFont>` 取值 panic。
@@ -89,7 +92,10 @@ pub fn run(addr: &str) {
             Update,
             (
                 crate::net::receive_snapshots,
-                // 控制消息路由须先于实体对账：本人实体 ID 与体素模型目录均在此灌入，
+                // 资源帧先落池，再由池增量同步进 ModelCatalog 视图（下游渲染消费）。
+                crate::net::receive_resources,
+                crate::net::sync_catalog_from_pool,
+                // 控制消息路由须先于实体对账：本人实体 ID 在此灌入，
                 // 若晚于 `apply_entities`，首帧快照会把本人按方块回退落成（随后不再重建）。
                 crate::flow::route_control_messages,
                 crate::net::apply_entities,

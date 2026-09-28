@@ -43,8 +43,13 @@ pub struct EntitySnapshot {
     pub ammo: i32,
     /// 当前弹夹容量（HUD 大字弹药分母 / 换弹进度；服务端权威；-1 表示无武器）
     pub ammo_max: i32,
-    /// 备用弹药池剩余（HUD 备用弹药数字；服务端权威；-1 表示无）
-    pub ammo_pool: i32,
+    /// 权威**备用弹药总量**（0.11.0 新增）= 背包内全部弹药堆合计（-1 表示非玩家实体无备用弹）。
+    ///
+    /// 设计动机（Why）：备用子弹的权威宿主是背包格位（可堆叠物品），换弹直接从背包抽弹补满
+    /// 弹夹、不再经任何中间弹池（0.11.0 已移除 `ammo_pool`）。本字段由服务端合计下发，
+    /// 客户端只显示——避免客户端自行推算备用弹。
+    #[serde(default)]
+    pub ammo_reserve: i32,
     /// 换弹剩余时间（秒；>0 表示正在换弹，HUD 显示 `RELOADING`；0=未在换弹）
     pub reload_remaining: f32,
     /// 干员编号（HUD 干员名；服务端权威）
@@ -222,7 +227,7 @@ impl EntitySnapshot {
             active_slot: 0,
             ammo: -1,
             ammo_max: -1,
-            ammo_pool: -1,
+            ammo_reserve: -1,
             reload_remaining: 0.0,
             operator_id: 0,
             skill_cd_q: 0.0,

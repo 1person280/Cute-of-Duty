@@ -146,7 +146,6 @@ pub fn route_control_messages(
     mut live: ResMut<LiveLatency>,
     mut announces: ResMut<Announcements>,
     mut kills: ResMut<KillCount>,
-    mut catalog: ResMut<ModelCatalog>,
     mut load_timer: Local<f32>,
     time: Res<Time>,
 ) {
@@ -180,11 +179,8 @@ pub fn route_control_messages(
                 ClientInbound::Server(ServerMessage::ReturnToMenu) => {
                     next_state.set(AppState::MainMenu);
                 }
-                ClientInbound::Server(ServerMessage::ModelCatalog { models, animations }) => {
-                    // 握手后一次性灌入体素模型/动画目录（本人模型渲染 + idle 动画求值的数据源）。
-                    catalog.models = models;
-                    catalog.animations = animations;
-                }
+                // ModelCatalog 已改为经**远程对象池**（Resource 帧）抵达，由
+                // `net::sync_catalog_from_pool` 灌入 `ModelCatalog` 视图，不再走控制通道。
                 _ => {}
             }
         }

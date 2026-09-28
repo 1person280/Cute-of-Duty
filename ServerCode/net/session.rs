@@ -12,13 +12,16 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::tcp::{OwnedReadHalf, OwnedWriteHalf};
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 
 use crate::interact::InteractChoice;
 use crate::items::TransferDir;
+use crate::net::packet::{
+    ChunkAssembler, FRAME_BYTES, FrameKind, FrameReader, FrameWriter, decode_client, encode_server,
+};
 use crate::net::protocol::{ClientMessage, InventoryAction, PlayerInput, ServerMessage};
 
 /// 客户端连接向服务端权威主循环投递的事件。
@@ -141,73 +144,111 @@ pub async fn accept_loop(addr: String, rt: Arc<NetRuntime>) -> std::io::Result<(
     }
 }
 
-/// 写回循环：将服务端权威快照逐行写入该连接的 TCP 流。
+/// 写回循环：把服务端权威消息编成固定 64KB 槽帧写入该连接的 TCP 流。
+///
+/// 特例：`ModelCatalog` 被展开为"一资源一帧 + ResourceEnd"，其余按类别分片。
 async fn write_loop(
     mut writer: OwnedWriteHalf,
     mut rx: mpsc::UnboundedReceiver<ServerMessage>,
 ) {
+    let mut seq: u64 = 0;
     while let Some(msg) = rx.recv().await {
-        if writer.write_all(msg.to_line().as_bytes()).await.is_err() {
+        let mut w = FrameWriter::new();
+        seq += 1;
+        if encode_server(&mut w, &msg, seq).is_err() {
+            continue; // 单条消息编码失败不应拖垮整条连接
+        }
+        if writer.write_all(&w.take()).await.is_err() {
             // 对端关闭：结束写任务，通道由 remove_writer 清理
             break;
         }
     }
 }
 
-/// 读取循环：逐行解析客户端消息并投递为 `NetCommand`。
+/// 读取循环：按固定 64KB 帧解析客户端消息并投递为 `NetCommand`。
+///
+/// 客户端上行一律为 `Control` 帧（可跨帧分片），故按 `ChunkAssembler` 重组后 `decode_client`；
+/// 畸形帧/读错即视为断开（服务端只信任自描述帧头）。
 async fn read_loop(mut reader: OwnedReadHalf, conn_id: u64, rt: Arc<NetRuntime>) {
-    let mut buf = BufReader::new(&mut reader);
-    let mut line = String::new();
+    let mut frame_reader = FrameReader::new();
+    let mut buf = vec![0u8; FRAME_BYTES];
+    let mut asm = ChunkAssembler::default();
     loop {
-        line.clear();
-        match buf.read_line(&mut line).await {
-            Ok(0) | Err(_) => {
-                // EOF 或读错 → 视为断开
-                let _ = rt.cmd_tx.send(NetCommand::Disconnect { conn_id });
-                break;
-            }
-            Ok(_) => {
-                let msg = match ClientMessage::from_line(line.trim_end()) {
-                    Ok(m) => m,
-                    Err(_) => continue,
-                };
-                match msg {
-                    ClientMessage::Connect { profile } => {
-                        let _ = rt.cmd_tx.send(NetCommand::Connect { conn_id, name: profile });
+        // 恒定 64KB 整帧读：线格式保证帧对齐。
+        if reader.read_exact(&mut buf).await.is_err() {
+            let _ = rt.cmd_tx.send(NetCommand::Disconnect { conn_id });
+            break;
+        }
+        frame_reader.feed(&buf);
+        loop {
+            match frame_reader.next_frame() {
+                Ok(Some((header, payload))) => {
+                    if header.kind != FrameKind::Control {
+                        continue; // 客户端只发控制帧；忽略其它类别
                     }
-                    ClientMessage::Input { player } => {
-                        let _ = rt.cmd_tx.send(NetCommand::Input { conn_id, player });
+                    let full = match asm.push(&header, &payload) {
+                        Ok(Some(full)) => full,
+                        Ok(None) => continue,
+                        Err(_) => {
+                            let _ = rt.cmd_tx.send(NetCommand::Disconnect { conn_id });
+                            return;
+                        }
+                    };
+                    let msg = match decode_client(&full) {
+                        Ok(m) => m,
+                        Err(_) => continue,
+                    };
+                    if !dispatch_client_message(&rt, conn_id, msg) {
+                        return; // 客户端主动 Disconnect
                     }
-                    ClientMessage::Inventory { action } => {
-                        let _ = rt.cmd_tx.send(NetCommand::Inventory { conn_id, action });
-                    }
-                    ClientMessage::Loadout { carried } => {
-                        let _ = rt.cmd_tx.send(NetCommand::Loadout { conn_id, carried });
-                    }
-                    ClientMessage::StartTraining => {
-                        let _ = rt.cmd_tx.send(NetCommand::StartTraining { conn_id });
-                    }
-                    ClientMessage::ExtractRequest => {
-                        let _ = rt.cmd_tx.send(NetCommand::ExtractRequest { conn_id });
-                    }
-                    ClientMessage::SwitchOperator { operator_id } => {
-                        let _ = rt.cmd_tx.send(NetCommand::SwitchOperator { conn_id, operator_id });
-                    }
-                    ClientMessage::Interact { target, choice } => {
-                        let _ = rt.cmd_tx.send(NetCommand::Interact { conn_id, target, choice });
-                    }
-                    ClientMessage::LootTransfer { target, dir, index } => {
-                        let _ = rt.cmd_tx.send(NetCommand::LootTransfer { conn_id, target, dir, index });
-                    }
-                    ClientMessage::Ping { seq } => {
-                        let _ = rt.cmd_tx.send(NetCommand::Ping { conn_id, seq });
-                    }
-                    ClientMessage::Disconnect => {
-                        let _ = rt.cmd_tx.send(NetCommand::Disconnect { conn_id });
-                        break;
-                    }
+                }
+                Ok(None) => break,
+                Err(_) => {
+                    let _ = rt.cmd_tx.send(NetCommand::Disconnect { conn_id });
+                    return;
                 }
             }
         }
     }
+}
+
+/// 把一条已解码的客户端消息投递为 `NetCommand`；返回 `false` 表示连接应终止。
+fn dispatch_client_message(rt: &Arc<NetRuntime>, conn_id: u64, msg: ClientMessage) -> bool {
+    match msg {
+        ClientMessage::Connect { profile } => {
+            let _ = rt.cmd_tx.send(NetCommand::Connect { conn_id, name: profile });
+        }
+        ClientMessage::Input { player } => {
+            let _ = rt.cmd_tx.send(NetCommand::Input { conn_id, player });
+        }
+        ClientMessage::Inventory { action } => {
+            let _ = rt.cmd_tx.send(NetCommand::Inventory { conn_id, action });
+        }
+        ClientMessage::Loadout { carried } => {
+            let _ = rt.cmd_tx.send(NetCommand::Loadout { conn_id, carried });
+        }
+        ClientMessage::StartTraining => {
+            let _ = rt.cmd_tx.send(NetCommand::StartTraining { conn_id });
+        }
+        ClientMessage::ExtractRequest => {
+            let _ = rt.cmd_tx.send(NetCommand::ExtractRequest { conn_id });
+        }
+        ClientMessage::SwitchOperator { operator_id } => {
+            let _ = rt.cmd_tx.send(NetCommand::SwitchOperator { conn_id, operator_id });
+        }
+        ClientMessage::Interact { target, choice } => {
+            let _ = rt.cmd_tx.send(NetCommand::Interact { conn_id, target, choice });
+        }
+        ClientMessage::LootTransfer { target, dir, index } => {
+            let _ = rt.cmd_tx.send(NetCommand::LootTransfer { conn_id, target, dir, index });
+        }
+        ClientMessage::Ping { seq } => {
+            let _ = rt.cmd_tx.send(NetCommand::Ping { conn_id, seq });
+        }
+        ClientMessage::Disconnect => {
+            let _ = rt.cmd_tx.send(NetCommand::Disconnect { conn_id });
+            return false;
+        }
+    }
+    true
 }

@@ -5,13 +5,22 @@
 //! - 服务端是唯一真理源，客户端只发输入、只收服务端算好的结果（快照）；
 //! - `aoi` 兴趣区域剔除：每个客户端只收到其视野范围内的实体数据（根治 ESP 透视）。
 //!
-//! 线格式采用 **JSON 行（NDJSON）** 帧协议，便于无头阶段调试与后续升级。
+//! 线格式采用**统一固定 64KB 槽帧**（见 [`packet`]）：资源一资源一帧、控制指令
+//! （~256B）也打包进 64KB 帧，超长消息按 `continuation` 分片重组。客户端据此把资源帧
+//! 写入固定地址槽位池（见 HostCode `net::remote`），实体因 AOI 突现即复用、不等加载。
 
 pub mod protocol;
 pub mod aoi;
 pub mod broadcaster;
+pub mod packet;
+pub mod prefetch;
 pub mod session;
 
 pub use broadcaster::build_snapshot;
+pub use packet::{
+    FrameHeader, FrameKind, FrameReader, FrameWriter, Region, ResourceKind, encode_client,
+    encode_server, decode_client, decode_server,
+};
+pub use prefetch::predict_prefetch;
 pub use protocol::{ClientMessage, EntitySnapshot, PlayerInput, ServerMessage};
 pub use session::{NetCommand, NetRuntime, accept_loop};

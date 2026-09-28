@@ -88,7 +88,7 @@
 | `damage` | 伤害管线（packet → resolver → effect） | 伤害结算中间态 | 纯函数 + 事件 | 消费伤害包 | L1 |
 | `gamemode` | 玩法模式规则 | 模式状态 | 模式查询 | 无 | L0 |
 | `interact` | 站点/拾取交互与结算（`settle`、`InteractChoice`） | 交互目标与结算 | `INTERACT_RANGE`、`SupplyKind` | Event 回执 | **L1→L2 待定**（定级前按 L2 流程，见 [CONTRIBUTING 第九节](../../CONTRIBUTING.md)） |
-| `net` | 协议线格式、会话、AOI、广播 | 连接会话 | `protocol`、`session`、`broadcaster` | 收发消息 | **L2（线格式）** |
+| `net` | 协议线格式、统一 64KB 槽帧（`packet`）、会话、AOI、广播、AOI 边缘预取（`prefetch`） | 连接会话 | `protocol`、`packet`、`session`、`broadcaster`、`prefetch` | 收发消息 | **L2（线格式）** |
 | `storage` | 冷数据持久化（json_log / cold_repo） | 落盘数据 | `thiserror` 错误类型 | 无 | L1 |
 | `hal` | 硬件抽象（平台相关） | 无 | Trait | 无 | L0 |
 
@@ -123,7 +123,7 @@
 | 域 | 归属模块 | 数据 | 生命周期 | 是否落盘 |
 |---|---|---|---|---|
 | **局内（in-match）** | `items` | `Backpack{slots:12}`、`Container{slots:12}`、`LootItem`、`POOL` | 一局 | ❌ 不落盘 |
-| **局内（in-match）** | `combat` | `WEAPON_SLOTS`、`DEFAULT_AMMO_POOL`（手持槽 / 弹夹） | 一局 | ❌ 不落盘 |
+| **局内（in-match）** | `combat` | `WEAPON_SLOTS`、`Combatant`（手持槽 / 弹夹；备弹权威在 `items::Backpack`） | 一局 | ❌ 不落盘 |
 | **局外（out-of-match）** | `inventory` | 货币、制作、丢弃（**经济域**） | 跨局 | ✅ 落 storage |
 | **局外（out-of-match）** | `equipment` | 装备实例注册表 | 跨局 | ✅ 落 storage |
 

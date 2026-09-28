@@ -4,14 +4,18 @@
 //! 承载三路通道（快照/下行控制/上行意图）的消费端：拉快照出画、握手/事件/撤离回程
 //! 路由、CapsLock 延迟面板，以及把玩家输入上行给服务端。
 
+pub(crate) mod downlink;
 pub(crate) mod latency;
 pub(crate) mod network;
 pub(crate) mod pilot;
+pub(crate) mod remote;
 pub(crate) mod snapshot;
+pub(crate) mod uplink;
 
 pub(crate) use latency::{caps_toggle, panel_update, spawn_panel};
-pub(crate) use network::{ClientInbound, ControlBuffer, NetOut, run_pull_loop};
+pub(crate) use network::{ClientInbound, ControlBuffer, NetOut, run_network};
 pub(crate) use pilot::input_system;
+pub(crate) use remote::{PoolMessage, RemoteObjects, receive_resources, sync_catalog_from_pool};
 pub(crate) use snapshot::{
     CubeMesh, EntityMaterials, SnapshotBuffer, apply_entities, receive_snapshots,
 };

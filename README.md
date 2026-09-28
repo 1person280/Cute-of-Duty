@@ -9,7 +9,7 @@
 
 [![License: GPL-3.0 (code)](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
 [![License: CC BY-NC-SA 4.0 (assets)](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-lightgrey.svg)](LICENSE-ASSETS)
-[![Version](https://img.shields.io/badge/Version-0.10.0-blue.svg)](#五版本历史)
+[![Version](https://img.shields.io/badge/Version-0.11.0-blue.svg)](#五版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
 
 **外部依赖 · 站在开源社区的肩膀上** · [![by Bevy](https://img.shields.io/badge/by-Bevy-E90000)](https://bevyengine.org)
@@ -182,7 +182,7 @@ Cargo Workspace（虚拟 manifest）下平级三个 crate：
 | `element` | 元素反应系统 | `mod.rs` |
 | `map` | 纯数据地图（训练场 CQB + `lawn` 1×1km 露天搜打撤大场） | `training/` + `lawn/` |
 | `model` | 模型文件（易变化资源）经快照下发客户端 | `mod.rs` |
-| `net` | TCP 网络层（AOI / 会话 / 广播 / 协议） | `aoi.rs` / `session.rs` / `broadcaster.rs` / `protocol.rs` |
+| `net` | TCP 网络层（AOI / 帧编解码 / 会话 / 广播 / 预取 / 协议） | `aoi.rs` / `packet.rs` / `session.rs` / `broadcaster.rs` / `prefetch.rs` / `protocol.rs` |
 | `config` / `operator` / `player` / `equipment` / `gamemode` / `hal` | 配置 / 干员 / 档案 / 装备 / 模式 / 时钟 | 各自 `mod.rs` |
 | **契约 · `ContractCode/`** | 线格式类型 + 跨域载荷 + 共享常量 + Port Trait（不依赖两端） | `docs/contracts/protocol.yaml` 为其机器可读描述 |
 
@@ -250,6 +250,21 @@ TCP 的可靠传输更好保障**元素状态、技能效果、背包交互**等
 | AOI 剔除 | 控带宽 + 根治 ESP 透视外挂 |
 | 客户端全开源 | 服务器校验兜底，开源不破坏完整性，反哺 Mod 生态 |
 
+### 4.6 传输层 · 统一 64KB 槽帧 + 远程对象池（0.11.0 起）
+
+下行线格式由 NDJSON 行帧改为**统一固定 64KB 槽帧**（`ServerCode/net/packet.rs`）：
+
+- **定长帧**：每帧恒定 64KB（尾部零填充对齐），头 32B：`magic/version/kind/flags/region/sub_kind/seq/key/payload_len`；
+  类别 `Control`（≤256B 指令也打包进 64KB）/`Snapshot`/`Event`/`Resource`/`ResourceEnd`；
+  超单帧容量的消息按 `flags.continuation` **跨帧分片**、接收侧重组；单份资源**一资源一帧**。
+- **客户端 16MB 固定地址远程对象池**（`HostCode/net/remote.rs`）：256 个 64KB 槽 —— 前 250 槽（16000KB）**在用缓冲**、
+  末 6 槽（384KB）**预取区**；资源按 `key` 落槽、命中即复用，实体因 AOI 突现时**零等待**。纯本地内存，**不引入共享内存**。
+- **双线单线程**（`HostCode/net/downlink.rs` / `uplink.rs`）：上传与下载各为阻塞单线程、各持 `try_clone` 独立句柄，
+  **上传不阻塞下载**；收/发完一帧立即处理下一帧，**不设传输时钟**。
+- **AOI 边缘预取**（`ServerCode/net/prefetch.rs`）：按「到 AOI 边界距离 ÷ 速度」预测最可能进入视野的 6 个实体（算法就绪，端到端推送待接线）。
+
+> 决策记录：[ADR 0005](docs/adr/0005-slot-frame-transport.md)；线格式契约：[protocol.yaml](docs/contracts/protocol.yaml) `transport` 节。
+
 ---
 
 ## 五、版本历史
@@ -260,6 +275,7 @@ TCP 的可靠传输更好保障**元素状态、技能效果、背包交互**等
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| **0.11.0** | 2026-09-28 | **通信优化（协议不兼容）**：线格式由 NDJSON 行帧改为**统一固定 64KB 槽帧**；客户端新增**固定 16MB（250 在用 + 6 预取，各 64KB 固定地址）远程对象池**，资源按 `key` 落槽、实体突现即复用；**上传/下载双线单线程**（各持 `try_clone` 句柄，上传不阻塞下载）；**传输不设时钟**；新增 AOI 边缘预取算法（预测 6 个即将进入视野的实体）。**代码更改**：移除 `Combatant::ammo_pool` 中间弹池，换弹改为计时耗尽后直接从背包弹药堆抽满 —— 修「备弹诡异归零 / 要多按一次 R」（协议 `ammo_pool` → `ammo_reserve`）。**扁平化更新**：`ServerCode/net/packet.rs` 统一帧编解码、`HostCode/net/remote.rs` 定址对象池、`downlink.rs`/`uplink.rs` 双线拆分。**未做**：预取推送端到端接线。**下一版本目标**：`0.6.1` 网游版本（①多玩家 → ②匹配机制 → ③无掩体竞技场）。详见 [ADR 0005](docs/adr/0005-slot-frame-transport.md)。 |
 | **0.10.0** | 2026-09-28 | **模型修复**：客户端首次可见本人「焰狐」体素模型。①**服务端下发模型目录**（几何+动画随握手一次性下行，协议 `0.10.0`，仅增不改、向后兼容）；②**焰狐几何重建**——修「四肢左右镜像颠倒 / 枪悬空 1.15m / 狐耳内折」三处硬伤，35→43 盒并优化造型；③**逐盒材质键**（`VoxelCube.mat`）——此前只按骨名着色致细节全被抹平、模型退化为一坨纯色方块，现按 0.3.2 色板逐盒上色；④**朝向随视线**（修「永远向北」）+ 相机按 3.52m 体型重新标定；⑤**扁平化**——解析器 `voxel_spec.rs`→`loader.rs`、两份 JSON 合并为单文件 `FireFox.json`、`mod.rs` 网关重导出保路径稳定。**未做**：多人联机 / 匹配机制 / 无掩体竞技场。**下一版本目标**：`0.6.1` 网游版本（①多玩家 → ②匹配机制 → ③无掩体竞技场）。**本轮冻结（下次修）**：无新增，遗留项见 [docs/frozen-tasks](docs/frozen-tasks/snapshot-8-playtest-feedback.md)。 |
 | **0.6（Release）** | 2026-09-27 | **单机落幕 · 正式发布**：收官补齐手雷「先瞄准后释放」持雷态、可点击操作按钮组（`B`）、legacy 操作表逐行核对；修复三条实机缺陷（手雷重力未写回致走直线、新增抛物线预览、释放光标后视角仍转）——协议 `0.9.1`。**下一版本目标：0.6.1 网游版本**（①多玩家 → ②匹配机制 → ③无掩体竞技场） |
 | 0.6-Snapshot-1…10（Pre-Release） | 2026-09-25 ~ 09-27 | **由单 crate 迁移为双 crate workspace，并逐快照还原玩法**：确立 `ServerCode`（服务端权威模拟 + TCP 网络层）/ `HostCode`（客户端表现层）物理分离；训练场迁移至 0.3.2 `map::lawn` 1×1km 露天搜打撤大场 + `~` 暂停菜单 + 断线自动重连；越肩瞄准全套（SpringArm + 撞墙避障 + 越肩取景）；地图交互端到端（`F` 交互面板 / 物资箱 / 补给台 4×3 双向格位 / Tab 背包总览）；消耗品 `3`/`4`（医疗包 / 手雷）与手雷「先瞄准后释放」；备用子弹改为可堆叠背包物品（弹药 ×64 / 恢复·战术 ×16 / 工具不可堆叠）；HUD 图标化 + 战术大地图；架构边界体系落地（ADR 0001–0004 / 模块边界 / 契约 YAML / 冻结区）。逐快照完整记录见 [barek-history.md](docs/barek-history.md) |

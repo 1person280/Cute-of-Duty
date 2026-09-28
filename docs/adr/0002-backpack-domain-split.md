@@ -19,7 +19,7 @@
 | 生命周期 | 随战局创建/销毁 | 落盘到 `storage` 冷仓库 |
 | 已知消费方 | `combat::use_item_at`、`interact::settle` | 无（当前为孤立域服务） |
 
-另有第二处重叠：`equipment` 持"装备热实例注册表"，而 `combat/combatant.rs` 持 `WEAPON_SLOTS` / `DEFAULT_AMMO_POOL`（手持槽 / 弹夹）。两者都涉及"武器"。
+另有第二处重叠：`equipment` 持"装备热实例注册表"，而 `combat/combatant.rs` 持 `WEAPON_SLOTS` / `Combatant`（手持槽 / 弹夹）。两者都涉及"武器"。
 
 按 ADR 0001 铁律 2，同一份可变状态不得有两个 owning 模块。必须裁决。
 
@@ -32,7 +32,7 @@
 | 归属 | 模块 | 拥有的数据 | 生命周期 | 是否落盘 |
 |---|---|---|---|---|
 | **局内** | `items` | `Backpack{slots:12}`、`Container{slots:12}`、`LootItem`、`POOL` | 一局 | ❌ 不落盘 |
-| **局内** | `combat` | 手持武器槽（`WEAPON_SLOTS`）、弹夹 / `DEFAULT_AMMO_POOL` | 一局 | ❌ 不落盘 |
+| **局内** | `combat` | 手持武器槽（`WEAPON_SLOTS`）、弹夹（`Combatant`；备弹权威在 `items`） | 一局 | ❌ 不落盘 |
 | **局外** | `inventory` | 货币、制作、丢弃等**经济操作**及其一致性守卫 | 跨局 | ✅ 落 `storage` |
 | **局外** | `equipment` | 装备实例注册表（等级 / 元素 / 归属） | 跨局 | ✅ 落 `storage` |
 
