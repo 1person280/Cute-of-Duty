@@ -145,18 +145,15 @@ cargo-wrap build --release --workspace      # 发布构建，产出 cod_server.e
 
 ## 三、架构总览（接手前必读）
 
-```
-                    ┌────────────────────────────────────────────┐
-                    │  Cargo Workspace（虚拟 manifest）            │
-                    └───────┬──────────────────────────┬─────────┘
-              ┌─────────────▼────────────┐  ┌──────────▼─────────────────────┐
-              │ ServerCode（领域层 + 基础设施）│  │ HostCode（客户端表现层）          │
-              │ 权威 60Hz Tick · 核心零 bevy │  │ 动态装载 bevy 0.14 · 只吃快照 + 画 │
-              │ TCP 网络层 / 配置 / 存档     │  │ launcher 纯装配 + HUD / 相机 Rig  │
-              └────────────────────────────┘  └────────────────────────────────┘
-                              ▲                          ▲
-                              └──── ContractCode（契约层：线格式 + Port Trait）┘
-```
+Cargo Workspace（虚拟 manifest）下平级三个 crate：
+
+| Crate | 角色定位 | 内容 | 依赖 bevy |
+|---|---|---|---|
+| **ServerCode** | 领域层 + 基础设施（**权威真理源**） | 权威 60Hz Tick · TCP 网络层 · 配置 · 存档 | ❌ 核心零 bevy |
+| **HostCode** | 客户端表现层（**只吃快照 + 画**） | 动态装载 bevy 0.14 · `launcher` 纯装配 + HUD / 相机 Rig | ✅ 独占 bevy |
+| **ContractCode** | 契约层（被两端共用，**不依赖两端**） | 线格式类型 + Port Trait + 共享常量 | ❌ |
+
+> 数据流向：`ServerCode`（权威算）— 线格式/Port Trait → `HostCode`（只画，消费快照）。
 
 **三条铁律**：
 
