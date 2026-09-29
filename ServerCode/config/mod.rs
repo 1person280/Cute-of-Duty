@@ -13,6 +13,7 @@
 //! - 文件存在但解析失败 → 返回 `Err`，由调用方大声失败（改错表就该当场报错，而不是静默用默认值）。
 
 use crate::element::ElementConfig;
+use crate::net::web::WebConfig;
 use std::path::{Path, PathBuf};
 
 /// 元素配置在项目内的相对路径（同时作为项目根目录的探测标记）。
@@ -77,6 +78,37 @@ pub fn load_element_config() -> Result<(ElementConfig, Option<PathBuf>), String>
         None => serde_yaml::from_str(ELEMENT_CONFIG_EMBEDDED)
             .map(|c: ElementConfig| (c, None))
             .map_err(|e| format!("嵌入默认元素配置解析失败: {e}")),
+    }
+}
+
+/// Web 服务配置在项目内的相对路径（0.12.3 新增，与元素配置同款探测/回退语义）。
+pub const WEB_CONFIG_REL: &str = "ServerCode/config/web.yaml";
+
+/// 编译期嵌入的权威默认 Web 配置（与仓库内 `web.yaml` 恒为同一份内容）。
+pub const WEB_CONFIG_EMBEDDED: &str = include_str!("web.yaml");
+
+/// 定位 Web 配置文件。
+pub fn web_config_path() -> Option<PathBuf> {
+    project_root().map(|root| root.join(WEB_CONFIG_REL))
+}
+
+/// 便捷入口：自动定位并加载 Web 配置。
+///
+/// - 找到且解析成功 → `Ok((配置, Some(路径)))`
+/// - 文件缺失       → `Ok((嵌入默认配置, None))`
+/// - 解析失败       → `Err(带路径与原因的完整错误信息)`
+pub fn load_web_config() -> Result<(WebConfig, Option<PathBuf>), String> {
+    match web_config_path() {
+        Some(path) => {
+            let content = std::fs::read_to_string(&path)
+                .map_err(|e| format!("读取 Web 配置失败 {}: {e}", path.display()))?;
+            let config = serde_yaml::from_str(&content)
+                .map_err(|e| format!("解析 Web 配置失败 {}: {e}", path.display()))?;
+            Ok((config, Some(path)))
+        }
+        None => serde_yaml::from_str(WEB_CONFIG_EMBEDDED)
+            .map(|c: WebConfig| (c, None))
+            .map_err(|e| format!("嵌入默认 Web 配置解析失败: {e}")),
     }
 }
 
@@ -163,5 +195,27 @@ mod tests {
         // 表中没有的环境组合返回 1.0
         let modifier = system.get_environment_modifier(&EntityElementState::SnowEnvironment, &ElementType::Fire);
         assert!((modifier - 1.0).abs() < f32::EPSILON);
+    }
+
+    /// Web 配置：嵌入默认必须与仓库中的 web.yaml 一致（改表须同步嵌入才算生效）。
+    #[test]
+    fn test_web_embedded_default_matches_yaml() {
+        let embedded: WebConfig =
+            serde_yaml::from_str(WEB_CONFIG_EMBEDDED).expect("嵌入默认 Web 配置应可解析");
+        let path = web_config_path().expect("web.yaml 应存在");
+        let content = std::fs::read_to_string(&path).expect("web.yaml 应可读");
+        let from_file: WebConfig = serde_yaml::from_str(&content).expect("web.yaml 应可解析");
+        assert_eq!(embedded, from_file, "嵌入默认与 ServerCode/config/web.yaml 不一致");
+        assert_eq!(embedded, WebConfig::default(), "嵌入默认应与 WebConfig::default() 一致");
+    }
+
+    /// `load_web_config` 走文件路径时应成功并回传路径。
+    #[test]
+    fn test_load_web_config_from_file() {
+        let (config, path) = load_web_config().expect("应能加载 Web 配置");
+        assert!(path.is_some());
+        assert_eq!(config.http.port, 8080);
+        assert_eq!(config.https.port, 8443);
+        assert!(config.enabled);
     }
 }

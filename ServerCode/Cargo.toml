@@ -1,6 +1,6 @@
 [package]
 name = "cute_of_duty_server"
-version = "0.12.2"
+version = "0.12.3"
 edition = "2021"
 license = "GPL-3.0-with-linking-exception"
 authors = ["B站@3493264141322312", "Kimi AI Collaborator"]
@@ -11,12 +11,19 @@ serde = { version = "1", features = ["derive"] }
 serde_yaml = "0.9"
 serde_json = "1.0"
 crossbeam-queue = "0.3"
+# 错误类型统一（公约红线七.2：错误类型统一 thiserror，禁 Box<dyn Error> 穿模块边界）。
+thiserror = "1"
 rand = { version = "0.8", features = ["std_rng"] }
 rand_pcg = "0.3"
 tracing = "0.1"
 tracing-subscriber = "0.3"
 tokio = { version = "1.35", features = ["rt-multi-thread", "time", "macros", "net", "io-util", "sync"] }
 blake3 = "1.5"
+# 内置 Web 服务的 TLS 承载（0.12.3；纯 tokio 无法 TLS，这是唯一新增依赖族，见 ADR 0007）。
+# 统一走 ring 加密后端（关掉 tokio-rustls 默认的 aws-lc-rs，省去 cmake/nasm 重编译链）。
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "tls12", "logging"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-pemfile = "2"
 # 双端共享契约（线格式类型 / 跨域语义 / 共享常量）。
 cute_of_duty_contract = { path = "../ContractCode" }
 

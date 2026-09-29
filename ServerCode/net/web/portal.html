@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin: 0; font-family: system-ui, "Segoe UI", sans-serif;
+         background: #14161a; color: #e8eaed; line-height: 1.6; }
+  main { max-width: 720px; margin: 8vh auto; padding: 0 24px; }
+  h1 { font-size: 1.6rem; margin: 0 0 .2em; }
+  .motd { color: #9aa0a6; margin-bottom: 2em; }
+  .card { background: #1d2026; border: 1px solid #2a2e35; border-radius: 10px;
+          padding: 16px 20px; margin-bottom: 16px; }
+  .row { display: flex; justify-content: space-between; padding: 4px 0; }
+  .k { color: #9aa0a6; }
+  code { background: #262a31; padding: 2px 6px; border-radius: 4px; font-size: .9em; }
+  #log { font-family: ui-monospace, Consolas, monospace; font-size: .85rem;
+         white-space: pre-wrap; max-height: 220px; overflow: auto; color: #b6c2cf; }
+</style>
+</head>
+<body>
+<main>
+  <h1>{{TITLE}}</h1>
+  <p class="motd">{{MOTD}}</p>
+
+  <div class="card">
+    <div class="row"><span class="k">在线人数</span><span id="online">—</span></div>
+    <div class="row"><span class="k">服务端版本</span><span id="version">—</span></div>
+    <div class="row"><span class="k">地图</span><span id="map">—</span></div>
+    <div class="row"><span class="k">运行时长</span><span id="uptime">—</span></div>
+  </div>
+
+  <div class="card">
+    <b>浏览器内游玩（骨架）</b>
+    <p class="k">本页演示浏览器按与原生客户端相同的 256B 定长包格式接入服务端。
+       完整 3D 客户端分期实现。</p>
+    <button id="connect">连接 /ws</button>
+    <div id="log"></div>
+  </div>
+</main>
+<script>
+async function refresh() {
+  try {
+    const r = await fetch("/api/status");
+    if (!r.ok) return;
+    const s = await r.json();
+    online.textContent = s.online;
+    version.textContent = s.version;
+    map.textContent = s.map;
+    uptime.textContent = s.uptime_secs + " s";
+  } catch (e) { /* 忽略瞬时错误 */ }
+}
+refresh();
+setInterval(refresh, 3000);
+
+// —— WebSocket 骨架：发 256B 绑定包（其余交给后续版本），打印收到的帧长 ——
+// 定长包头布局见 docs/contracts/protocol.yaml（全部小端）：
+// 0/4 magic · 4/2 version · 6/1 kind · 7/1 continuation · 8/1 unit_count
+// · 9/1 sub_kind · 10/1 region · 12/2 chunk_index · 14/2 payload_len · 16/8 seq · 24/8 key
+function bindPacket(name) {
+  const buf = new Uint8Array(256);
+  const dv = new DataView(buf.buffer);
+  dv.setUint32(0, 0x434F4431, true);    // MAGIC "COD1"（小端）
+  dv.setUint16(4, 12, true);            // WIRE_VERSION
+  buf[6] = 0;                           // PacketKind::Bind
+  buf[7] = 0;                           // continuation = false
+  buf[8] = 0;                           // unit_count = 0
+  buf[9] = 0;                           // sub_kind = Role::Control
+  buf[10] = 0;                          // region = InUse
+  const payload = new TextEncoder().encode(name);
+  dv.setUint16(14, payload.length, true); // payload_len
+  buf.set(payload, 32);
+  return buf;
+}
+
+let ws = null;
+document.getElementById("connect").onclick = () => {
+  if (ws) { ws.close(); ws = null; return; }
+  ws = new WebSocket("ws://" + location.host + "/ws");
+  ws.binaryType = "arraybuffer";
+  ws.onopen = () => {
+    log("已连接，发送绑定包（WS 桥在 0.12.3 第二步接入，服务端当前应回 501）");
+    ws.send(bindPacket("browser"));
+  };
+  ws.onmessage = (ev) => log("收到帧 " + ev.data.byteLength + " 字节");
+  ws.onclose = () => { log("连接关闭"); ws = null; };
+  ws.onerror = () => log("连接错误");
+};
+function log(t) {
+  const el = document.getElementById("log");
+  el.textContent += t + "\n";
+  el.scrollTop = el.scrollHeight;
+}
+</script>
+</body>
+</html>

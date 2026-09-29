@@ -12,16 +12,24 @@
 //!
 //! 两条通道同监听一个端口，按**首条绑定包**区分角色（见 [`session`]）。
 //!
-//! 0.13.0（[ADR 0003]）起，线格式的**类型与纯编解码**（`codec` / `packet` / `protocol` /
+//! 0.12.2（[ADR 0003]）起，线格式的**类型与纯编解码**（`codec` / `packet` / `protocol` /
 //! `resource_stream` / `scheduler`）迁至契约 crate `cute_of_duty_contract::net`；本模块
 //! 通过 `pub use` 保持既有公开路径不变，并只保留**服务端专属编排**（会话 / AOI / 预取）。
 //!
+//! 0.12.3（[ADR 0007]）起，本模块另承载**内置 Web 服务**（[`web`]：HTTP/HTTPS 门户 + 运维
+//! API + WebSocket 游玩桥）与**传输无关核心**（[`runtime`]）：TCP 与 WS 共用同一套定长包
+//! 解析与 `NetCommand` 分发，`wire_version` 仍为 12（不触碰线格式）。
+//!
 //! [ADR 0003]: ../../docs/adr/0003-contract-crate.md
+//! [ADR 0007]: ../../docs/adr/0007-native-web-service.md
 
 pub mod aoi;
 pub mod broadcaster;
 pub mod prefetch;
+pub mod runtime;
 pub mod session;
+pub mod stages;
+pub mod web;
 
 /// 线格式契约（迁至 `cute_of_duty_contract::net`，此处保持 `crate::net::*` 路径可用）。
 pub use cute_of_duty_contract::net::{codec, packet, protocol, resource_stream, scheduler};
@@ -32,4 +40,5 @@ pub use cute_of_duty_contract::net::protocol::{
     ClientMessage, EntitySnapshot, PlayerInput, ServerMessage,
 };
 pub use prefetch::predict_prefetch;
-pub use session::{NetCommand, NetRuntime, ResourceJob, accept_loop};
+pub use runtime::{ControlSession, NetCommand, NetRuntime, ResourceJob};
+pub use session::accept_loop;
