@@ -1,4 +1,4 @@
-//! HUD 格位搬运面板（统一形态）：**左「来源」右「背包」两个 4×3 网格 + 鼠标拖拽 / Shift 快捷**
+﻿//! HUD 格位搬运面板（统一形态）：**左「来源」右「背包」两个 4×3 网格 + 鼠标拖拽 / Shift 快捷**
 //!
 //! 设计动机（Why）：物资箱与补给台此前是两套别扭的操作（键盘逐格搬运 / 二级选项菜单）。
 //! 0.6-Snapshot-9 统一为**与仓库选装完全一致**的形态（见 `menu/arsenal/`）：
@@ -16,9 +16,9 @@
 
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use cute_of_duty_server::interact::{InteractChoice, SupplyKind};
-use cute_of_duty_server::items::{LootItem, TransferDir};
-use cute_of_duty_server::net::protocol::ClientMessage;
+use cute_of_duty_contract::interact::{InteractChoice, SupplyKind};
+use cute_of_duty_contract::items::{LootItem, TransferDir};
+use cute_of_duty_contract::net::protocol::ClientMessage;
 
 use crate::flow::flow_state::{self as flow, CjkFont, LocalPlayer};
 use crate::net::network::NetOut;

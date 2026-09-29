@@ -1,4 +1,4 @@
-//! 游玩流程状态机 + 下行控制消息路由
+﻿//! 游玩流程状态机 + 下行控制消息路由
 //!
 //! 设计动机（Why）：「加载 → 主菜单 → 训练场」是纯客户端表现层决策，但选装/进场/
 //! 撤离的资格与距离判定一律由服务端权威裁决。本模块只负责：持有全局资源（本人实体、
@@ -6,8 +6,8 @@
 //! 并把状态机推向正确的一环。
 
 use bevy::prelude::*;
-use cute_of_duty_server::model::{VoxelAnimationSpec, VoxelModelSpec};
-use cute_of_duty_server::net::protocol::{EventKind, ServerMessage};
+use cute_of_duty_contract::model::{VoxelAnimationSpec, VoxelModelSpec};
+use cute_of_duty_contract::net::protocol::{EventKind, ServerMessage};
 
 use crate::net::network::{ClientInbound, ControlBuffer};
 

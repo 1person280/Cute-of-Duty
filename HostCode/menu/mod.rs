@@ -15,15 +15,16 @@ pub(crate) use arsenal::{
     arsenal_drag_system, arsenal_interaction, ensure_overlay, ArsenalDrag, ArsenalSelection,
     ArsenalVisible,
 };
-pub(crate) use game_settings::{
-    GameSettings, settings_apply_ambient, settings_apply_fov,
-};
+pub(crate) use game_settings::{settings_apply_ambient, settings_apply_fov};
 pub(crate) use menu_behaviour::{
     main_menu_interaction, main_menu_loadout, main_menu_style, tick_grace,
 };
 pub(crate) use menu_main::spawn_menu;
 pub(crate) use mode_panel::{SelectedCategory, SelectedMode};
 pub(crate) use pause::{
-    cursor_lock_system, cursor_release_toggle, pause_closed, pause_menu_interaction, pause_toggle,
-    spawn_pause_ui, teardown_pause, CursorReleased, PauseMenu,
+    cursor_lock_system, cursor_release_toggle, open_pause_on_request, pause_closed,
+    pause_menu_interaction, pause_toggle, publish_modal_changes, spawn_pause_ui, teardown_pause,
+    CursorReleased, PauseMenu,
 };
+// 设置资源归 `flow`（跨模块全局状态），经本模块转出口以维持既有 `crate::menu::GameSettings` 路径。
+pub(crate) use crate::flow::GameSettings;

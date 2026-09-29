@@ -1,4 +1,4 @@
-//! 仓库选装浮层的**交互与拖拽**：拖拽会话状态机 + Shift 快捷移动 + 确认/返回。
+﻿//! 仓库选装浮层的**交互与拖拽**：拖拽会话状态机 + Shift 快捷移动 + 确认/返回。
 //!
 //! 设计动机（Why）：把「谁被拖起、松手落在哪个容器、有没有按 Shift」全部收敛在此——
 //! 共享状态定义在 `state`、绘制在 `refresh`，本模块只做输入判定与清单增删，且只上行
@@ -6,7 +6,7 @@
 
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use cute_of_duty_server::net::protocol::ClientMessage;
+use cute_of_duty_contract::net::protocol::ClientMessage;
 
 use crate::flow::flow_state::AppState;
 use crate::net::network::NetOut;

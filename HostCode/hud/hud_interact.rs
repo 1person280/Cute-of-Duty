@@ -1,4 +1,4 @@
-//! HUD 交互：**就近常显的附近列表**（滚轮翻页 + F/回车确认）+ 站点二级选项面板
+﻿//! HUD 交互：**就近常显的附近列表**（滚轮翻页 + F/回车确认）+ 站点二级选项面板
 //!
 //! 设计动机（Why）：交互是"服务端算、客户端看"的典型场景——客户端只负责①根据快照里
 //! 服务端下发的 `interact` 信息列出**附近可交互目标**；②把玩家的选择（拾取 / 领取哪项
@@ -17,10 +17,10 @@
 
 use bevy::input::mouse::MouseWheel;
 use bevy::prelude::*;
-use cute_of_duty_server::interact::{InteractChoice, InteractKind, INTERACT_RANGE};
-use cute_of_duty_server::map::StationKind;
-use cute_of_duty_server::net::protocol::ClientMessage;
-use cute_of_duty_server::operator::roster;
+use cute_of_duty_contract::interact::{InteractChoice, InteractKind, INTERACT_RANGE};
+use cute_of_duty_contract::map::StationKind;
+use cute_of_duty_contract::net::protocol::ClientMessage;
+use cute_of_duty_contract::operator::roster;
 
 use crate::flow::flow_state::{self as flow, CjkFont, LocalPlayer};
 use crate::net::network::NetOut;

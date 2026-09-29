@@ -12,55 +12,29 @@
 
 pub mod loader;
 
-pub use loader::{
-    animations, catalog, RotationExpr, VoxelAnimationSpec, VoxelBone, VoxelBoneTrack, VoxelCube,
-    VoxelModelSpec,
+// 体素模型的**形状契约**（身份标记 + 几何/动画结构 + 像素比例）是双端共享的线格式类型，
+// 归契约 crate 所有；解析（`loader`）与服务端专属的实体→模型映射留在服务端。
+pub use cute_of_duty_contract::model::{
+    ModelPreset, RotationExpr, VoxelAnimationSpec, VoxelBone, VoxelBoneTrack, VoxelCube,
+    VoxelModelSpec, YANHU_SCALE,
 };
+pub use loader::{animations, catalog};
 
 use crate::entity::EntityType;
 
-/// 体素模型身份（服务端权威标记，经快照下行给客户端）
+/// 由实体类型派生默认模型身份。
 ///
-/// 命名即"这个实体的胸口形象"，客户端依此从本地资产挑选体素网格与配色。
-/// 新增造型只需在此枚举加一档，并在 `from_entity_type` 里建立映射。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-pub enum ModelPreset {
-    /// 我方火系干员（默认玩家形象）
-    OperativeFire,
-    /// 我方冰系干员
-    OperativeIce,
-    /// 我方电系干员
-    OperativeElectric,
-    /// 我方毒系干员
-    OperativePoison,
-    /// 敌方通用暴徒
-    EnemyThug,
-    /// 手雷投射物
-    Grenade,
-    /// 补给箱（搜刮点）
-    SupplyCrate,
-    /// 场景障碍/掩体
-    Obstacle,
-    /// 训练靶（实弹靶机造型）
-    AimTarget,
-    /// 功能站点（补给台/干员切换台/物资箱的矮台造型）
-    Station,
-}
-
-impl ModelPreset {
-    /// 由实体类型派生默认模型身份。
-    ///
-    /// 为何放在服务端：一个实体最终以哪种模型呈现，随策划内容迭代而变，
-    /// 属"易变"信息，故作为服务端权威在此裁决，而非写死在客户端。
-    pub fn from_entity_type(t: EntityType) -> Self {
-        match t {
-            EntityType::Player => Self::OperativeFire,
-            EntityType::AI => Self::EnemyThug,
-            EntityType::Grenade => Self::Grenade,
-            EntityType::Loot => Self::SupplyCrate,
-            EntityType::Obstacle => Self::Obstacle,
-            EntityType::Target => Self::AimTarget,
-            EntityType::Station => Self::Station,
-        }
+/// 为何放在服务端：一个实体最终以哪种模型呈现，随策划内容迭代而变，属"易变"信息，
+/// 故作为服务端权威在此裁决，而非写死在客户端。映射依赖服务端的 [`EntityType`]，
+/// 按 Rust 孤儿规则不能作为契约类型上的 inherent 方法，故落为服务端自由函数。
+pub fn preset_for_entity_type(t: EntityType) -> ModelPreset {
+    match t {
+        EntityType::Player => ModelPreset::OperativeFire,
+        EntityType::AI => ModelPreset::EnemyThug,
+        EntityType::Grenade => ModelPreset::Grenade,
+        EntityType::Loot => ModelPreset::SupplyCrate,
+        EntityType::Obstacle => ModelPreset::Obstacle,
+        EntityType::Target => ModelPreset::AimTarget,
+        EntityType::Station => ModelPreset::Station,
     }
 }

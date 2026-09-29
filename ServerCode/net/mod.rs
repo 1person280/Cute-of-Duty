@@ -11,19 +11,25 @@
 //!   64KB 固定槽位池（见 HostCode `net::remote`）。
 //!
 //! 两条通道同监听一个端口，按**首条绑定包**区分角色（见 [`session`]）。
+//!
+//! 0.13.0（[ADR 0003]）起，线格式的**类型与纯编解码**（`codec` / `packet` / `protocol` /
+//! `resource_stream` / `scheduler`）迁至契约 crate `cute_of_duty_contract::net`；本模块
+//! 通过 `pub use` 保持既有公开路径不变，并只保留**服务端专属编排**（会话 / AOI / 预取）。
+//!
+//! [ADR 0003]: ../../docs/adr/0003-contract-crate.md
 
 pub mod aoi;
 pub mod broadcaster;
-pub mod codec;
-pub mod packet;
 pub mod prefetch;
-pub mod protocol;
-pub mod resource_stream;
-pub mod scheduler;
 pub mod session;
 
+/// 线格式契约（迁至 `cute_of_duty_contract::net`，此处保持 `crate::net::*` 路径可用）。
+pub use cute_of_duty_contract::net::{codec, packet, protocol, resource_stream, scheduler};
+
 pub use broadcaster::build_snapshot;
-pub use packet::{Region, ResourceKind, ResourcePayload, Unit};
+pub use cute_of_duty_contract::net::packet::{Region, ResourceKind, ResourcePayload, Unit};
+pub use cute_of_duty_contract::net::protocol::{
+    ClientMessage, EntitySnapshot, PlayerInput, ServerMessage,
+};
 pub use prefetch::predict_prefetch;
-pub use protocol::{ClientMessage, EntitySnapshot, PlayerInput, ServerMessage};
 pub use session::{NetCommand, NetRuntime, ResourceJob, accept_loop};

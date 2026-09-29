@@ -12,9 +12,12 @@ use bevy::prelude::*;
 use bevy::window::{CursorGrabMode, PrimaryWindow};
 
 use crate::flow::flow_state::{self as flow, AppState, CjkFont};
+use crate::flow::{
+    apply_setting_step, setting_label, GameSettings, ModalChange, ModalKind, ModalState,
+    PauseOpenRequest, SettingKind,
+};
 use super::game_settings::{
-    apply_setting_step, setting_label, spawn_credits_panel, spawn_setting_row,
-    GameSettings, SettingAdjust, SettingKind, SettingValueText,
+    spawn_credits_panel, spawn_setting_row, SettingAdjust, SettingValueText,
 };
 use super::menu_main::{menu_button_palette, spawn_action_button, MenuButton};
 
@@ -307,28 +310,14 @@ pub fn pause_menu_interaction(
 /// 设计动机（Why）：鼠标锁定是「游戏内输入模态」的表现层开关。而 4×3 格位面板（物资箱/补给台）、
 /// 交互二级选项面板、战术大地图都是**依赖指针悬停/点击**的 UI——若仍锁死光标，bevy 的
 /// `ui_focus_system` 只会在窗口中心命中节点，玩家既无法拖拽格位、也点不到选项（实测反馈
-/// "没有呼出鼠标让我拖拽"）。故这四类面板打开时一律释放光标。三者本就把 `gameplay_input_active`
-/// 置假（相机不再跟随鼠标），释放光标不会引起视角乱转。
-/// 注意：**径向轮盘除外**——它靠鼠标**位移**而非指针位置选格，保持锁定更符合 legacy 手感。
+/// "没有呼出鼠标让我拖拽"）。判据统一由 [`ModalState::releases_cursor`] 回答（已内含"径向轮盘
+/// 除外"的例外）——本模块不再直接读各面板资源，消除 `menu → hud` 的同层横向依赖。
 pub fn cursor_lock_system(
     state: Res<State<AppState>>,
-    pause: Res<PauseMenu>,
-    bigmap: Res<crate::hud::BigMapOpen>,
-    interact: Res<crate::hud::InteractState>,
-    loot: Res<crate::hud::LootPanelState>,
-    backpack: Res<crate::hud::BackpackPanelState>,
-    button: Res<crate::hud::ButtonPanelState>,
-    released: Res<CursorReleased>,
+    modal: Res<ModalState>,
     mut windows: Query<&mut Window, With<PrimaryWindow>>,
 ) {
-    let lock = *state.get() == AppState::InGame
-        && *pause == PauseMenu::Closed
-        && !bigmap.0
-        && !interact.panel_open
-        && !loot.open
-        && !backpack.open
-        && !button.open
-        && !released.0;
+    let lock = *state.get() == AppState::InGame && !modal.releases_cursor();
     for mut window in &mut windows {
         let grab = if lock { CursorGrabMode::Locked } else { CursorGrabMode::None };
         if window.cursor_options.grab_mode != grab {
@@ -350,15 +339,10 @@ pub struct CursorReleased(pub bool);
 ///
 /// 设计动机（Why）：任一模态打开时 Esc 的语义是"关闭该模态"（各级面板优先消费），
 /// 此时不得抢用 Esc 去切换光标，否则一次 Esc 会同时关面板又弹光标，手感割裂。
+/// 该判据由 [`ModalState::escape_consumed_by_modal`] 统一回答（轮盘不消费 Esc、软开关自身除外）。
 pub fn cursor_release_toggle(
     keys: Res<ButtonInput<KeyCode>>,
-    pause: Res<PauseMenu>,
-    open: Res<crate::hud::BigMapOpen>,
-    interact: Res<crate::hud::InteractState>,
-    loot: Res<crate::hud::LootPanelState>,
-    backpack: Res<crate::hud::BackpackPanelState>,
-    button: Res<crate::hud::ButtonPanelState>,
-    held: Res<crate::hud::HeldGrenadeState>,
+    modal: Res<ModalState>,
     mut released: ResMut<CursorReleased>,
 ) {
     if !keys.just_pressed(KeyCode::Escape) {
@@ -366,17 +350,53 @@ pub fn cursor_release_toggle(
     }
     // 持雷时 Esc 的语义是"取消投掷"（`net::input_system` 上报 `grenade_cancel`），
     // 不得被本软开关抢走，否则一次 Esc 既取消持雷又弹出光标，手感割裂。
-    let any_ui = *pause != PauseMenu::Closed
-        || open.0
-        || interact.panel_open
-        || loot.open
-        || backpack.open
-        || button.open
-        || held.element.is_some();
-    if any_ui {
+    if modal.escape_consumed_by_modal() {
         return;
     }
     released.0 = !released.0;
+}
+
+/// 消费「打开暂停菜单」请求（由 `hud` 操作按钮组发射），装配暂停 UI。
+///
+/// 设计动机（Why）：`hud` 不得横向调用 `menu::spawn_pause_ui`；把"请打开暂停"建模成事件后，
+/// `menu` 作为暂停面板的唯一实现者在此自行装配，方向保持单向。
+pub fn open_pause_on_request(
+    mut requests: EventReader<PauseOpenRequest>,
+    mut pause: ResMut<PauseMenu>,
+    fonts: Res<CjkFont>,
+    settings: Res<GameSettings>,
+    mut commands: Commands,
+) {
+    if requests.read().count() == 0 {
+        return;
+    }
+    // 字体未就绪则不弹（与 `pause_toggle` 同口径）；已在暂停态则忽略重复请求。
+    if fonts.0.is_none() || *pause != PauseMenu::Closed {
+        return;
+    }
+    *pause = PauseMenu::Main;
+    spawn_pause_ui(&mut commands, &fonts, &settings);
+}
+
+/// 发布模态变更：把暂停浮层与 Esc 软开关的当前状态对照仲裁态，有差异才发事件。
+///
+/// 设计动机（Why）：生产者不必在每个开关点手工发事件——集中一处"对照 → 发差"即可，
+/// 状态怎么变（按键 / 按钮 / teardown 兜底）都自动被捕获，杜绝漏发。
+pub fn publish_modal_changes(
+    modal: Res<ModalState>,
+    mut out: EventWriter<ModalChange>,
+    pause: Res<PauseMenu>,
+    released: Res<CursorReleased>,
+) {
+    let pairs = [
+        (ModalKind::Pause, *pause != PauseMenu::Closed),
+        (ModalKind::CursorReleased, released.0),
+    ];
+    for (kind, open) in pairs {
+        if modal.get(kind) != open {
+            out.send(ModalChange { kind, open });
+        }
+    }
 }
 
 /// 离开 InGame 时的兜底清理：关闭暂停态并销毁浮层（返回主界面 / 状态切换通用）。

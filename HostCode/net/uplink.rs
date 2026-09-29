@@ -1,4 +1,4 @@
-//! 控制通道上传线程：把 Bevy 侧排队的上行意图编成恒 256B 包写回服务端
+﻿//! 控制通道上传线程：把 Bevy 侧排队的上行意图编成恒 256B 包写回服务端
 //!
 //! 设计动机（Why）：上行（移动/瞄准/开火/交互意图）与下行必须**互不阻塞**——同一条 TCP
 //! 连接上，若读线程因写阻塞而停摆，画面会卡住。故上行独占一个**阻塞单线程**，持有
@@ -15,9 +15,9 @@ use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use cute_of_duty_server::net::codec::encode_client;
-use cute_of_duty_server::net::protocol::ClientMessage;
-use cute_of_duty_server::net::scheduler::SendScheduler;
+use cute_of_duty_contract::net::codec::encode_client;
+use cute_of_duty_contract::net::protocol::ClientMessage;
+use cute_of_duty_contract::net::scheduler::SendScheduler;
 
 use crate::net::network::PING_INTERVAL;
 

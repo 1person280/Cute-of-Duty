@@ -1,23 +1,19 @@
-//! 游玩设置：`GameSettings` 资源 + 设置行 UI + 应用系统。
+//! 设置面板 UI：设置行构建 + FOV / 环境亮度应用系统。
 //!
-//! 设计动机（Why）：设置项是可调的表现层参数（灵敏度 / 视野 / 环境亮度）。期间只把
+//! 设计动机（Why）：设置项是**可调的表现层参数**（灵敏度 / 视野 / 环境亮度）。期间只把
 //! FOV 真实作用到本端相机投影、把环境亮度写入世界 `AmbientLight` —— 它们不触碰任何
 //! 服务端权威数据。灵敏度因当前相机为绕点轨道 + WASD（无越肩瞄准），仅在面板存储与
 //! 显示，预留给日后的鼠标瞄准输入。
+//!
+//! 边界：设置**数据与规则**（[`GameSettings`] / [`SettingKind`] / 步进 / 文本）归 `flow`；
+//! 本文件只做面板 UI 构建与把设置作用到世界的应用系统。
 
 use bevy::prelude::*;
 
 use crate::world::camera::{ChaseCamera, AIM_FOV_NARROW};
 use crate::flow::flow_state::{self as flow, CjkFont};
+use crate::flow::{setting_label, setting_step, GameSettings, SettingKind};
 use super::menu_main::{menu_accent, MenuButton};
-
-/// 可调设置项：每帧由「值文本」与「步进按钮」共同呈现。
-#[derive(Component, Clone, Copy, PartialEq)]
-pub enum SettingKind {
-    Sensitivity,
-    Fov,
-    Ambient,
-}
 
 /// ◀ / ▶ 步进按钮：kind 对应设置项，delta 为步进量（负为减小）。
 #[derive(Component)]
@@ -29,20 +25,6 @@ pub struct SettingAdjust {
 /// 设置项当前值文本。
 #[derive(Component)]
 pub struct SettingValueText(pub SettingKind);
-
-/// 局内可调设置值（会话内保留；默认值与 v0.3.2 一致）。
-#[derive(Resource)]
-pub struct GameSettings {
-    pub mouse_sensitivity: f32,
-    pub fov_deg: f32,
-    pub ambient_brightness: f32,
-}
-
-impl Default for GameSettings {
-    fn default() -> Self {
-        Self { mouse_sensitivity: 1.0, fov_deg: 45.0, ambient_brightness: 0.55 }
-    }
-}
 
 /// 设置行：标签 + ◀ 值 ▶。
 pub fn spawn_setting_row(
@@ -204,33 +186,6 @@ pub fn spawn_credits_panel(parent: &mut ChildBuilder, fonts: &CjkFont) {
                     });
             }
         });
-}
-
-/// 每项设置的步进量。
-pub fn setting_step(kind: SettingKind) -> f32 {
-    match kind {
-        SettingKind::Sensitivity => 0.1,
-        SettingKind::Fov => 5.0,
-        SettingKind::Ambient => 0.05,
-    }
-}
-
-/// 设置项当前值的显示文本。
-pub fn setting_label(settings: &GameSettings, kind: SettingKind) -> String {
-    match kind {
-        SettingKind::Sensitivity => format!("x{:.1}", settings.mouse_sensitivity),
-        SettingKind::Fov => format!("{:.0}", settings.fov_deg),
-        SettingKind::Ambient => format!("{:.2}", settings.ambient_brightness),
-    }
-}
-
-/// 应用一步增量，并 clamp 到合理区间。
-pub fn apply_setting_step(settings: &mut GameSettings, kind: SettingKind, delta: f32) {
-    match kind {
-        SettingKind::Sensitivity => settings.mouse_sensitivity = (settings.mouse_sensitivity + delta).clamp(0.2, 3.0),
-        SettingKind::Fov => settings.fov_deg = (settings.fov_deg + delta).clamp(40.0, 110.0),
-        SettingKind::Ambient => settings.ambient_brightness = (settings.ambient_brightness + delta).clamp(0.10, 1.20),
-    }
 }
 
 /// 把设置 FOV（叠加越肩瞄准收窄）幂等应用到轨道相机投影。

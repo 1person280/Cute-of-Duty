@@ -13,16 +13,17 @@
 
 use std::any::Any;
 
-use serde::{Deserialize, Serialize};
-
 use crate::combat;
 use crate::damage::Vec3;
 use crate::entity::{Component, Entity, EntityId, World};
 use crate::items::{Container, LootItem};
 use crate::map::{MapLayout, PickupKind, StationKind};
 
-/// 交互触发半径（米，平面距离）。与客户端提示的判定口径一致。
-pub const INTERACT_RANGE: f32 = 3.5;
+// 跨域线格式类型（交互半径、交互语义、快照下行信息、补给选择、上行选择）由契约 crate
+// 提供；经 `pub use` 保持 `crate::interact::*` 公开路径不变，其余模块无需改引用。
+pub use cute_of_duty_contract::interact::{
+    InteractChoice, InteractInfo, InteractKind, SupplyKind, INTERACT_RANGE,
+};
 
 /// 玩家护甲显示上限（表现层 `MAX_ARMOR` 同源）。服务端实体无护甲上限字段，
 /// 在此统一钳制，避免补给叠加出超过 UI 的数值。
@@ -34,60 +35,6 @@ const SUPPLY_AMMO: i32 = 90;
 const SUPPLY_HEALTH: f32 = 50.0;
 /// 补给台「领取护甲」一次加甲值。
 const SUPPLY_ARMOR: f32 = 50.0;
-
-/// 可交互语义（服务端权威）：地面拾取物 or 功能站点。
-///
-/// 直接内嵌 `map` 的数据层枚举，使"地图定义了哪些拾取物/站点"与"实体携带什么语义"
-/// 是同一套类型，新增一种拾取物无需两处同步。
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub enum InteractKind {
-    /// 地面拾取物（一次性，拾取后消失）
-    Pickup(PickupKind),
-    /// 功能站点（可反复交互）
-    Station(StationKind),
-}
-
-/// 快照下行的"可交互"信息：客户端据此显示 `[F] 提示` 与交互菜单。
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct InteractInfo {
-    /// 展示名（"补给台"/"医疗包"…）
-    pub label: String,
-    pub kind: InteractKind,
-}
-
-/// 补给台三项补给的选择项（客户端菜单选项 → 服务端发放对应物资）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SupplyKind {
-    Ammo,
-    Health,
-    Armor,
-}
-
-impl SupplyKind {
-    /// 展示名（菜单选项文案）。
-    ///
-    /// 设计动机（Why）：玩家在补给台上是"照着物品名领取"——选项必须直接写出到手的
-    /// 物资名与数量（对齐 legacy 补给菜单），而不是"领取弹药/领取医疗"这类动作词。
-    /// 数量口径与 [`grant_supply`] 的实际发放值同源，改这一处即可。
-    pub fn label(self) -> &'static str {
-        match self {
-            SupplyKind::Ammo => "步枪弹药 ×90",
-            SupplyKind::Health => "医疗包",
-            SupplyKind::Armor => "护甲片",
-        }
-    }
-}
-
-/// 客户端交互选择（只给"选了哪一项"，具体数值由服务端裁决）。
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum InteractChoice {
-    /// 拾取地面物品（无需选择）
-    Take,
-    /// 补给台：领取指定物资
-    Supply { kind: SupplyKind },
-    /// 打开场景物资箱
-    OpenCrate,
-}
 
 /// 可交互标记组件：附在 Loot / Station 实体上，承载展示名与语义。
 #[derive(Debug, Clone)]

@@ -1,4 +1,4 @@
-//! WASD 移动 + 鼠标视角 + 开火/换弹/技能输入系统：把本地意图折成 `PlayerInput` 上报服务端
+﻿//! WASD 移动 + 鼠标视角 + 开火/换弹/技能输入系统：把本地意图折成 `PlayerInput` 上报服务端
 //!
 //! 设计动机（Why）：服务端权威架构下客户端绝不本地移动，只把按键/视角意图折成
 //! `PlayerInput` 上报，位移由服务端按 Tick 结算后经快照回显。移动轴系取自视角
@@ -13,9 +13,10 @@
 //! 边沿量（换弹/Q/E）因此天然形成"一帧 true → 下一帧 false"的脉冲，服务端会锁存并消费一次。
 
 use bevy::prelude::*;
-use cute_of_duty_server::net::protocol::{ClientMessage, PlayerInput};
+use cute_of_duty_contract::net::protocol::{ClientMessage, PlayerInput};
 
 use crate::flow::flow_state::{AimRig, SeqCounter};
+use crate::flow::ModalState;
 use crate::hud::ItemWheelState;
 use super::network::NetOut;
 
@@ -26,13 +27,15 @@ pub fn input_system(
     rig: Res<AimRig>,
     out: Res<NetOut>,
     mut seq: ResMut<SeqCounter>,
+    modal: Res<ModalState>,
     mut wheel: ResMut<ItemWheelState>,
     held: Res<crate::hud::HeldGrenadeState>,
     mut last: Local<Option<PlayerInput>>,
 ) {
     // 径向轮盘打开期间冻结一切玩法意图（移动/开火/换弹/技能/切枪），但**保留视角朝向**——
     // 否则选格时鼠标位移会带着人物一起旋转。轮盘自身的选格由 `hud::item_wheel_input` 处理。
-    let wheel_open = wheel.open;
+    // 门控结论统一取自 `flow::ModalState`（不再逐面板读 `wheel.open` / `loot.open` 等散落条件）。
+    let wheel_open = modal.wheel;
     // 持雷态（服务端权威下发）：决定左键语义是"投掷"还是"开火"，以及 Esc 是否上报取消。
     let holding = held.element.is_some();
     let mut input = PlayerInput::default();

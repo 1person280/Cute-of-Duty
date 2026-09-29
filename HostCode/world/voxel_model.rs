@@ -1,4 +1,4 @@
-//! 焰狐体素模型渲染（把服务端下发的 [`VoxelModelSpec`] 落成实体树）
+﻿//! 焰狐体素模型渲染（把服务端下发的 [`VoxelModelSpec`] 落成实体树）
 //!
 //! 设计动机（对齐全局约束「易变内容放服务端、客户端只画」）：几何骨/盒不由客户端硬编码，
 //! 而是消费服务端经协议下发的内存副本。本模块只做"把规格摆成 3D 实体"这一件事——
@@ -13,7 +13,7 @@ use std::collections::HashMap;
 
 use bevy::ecs::system::EntityCommands;
 use bevy::prelude::*;
-use cute_of_duty_server::model::{VoxelBone, VoxelCube, VoxelModelSpec};
+use cute_of_duty_contract::model::{VoxelBone, VoxelCube, VoxelModelSpec};
 
 use crate::net::snapshot::CubeMesh;
 

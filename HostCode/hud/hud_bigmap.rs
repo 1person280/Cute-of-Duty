@@ -1,4 +1,4 @@
-//! 战术全景图（按 M 打开）：全屏俯瞰整张活动地图
+﻿//! 战术全景图（按 M 打开）：全屏俯瞰整张活动地图
 //!
 //! 设计动机：与左上角小地图职责分离——小地图是"我周围有什么"，全景图是"整张图长什么样"。
 //! 本视图画出搜打撤四段分区色带、分区边界、撤离信标、全部静态掩体/目标/拾取物/功能站点，
@@ -9,11 +9,12 @@
 //! 覆盖层，并冻结游戏内输入上报与相机朝向，避免"开着地图还在平移视角/走火"。
 
 use bevy::prelude::*;
-use cute_of_duty_server::element::ElementType;
-use cute_of_duty_server::map::lawn;
-use cute_of_duty_server::map::{PickupKind, StationKind};
+use cute_of_duty_contract::element::ElementType;
+use cute_of_duty_contract::map::lawn;
+use cute_of_duty_contract::map::{PickupKind, StationKind};
 
 use crate::flow::flow_state::{self as flow, AimRig, CjkFont, LocalPlayer};
+use crate::flow::ModalState;
 use crate::net::snapshot::SnapshotBuffer;
 
 /// 全景图是否打开（打开时冻结游戏内输入，仅允许关图按键）。
@@ -316,34 +317,16 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     });
 }
 
-/// 运行条件：游玩输入可用 = 未暂停 **且** 全景图未打开 **且** 交互二级面板/物资箱面板/径向轮盘/
-/// 背包面板/按钮面板均未打开 **且** 未按 Esc 主动交还光标。
+/// 运行条件：游玩输入可用 = 未被任何模态冻结。
 ///
-/// 把六个模态门控合成单一条件，避免在 `run_if` 处用 `Condition::and` 组合（bevy 0.14 的
-/// `Condition` 组合器不在 prelude，直接在函数项上调用 `.and` 无法解析）。
+/// 设计动机（Why）：此前本函数逐个读 `pause` / `bigmap` / `interact` / `loot` / `wheel` /
+/// `backpack` / `button` / `released` 八枚资源并拼成一串 `&& !x`，其中两枚还来自 `menu`
+/// （同层横向依赖）。现统一向 `flow::ModalState` 一问一答，判据集中在
+/// [`ModalState::blocks_gameplay_input`]，本处不再感知任何具体面板资源。
+///
 /// 注意：**就近交互列表本身不冻结输入**——它是常显的提示性列表，玩家可边跑边看（对齐 legacy）。
-///
-/// `CursorReleased`（Esc「无 UI 时释放鼠标」）必须计入：光标交还后鼠标事件是给 UI 的，
-/// 若仍跑 [`crate::world::mouse_look_system`]，移动鼠标会带着视角乱转（实测反馈
-/// "释放鼠标会移动视角"）。
-pub fn gameplay_input_active(
-    pause: Res<crate::menu::PauseMenu>,
-    open: Res<BigMapOpen>,
-    interact: Res<crate::hud::InteractState>,
-    loot: Res<crate::hud::LootPanelState>,
-    wheel: Res<crate::hud::ItemWheelState>,
-    backpack: Res<crate::hud::BackpackPanelState>,
-    button: Res<crate::hud::ButtonPanelState>,
-    released: Res<crate::menu::CursorReleased>,
-) -> bool {
-    *pause == crate::menu::PauseMenu::Closed
-        && !open.0
-        && !interact.panel_open
-        && !loot.open
-        && !wheel.open
-        && !backpack.open
-        && !button.open
-        && !released.0
+pub fn gameplay_input_active(modal: Res<ModalState>) -> bool {
+    !modal.blocks_gameplay_input()
 }
 
 /// 离开训练场时复位全景图门控（否则下次进场会带着"已打开"状态冻结输入）。

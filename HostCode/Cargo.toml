@@ -1,15 +1,15 @@
 [package]
 name = "cute_of_duty_host"
-version = "0.12.1"
+version = "0.12.2"
 edition = "2021"
 license = "GPL-3.0-with-linking-exception"
 authors = ["B站@3493264141322312", "Kimi AI Collaborator"]
 description = "Cute Of Duty 客户端（渲染表现层：消费服务端权威快照，用本地稳定资源绘制）"
 
 [dependencies]
-# 仅引入服务端 `net::protocol` 的线格式类型用于反序列化服务端结果，
-# 不调用任何服务端模拟逻辑——即「服务端算、客户端显示」。
-cute_of_duty_server = { path = "../ServerCode" }
+# 双端共享契约：仅引入线格式类型（快照/上行/资源）用于反序列化服务端结果，
+# 不含任何服务端模拟逻辑——即「服务端算、客户端显示」。
+cute_of_duty_contract = { path = "../ContractCode" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.35", features = ["rt-multi-thread", "time", "macros", "net", "io-util", "rt"] }

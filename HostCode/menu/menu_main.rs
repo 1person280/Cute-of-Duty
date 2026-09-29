@@ -10,7 +10,8 @@ use bevy::prelude::*;
 
 use super::arsenal::{ArsenalSelection, ArsenalVisible};
 use crate::flow::flow_state::{self as flow, AppState, CjkFont};
-use super::game_settings::{self, GameSettings, SettingKind};
+use super::game_settings;
+use crate::flow::{GameSettings, SettingKind};
 use super::mode_panel::{self, game_mode_spec, CategoryButton, ModePanelRoot, ModeRow, SelectedMode};
 use crate::shared::theme;
 

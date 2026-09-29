@@ -1,4 +1,4 @@
-//! HUD 右下：武器槽 [1]/[2] + 大字弹药 + 备用弹池 + 换弹提示 + 元素状态；以及顶部公告流
+﻿//! HUD 右下：武器槽 [1]/[2] + 大字弹药 + 备用弹池 + 换弹提示 + 元素状态；以及顶部公告流
 //!
 //! 设计动机：右下面板对齐旧版"武器槽 → 大字弹药 → 状态行"的三段结构（[1]/[2] 槽位、
 //! `当前 / 容量` 大字、`RELOADING` 提示），但配色/字号仍走本项目的 `theme` 过程化风格。
@@ -13,8 +13,8 @@
 //! 从结构上规避 bevy 0.14 同组件 `&mut` 多查询导致的 B0001 冲突。
 
 use bevy::prelude::*;
-use cute_of_duty_server::element::ElementType;
-use cute_of_duty_server::operator::rifle_profile;
+use cute_of_duty_contract::element::ElementType;
+use cute_of_duty_contract::operator::rifle_profile;
 
 use crate::flow::flow_state::{self as flow, Announcements, CjkFont, LocalPlayer};
 use crate::net::snapshot::SnapshotBuffer;
@@ -258,8 +258,8 @@ fn weapon_color(e: ElementType) -> Color {
 }
 
 /// 元素附着读数：`Normal`（或无快照）显示"无"，其余显示状态名并配元素色。
-fn element_readout(state: Option<&cute_of_duty_server::element::EntityElementState>) -> (String, Color) {
-    use cute_of_duty_server::element::EntityElementState as S;
+fn element_readout(state: Option<&cute_of_duty_contract::element::EntityElementState>) -> (String, Color) {
+    use cute_of_duty_contract::element::EntityElementState as S;
     match state {
         Some(S::Burning) => ("元素 · 燃烧".to_string(), Color::srgb(1.0, 0.45, 0.2)),
         Some(S::Frozen) => ("元素 · 冰冻".to_string(), Color::srgb(0.5, 0.85, 1.0)),

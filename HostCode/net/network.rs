@@ -1,4 +1,4 @@
-//! 客户端网络装配：连接服务端、起控制/资源两类线程、断线自动重连
+﻿//! 客户端网络装配：连接服务端、起控制/资源两类线程、断线自动重连
 //!
 //! 服务器权威架构下，本模块只做：连接、转发 bevy 侧上行意图、接收下行消息并分发。
 //! **不做任何模拟/校订**。0.12 起线格式为**小定长包 + 双通道**（见服务端 `net::packet`）：
@@ -17,10 +17,10 @@ use std::time::{Duration, Instant};
 
 use bevy::prelude::Resource;
 
-use cute_of_duty_server::net::packet::{
+use cute_of_duty_contract::net::packet::{
     PacketHeader, PacketKind, PacketWriter, Region, Role, PACKET_BYTES,
 };
-use cute_of_duty_server::net::protocol::{ClientMessage, EntitySnapshot, ServerMessage};
+use cute_of_duty_contract::net::protocol::{ClientMessage, EntitySnapshot, ServerMessage};
 
 /// 下行快照通道类型（渲染对账消费）。
 pub type SnapshotChannel = std::sync::mpsc::Sender<Vec<EntitySnapshot>>;

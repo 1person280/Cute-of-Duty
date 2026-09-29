@@ -1,0 +1,18 @@
+[package]
+name = "cute_of_duty_contract"
+version = "0.12.2"
+edition = "2021"
+license = "GPL-3.0-with-linking-exception"
+authors = ["B站@3493264141322312", "Kimi AI Collaborator"]
+description = "Cute Of Duty 双端契约 crate（线格式/跨域类型/共享常量/Port Trait；零 bevy、零模拟逻辑、零 I/O）"
+
+[dependencies]
+# 契约只允许纯数据依赖：serde（派生）+ serde_json（线格式 JSON）。
+# 禁止 std::fs / 网络 / 模拟计算 / bevy —— 见 docs/adr/0003-contract-crate.md。
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0"
+
+[lib]
+name = "cute_of_duty_contract"
+# 源码直接置于包根（与 HostCode / ServerCode 同一约定，不嵌套 src/）
+path = "lib.rs"

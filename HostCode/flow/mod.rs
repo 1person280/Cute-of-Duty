@@ -5,9 +5,15 @@
 //! 通告/中文字体/上行序号）、消费下行控制消息并推动状态机，不做任何模拟判定。
 
 pub(crate) mod flow_state;
+pub(crate) mod game_settings;
 pub(crate) mod loading;
+pub(crate) mod modal_state;
 
 pub(crate) use flow_state::{
     route_control_messages, setup_global, AppState, CjkFont, LocalPlayer, ModelCatalog,
 };
+pub(crate) use game_settings::{apply_setting_step, setting_label, setting_step, GameSettings, SettingKind};
 pub(crate) use loading::{loading_tick, spawn_loading};
+pub(crate) use modal_state::{
+    apply_modal_changes, ModalChange, ModalKind, ModalState, PauseOpenRequest,
+};

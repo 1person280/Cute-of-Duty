@@ -1,4 +1,4 @@
-//! HUD 消耗品径向轮盘：**长按 3/4 呼出、滚轮/鼠标方向选格、松开速用；短按直接速用首件**
+﻿//! HUD 消耗品径向轮盘：**长按 3/4 呼出、滚轮/鼠标方向选格、松开速用；短按直接速用首件**
 //!
 //! 设计动机（Why）：3/4 号槽不再是"固定的医疗包/手雷"两个硬编码位，而是**按类别索引进
 //! 背包**——服务端权威的 4×3 背包里凡是恢复类（[`ItemCategory::Consumable`]）即可用 3 调用，
@@ -15,9 +15,10 @@
 
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
-use cute_of_duty_server::items::ItemCategory;
+use cute_of_duty_contract::items::ItemCategory;
 
 use crate::flow::flow_state::{self as flow, Announcements, CjkFont, LocalPlayer};
+use crate::flow::ModalState;
 use crate::net::snapshot::SnapshotBuffer;
 use crate::shared::theme;
 
@@ -222,24 +223,15 @@ pub fn item_wheel_input(
     time: Res<Time>,
     snap: Res<SnapshotBuffer>,
     player: Res<LocalPlayer>,
-    pause: Res<crate::menu::PauseMenu>,
-    bigmap: Res<crate::hud::BigMapOpen>,
-    interact: Res<crate::hud::InteractState>,
-    loot: Res<crate::hud::LootPanelState>,
-    backpack: Res<crate::hud::BackpackPanelState>,
-    button: Res<crate::hud::ButtonPanelState>,
+    modal: Res<ModalState>,
     mut announces: ResMut<Announcements>,
     mut state: ResMut<ItemWheelState>,
 ) {
     // 先消费本帧鼠标事件（即使被门控丢弃），避免门控解除后第一帧突然跳到选。
     let delta: Vec2 = motion.read().map(|e| e.delta).fold(Vec2::ZERO, |a, b| a + b);
 
-    let blocked = *pause != crate::menu::PauseMenu::Closed
-        || bigmap.0
-        || interact.panel_open
-        || loot.open
-        || backpack.open
-        || button.open;
+    // 其它模态（暂停/大地图/交互二级面板/物资箱/背包/按钮组）打开时丢弃本次会话。
+    let blocked = modal.other_modal_open();
 
     // —— 松开优先结算：本次按键会话的唯一出口，不受任何模态门控影响 ——
     if let Some(key) = state.held_key {

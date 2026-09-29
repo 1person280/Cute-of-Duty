@@ -1,4 +1,4 @@
-//! HUD 可点击操作按钮组（按 B 打开的模态面板）：把 demo 操作映射为一组可点击按钮。
+﻿//! HUD 可点击操作按钮组（按 B 打开的模态面板）：把 demo 操作映射为一组可点击按钮。
 //!
 //! 设计动机（Why）：legacy demo 的操作方式全是键鼠（WASD / 左键 / R / Q / E / 3 / 4…），
 //! 缺少"屏幕上点一下就触发"的等价入口（台账 B#1「按钮」缺口）。本面板把每一类 demo 操作
@@ -14,8 +14,8 @@
 //! M 大地图 / 暂停 / 关闭为**纯客户端**（切换本地面板，不上行）。
 
 use bevy::prelude::*;
-use cute_of_duty_server::items::ItemCategory;
-use cute_of_duty_server::net::protocol::{ClientMessage, PlayerInput};
+use cute_of_duty_contract::items::ItemCategory;
+use cute_of_duty_contract::net::protocol::{ClientMessage, PlayerInput};
 
 use crate::flow::flow_state::{self as flow, AimRig, CjkFont, LocalPlayer, SeqCounter};
 use crate::net::network::NetOut;
@@ -221,12 +221,9 @@ pub fn button_panel_click(
     mut state: ResMut<ButtonPanelState>,
     snap: Res<SnapshotBuffer>,
     player: Res<LocalPlayer>,
-    mut pause: ResMut<crate::menu::PauseMenu>,
     mut backpack: ResMut<crate::hud::BackpackPanelState>,
     mut bigmap: ResMut<crate::hud::BigMapOpen>,
-    fonts: Res<CjkFont>,
-    settings: Res<crate::menu::GameSettings>,
-    mut commands: Commands,
+    mut pause_req: EventWriter<crate::flow::PauseOpenRequest>,
     mut root: Query<&mut Visibility, With<ButtonPanelRoot>>,
     mut backpack_root: Query<
         &mut Visibility,
@@ -286,11 +283,8 @@ pub fn button_panel_click(
             }
             ButtonKind::OpenPause => {
                 close_self(&mut state, &mut root);
-                // 字体未就绪则不弹（与 `pause_toggle` 同口径）。
-                if fonts.0.is_some() {
-                    *pause = crate::menu::PauseMenu::Main;
-                    crate::menu::spawn_pause_ui(&mut commands, &fonts, &settings);
-                }
+                // 请求 `menu` 装配暂停 UI（字体未就绪与否由 `menu` 自行判定，与本模块解耦）。
+                pause_req.send(crate::flow::PauseOpenRequest);
             }
             ButtonKind::Close => close_self(&mut state, &mut root),
         }

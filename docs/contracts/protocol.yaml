@@ -1,8 +1,8 @@
 # =============================================================================
 # Cute Of Duty · 线格式契约（machine-readable contract）
 # =============================================================================
-# 状态：草案 v0.10.0 —— 【尚不是权威源】
-#   本文件目前是「手工整理的意图」，权威实现仍是 ServerCode/net/protocol.rs。
+# 状态：草案 v0.12.2 —— 【尚不是权威源】
+#   本文件目前是「手工整理的意图」，权威实现已随 0.12.2 契约拆分迁至 ContractCode/net/protocol.rs。
 #   权威源反转（YAML 为准、代码由 YAML 校验）是后续独立任务，见 docs/barek-history.md。
 #
 # 统一版本号 x.y.z（协议 = 游戏 = 发布号，与 CONTRIBUTING 第六节一致）：
@@ -17,10 +17,10 @@
 # =============================================================================
 
 contract: protocol
-version: 0.12.1
+version: 0.12.2
 status: draft
-owner_module: ServerCode/net
-authoritative_impl: ServerCode/net/protocol.rs
+owner_module: ContractCode/net
+authoritative_impl: ContractCode/net/protocol.rs
 compat:
   previous: 0.11.0
   breaking: true
@@ -44,7 +44,7 @@ compat:
 # 传输层：小定长包 + 指令优先组包 + 双通道（0.12.0 起取代统一 64KB 槽帧）
 # -----------------------------------------------------------------------------
 transport:
-  authoritative_impl: ServerCode/net/packet.rs
+  authoritative_impl: ContractCode/net/packet.rs
   channels:
     # 两条通道各自固定包长，**不合并数据包**；同一监听端口由首条绑定包区分角色。
     control:
@@ -52,11 +52,11 @@ transport:
       unit_bytes: 32
       units_per_packet: 7
       payload_bytes: 224
-      scheduler: ServerCode/net/scheduler.rs   # 指令优先：装满 7 指令再发数据切片
+      scheduler: ContractCode/net/scheduler.rs   # 指令优先：装满 7 指令再发数据切片
     resource:
       packet_bytes: 4096         # 恒定 4096B = 32B 头 + 4064B 负载
       payload_bytes: 4064
-      stream: ServerCode/net/resource_stream.rs # 单份资源跨多包分片 + 收侧重组
+      stream: ContractCode/net/resource_stream.rs # 单份资源跨多包分片 + 收侧重组
   bind:
     packet_bytes: 256            # 首条绑定包恒 256B
     sub_kind: 场景角色           # 0=Control（此后 256B）1=Resource（此后 4096B）
@@ -197,20 +197,20 @@ downlink:
 # -----------------------------------------------------------------------------
 types:
   LootItem:
-    owner_module: ServerCode/items
+    owner_module: ContractCode/items
     fields:
       - { name: label, type: String,     doc: 展示名（唯一文案来源，UI 与补给选项共用） }
       - { name: kind,  type: PickupKind }
   PickupKind:
-    owner_module: ServerCode/items
+    owner_module: ContractCode/items
     exposes:
       - { fn: occupies_slot, returns: bool }
       - { fn: category,      returns: "Option<ItemCategory>" }
   ItemCategory:
-    owner_module: ServerCode/items
+    owner_module: ContractCode/items
     variants: [Consumable, Tactical]     # 3 = Consumable、4 = Tactical
   TransferDir:
-    owner_module: ServerCode/items
+    owner_module: ContractCode/items
     variants: [Take, Put]                # Take: 容器→背包; Put: 背包→容器
 
 # -----------------------------------------------------------------------------
@@ -227,7 +227,7 @@ constants:
 # 待办
 # -----------------------------------------------------------------------------
 todos:
-  - 与 ServerCode/net/protocol.rs 逐字段核对，补全所有 variant 与字段
+  - 与 ContractCode/net/protocol.rs 逐字段核对，补全所有 variant 与字段
   - 反转权威源：由本 YAML 生成 Rust 类型或对 Rust 类型做一致性校验（CI 卡关）
   - 补 docs/contracts/README.md 说明 yaml schema 与使用方式
   - 与 docs/architecture/module-boundaries.md 第三节的 `?` 事件清单一并对齐

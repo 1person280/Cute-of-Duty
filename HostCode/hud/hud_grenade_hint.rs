@@ -1,4 +1,4 @@
-//! 持雷提示（HUD）：按本人快照 `held_grenade` 派生「手持手雷 — 左键投掷 · Esc 取消」。
+﻿//! 持雷提示（HUD）：按本人快照 `held_grenade` 派生「手持手雷 — 左键投掷 · Esc 取消」。
 //!
 //! 设计动机（Why）：手雷采用 legacy「先瞄准后释放」流程——服务端把取出后的手雷置入
 //! **持握态**（快照字段 `held_grenade`），此时左键=投掷、Esc=取消放回。玩家必须有明确
@@ -9,7 +9,7 @@
 //! 门控（Esc 不被软开关抢走）三处共用，避免各自重复解析快照、口径漂移。
 
 use bevy::prelude::*;
-use cute_of_duty_server::element::ElementType;
+use cute_of_duty_contract::element::ElementType;
 
 use crate::flow::flow_state::{self as flow, CjkFont, LocalPlayer};
 use crate::net::snapshot::SnapshotBuffer;

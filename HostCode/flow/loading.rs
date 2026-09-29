@@ -9,7 +9,7 @@
 use bevy::prelude::*;
 
 use super::flow_state::{self, AppState, CjkFont, LocalPlayer};
-use crate::menu::menu_main::menu_accent;
+use crate::shared::theme::ACCENT_CYAN;
 
 /// Loading 屏根节点标记（配合 `StateScoped` 惰性生成检测 + 离开状态自动销毁）。
 #[derive(Component)]
@@ -106,14 +106,14 @@ pub fn spawn_loading(
                             height: Val::Percent(100.0),
                             ..default()
                         },
-                        BackgroundColor(menu_accent()),
+                        BackgroundColor(ACCENT_CYAN),
                     ))
                     .id();
             });
             pct_id = root
                 .spawn(flow_state::text(
                     "0%",
-                    flow_state::style(&fonts, 15.0, menu_accent()),
+                    flow_state::style(&fonts, 15.0, ACCENT_CYAN),
                 ))
                 .id();
             root.spawn(flow_state::text(

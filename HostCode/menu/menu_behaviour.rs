@@ -1,4 +1,4 @@
-//! 主菜单行为层：输入分发、按钮动作、模式/分类选择与样式刷新。
+﻿//! 主菜单行为层：输入分发、按钮动作、模式/分类选择与样式刷新。
 //!
 //! 设计动机（Why）：把主菜单 UI 树的交互与样式从 `menu_main` 的构建中分离，保持每个
 //! 模块职责单一。进场（`开始游戏`）只把选中的「训练场」吸收为 `StartTraining` 上行、
@@ -6,13 +6,12 @@
 //! 显隐（`ArsenalVisible`）开关驱动，其自身交互仍在 `arsenal`。
 
 use bevy::prelude::*;
-use cute_of_duty_server::net::protocol::ClientMessage;
+use cute_of_duty_contract::net::protocol::ClientMessage;
 
 use super::arsenal::ArsenalVisible;
 use crate::flow::flow_state::AppState;
-use super::game_settings::{
-    apply_setting_step, setting_label, GameSettings, SettingAdjust, SettingValueText,
-};
+use crate::flow::{apply_setting_step, setting_label, GameSettings};
+use super::game_settings::{SettingAdjust, SettingValueText};
 use super::menu_main::{
     menu_accent, menu_button_palette, GearButton, GearIcon, LoadoutButton, MainMenuUi, MenuButton,
     MenuGrace, QuitButton, SettingsCloseButton, StatusText,

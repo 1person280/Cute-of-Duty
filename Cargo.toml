@@ -2,14 +2,15 @@
 #
 # 自 0.6.0 起由「单 crate（核心库 + cod1 + feature 门控的 Bevy Demo）」重构为
 # Cargo Workspace 物理分离：
-#   - HostCode   ：客户端（本阶段为无头表现层，仅消费服务端权威快照）
-#   - ServerCode ：服务端 + 核心模拟库（服务器权威真相源，服务端算、客户端显示）
+#   - HostCode     ：客户端（本阶段为无头表现层，仅消费服务端权威快照）
+#   - ServerCode   ：服务端 + 核心模拟库（服务器权威真相源，服务端算、客户端显示）
+#   - ContractCode ：双端共享契约（线格式类型 / 跨域语义 / 共享常量；零 bevy、零逻辑、零 I/O）
 #
 # 本根文件不含 [package]，仅声明 workspace 成员与 workspace 级 profile，
 # `cargo build` 会一次性并行编译出 cod1 与 cod_server 两个 .exe。
 
 [workspace]
-members = ["HostCode", "ServerCode"]
+members = ["HostCode", "ServerCode", "ContractCode"]
 resolver = "2"
 
 # 当某成员 crate 声明该 feature 时自动启用（当前未用到，预留）

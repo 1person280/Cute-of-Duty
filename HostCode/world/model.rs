@@ -1,4 +1,4 @@
-//! 体素造型（客户端稳定冷资源映射）
+﻿//! 体素造型（客户端稳定冷资源映射）
 //!
 //! 设计动机（对齐全局约束「客户端只承载不易变的东西」）：每个 `ModelPreset`
 //! 对应的几何尺寸与配色在这里一次性写死，属冷资源；服务端只发 preset 身份，
@@ -6,10 +6,10 @@
 
 use bevy::color::Color;
 use bevy::prelude::*;
-use cute_of_duty_server::element::ElementType;
-use cute_of_duty_server::interact::InteractKind;
-use cute_of_duty_server::map::{PickupKind, StationKind};
-use cute_of_duty_server::model::ModelPreset;
+use cute_of_duty_contract::element::ElementType;
+use cute_of_duty_contract::interact::InteractKind;
+use cute_of_duty_contract::map::{PickupKind, StationKind};
+use cute_of_duty_contract::model::ModelPreset;
 
 /// 单个体素角色/物体由「躯干 + 头」两个缩放方块拼出的稳定造型。
 ///

@@ -574,7 +574,18 @@ mod tests {
     /// 资源负载枚举可往返（供无头工具/测试构造）。
     #[test]
     fn resource_payload_enum_roundtrip() {
-        let spec = crate::model::catalog().into_iter().next().expect("应有焰狐模型");
+        // 契约 crate 不含服务端几何目录（`catalog()` 在 ServerCode），故手工构造一份最小规格。
+        let spec = VoxelModelSpec {
+            preset: crate::model::ModelPreset::OperativeFire,
+            scale: crate::model::YANHU_SCALE,
+            bones: vec![crate::model::VoxelBone {
+                name: "body".to_string(),
+                parent: None,
+                pivot: [0.0; 3],
+                rotation: [0.0; 3],
+                cubes: vec![],
+            }],
+        };
         let payload = ResourcePayload::Model(spec.clone());
         let bytes = serde_json::to_vec(&payload).expect("序列化应成功");
         match serde_json::from_slice::<ResourcePayload>(&bytes).expect("反序列化应成功") {

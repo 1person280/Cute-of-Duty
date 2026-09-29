@@ -1,10 +1,17 @@
 # ADR 0004 · 客户端表现层收敛：`ModalState` 事件仲裁 + `launcher` 瘦身
 
-- **状态**：已接受（Accepted）
-- **日期**：2026-09-26
+- **状态**：已落地（Implemented）
+- **日期**：2026-09-26（裁决） / 2026-09-29（落地）
 - **决策者**：项目 owner
 - **影响范围**：`HostCode/flow`、`HostCode/hud`、`HostCode/menu`、`HostCode/net`、`HostCode/launcher`、`HostCode/world`
 - **依据**：[ADR 0001](0001-modular-monolith-event-bus.md) 铁律 1「禁跨模块直接调用」与「同层禁横向调用」；[module-boundaries.md 冲突 3 / 冲突 4](../architecture/module-boundaries.md)
+
+> **落地记录（2026-09-29）**：决策 1 已实施 —— `flow` 新增 `ModalState`（唯一所有者）与
+> `ModalKind` 事件 + 订阅系统；`hud`/`net` 的输入门控（含 `hud_bigmap::gameplay_input_active`、
+> `net/pilot` 输入冻结）统一改读 `ModalState::blocks_gameplay_input()`；`menu`/`hud` 各面板开关点
+> 改为发事件；`HostCode/hud` 内 `use crate::menu::` 横向依赖清零。`GameSettings` / `menu_accent`
+> 归属一并收敛。决策 2（`launcher` 瘦身至纯装配）以「装配 + 表现代码归位」持续推进中，
+> 本 ADR 不单独作为完成判据。
 
 ---
 

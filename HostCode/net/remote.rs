@@ -18,7 +18,7 @@ use std::sync::mpsc;
 
 use bevy::prelude::{ResMut, Resource};
 
-use cute_of_duty_server::net::packet::{
+use cute_of_duty_contract::net::packet::{
     Region, ResourceKind, decode_animation, decode_model, resource_kind_from_byte,
 };
 
@@ -328,7 +328,7 @@ pub fn sync_catalog_from_pool(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cute_of_duty_server::net::packet;
+    use cute_of_duty_contract::net::packet;
 
     /// 区划恒等式：250 + 6 = 256；16000KB + 384KB = 16MB；每槽 64KB。
     #[test]
@@ -460,15 +460,30 @@ mod tests {
     /// 池内模型资源可增量同步进 `ModelCatalog` 视图（同键只搬一次）。
     #[test]
     fn pool_resources_sync_into_catalog() {
+        use cute_of_duty_contract::model::{
+            ModelPreset, VoxelBone, VoxelCube, VoxelModelSpec, YANHU_SCALE,
+        };
+
         let (_tx, rx) = mpsc::channel();
         let mut objects = RemoteObjects::new(rx);
 
-        // 直接构造一份可解码的模型负载（与服务端同一份规格）。
-        let model = cute_of_duty_server::model::catalog()
-            .into_iter()
-            .next()
-            .expect("应有焰狐模型");
-        let key = cute_of_duty_server::net::packet::model_key(&model);
+        // 手工构造一份可解码的模型负载（契约层结构；不依赖服务端的造型解析）。
+        let model = VoxelModelSpec {
+            preset: ModelPreset::OperativeFire,
+            scale: YANHU_SCALE,
+            bones: vec![VoxelBone {
+                name: "body".to_string(),
+                parent: None,
+                pivot: [0.0, 0.0, 0.0],
+                rotation: [0.0, 0.0, 0.0],
+                cubes: vec![VoxelCube {
+                    origin: [0.0, 0.0, 0.0],
+                    size: [1.0, 1.0, 1.0],
+                    mat: Some("cream".to_string()),
+                }],
+            }],
+        };
+        let key = cute_of_duty_contract::net::packet::model_key(&model);
         let bytes = serde_json::to_vec(&model).expect("序列化应成功");
         objects
             .insert_frame(&ResourceFrame {

@@ -1,10 +1,21 @@
 # ADR 0003 · 抽出独立契约 crate（`cute_of_duty_contract`）
 
-- **状态**：已接受（Accepted）
-- **日期**：2026-09-26
+- **状态**：已落地（Implemented）
+- **日期**：2026-09-26（裁决） / 2026-09-29（落地）
 - **决策者**：项目 owner
 - **影响范围**：workspace 根 `Cargo.toml`、新增 `ContractCode`、`ServerCode/net`、`ServerCode/{items,interact,map,model,operator}`、`HostCode/*`（全部跨 crate 引用点）
 - **依据**：[ADR 0001](0001-modular-monolith-event-bus.md) 铁律 1「禁跨模块直接调用」、铁律 5「契约机器可读」；[module-boundaries.md 冲突 2](../architecture/module-boundaries.md)
+
+> **落地记录（2026-09-29）**：判据达成 —— `HostCode/Cargo.toml` 已删除 `cute_of_duty_server` 依赖，
+> 改依赖 `cute_of_duty_contract = { path = "../ContractCode" }`；workspace 成员增至三个。
+> 与本文原始方案的偏差（以实际为准）：
+> 1. 契约 crate 依赖为 `serde` + `serde_json`（线格式 JSON 需 `serde_json` 承担往返），非原案 `serde + thiserror`。
+> 2. 搬迁采用「能整体搬就整体搬」：`net::{protocol,packet,codec,scheduler,resource_stream}`、
+>    `map`（含 `lawn`/`training` 子模块树）、`operator` 整模块物理迁入契约；`element`/`equipment`/
+>    `items`/`interact`/`model` 做拆分（类型进契约、逻辑留服务端），服务端原位置留 `pub use` 垫片保持公开路径不变。
+> 3. `ModelPreset::from_entity_type` 因依赖服务端 `EntityType` 且受 Rust 孤儿规则限制，改为服务端自由函数
+>    `model::preset_for_entity_type`；`model::catalog()`/`animations()`（含 `FireFox.json` 解析）仍留服务端。
+> 4. `roster` / 地图布局的「改为下发」仍是**跟进项**：本期以契约只读副本过渡，未接入下行链路（见下节未决事项）。
 
 ---
 

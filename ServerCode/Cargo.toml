@@ -1,6 +1,6 @@
 [package]
 name = "cute_of_duty_server"
-version = "0.12.1"
+version = "0.12.2"
 edition = "2021"
 license = "GPL-3.0-with-linking-exception"
 authors = ["B站@3493264141322312", "Kimi AI Collaborator"]
@@ -17,6 +17,8 @@ tracing = "0.1"
 tracing-subscriber = "0.3"
 tokio = { version = "1.35", features = ["rt-multi-thread", "time", "macros", "net", "io-util", "sync"] }
 blake3 = "1.5"
+# 双端共享契约（线格式类型 / 跨域语义 / 共享常量）。
+cute_of_duty_contract = { path = "../ContractCode" }
 
 [dev-dependencies]
 criterion = "0.5"

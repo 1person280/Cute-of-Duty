@@ -24,6 +24,25 @@
 
 ---
 
+## [0.12.2] · 2026-09-29 · 契约拆分落地（ADR 0003 / 0004 结清）
+
+- **变更类型**：Refactor（无协议语义变化；仅物理归属与公开路径）
+- **影响模块**：新增 `ContractCode`（crate `cute_of_duty_contract`）；`ServerCode`（改 `pub use` 垫片）；`HostCode`（全量 `use` 改写 + 删除 `cute_of_duty_server` 依赖）
+- **兼容性**：**兼容**（`z+1`）
+  - 线格式 / `ServerMessage` / `ClientMessage` **字节级不变**，`docs/contracts/protocol.yaml` 的 `wire_version` 仍为 `12`；双端 `0.12.2` 与 `0.12.1`／`0.12.0` 可互通。
+  - 类型未删未改语义，仅从 `cute_of_duty_server` 物理迁至 `cute_of_duty_contract`；服务端经 `pub use` 保持 `crate::net::*`／`crate::items::*`／`crate::interact::*`／`crate::model::*`／`crate::combat::grenade::*` 公开路径不变。
+  - **落地判据（ADR 0003）**：`HostCode/Cargo.toml` 第 12 行 `cute_of_duty_server = { path = "../ServerCode" }` **已删除**，客户端不再依赖服务端 crate。
+  - **落地判据（ADR 0004）**：`flow` 新增唯一 `ModalState` 所有者 + `ModalKind` 事件仲裁；`hud` 横向 `use crate::menu::` **已清零**。
+- **迁移指南**：不适用（`z+1`，非协议不兼容）。仅对**后续在本仓新增双端共享代码**者提示：
+  - 跨域线格式类型 / 共享常量 / Port Trait 一律进 `ContractCode`（零 bevy、零模拟逻辑、零 I/O，依赖仅 `serde` + `serde_json`）。
+  - 含服务端逻辑的类型**拆分**：类型进契约、逻辑留服务端（如 `ModelPreset` 的 `from_entity_type` 因用 `EntityType` 而改为服务端自由函数 `preset_for_entity_type`，受 Rust 孤儿规则）。
+  - 客户端一律 `use cute_of_duty_contract::...`，**禁**再引 `cute_of_duty_server`。
+- **验证**：`cargo-wrap check --workspace` 退出码 `0`；`cargo-wrap test -p cute_of_duty_server` **89 passed**；`cargo-wrap test -p cute_of_duty_contract` **49 passed**；`cargo-wrap check --workspace --all-targets` 退出码 `0`；`cargo-wrap build --workspace --release` 产出双端 exe。
+- **关联**：[ADR 0003](adr/0003-contract-crate.md)、[ADR 0004](adr/0004-client-layer-convergence.md)、
+  [模块边界](architecture/module-boundaries.md)、[protocol.yaml](contracts/protocol.yaml)
+
+---
+
 ## [归档] · 2026-09-29 · 0.6 冻结区清零（不再跟踪 0.6 版本遗留问题）
 
 - **变更类型**：文档 / 流程（**无代码变更**）
@@ -35,13 +54,9 @@
     C/F 节于 2026-09-27 随 0.6 复测确认；legacy 操作表 14 行由 owner 于 2026-09-29 确认全部可用）。
   - 两文件与 `docs/frozen-tasks/` 目录一并**删除**，仓库**不再跟踪 0.6 版本遗留问题**。
   - 对历史条目的引用改为纯文本，避免死链。
-- **结转（原 `stop-doing.md` §0 未结架构裁决 —— 非 0.6 玩法问题，仍在账，**不要**误认为已解决）**：
-  1. **ADR 0003「抽独立契约 crate `cute_of_duty_contract`」未落地**：`HostCode/Cargo.toml`
-     至今仍 `cute_of_duty_server = { path = "../ServerCode" }`，与模块边界「`HostCode` 不得依赖 `ServerCode`」
-     的判据相矛盾（判据 = 删掉该依赖）。
-  2. **ADR 0004「`flow` 拥有唯一 `ModalState` + 事件仲裁」未落地**：`hud` 仍在横向 `use crate::menu::`
-     （如 `launcher/mod.rs` 的 `crate::menu::pause_closed`、`crate::menu::cursor_lock_system`），
-     与「出现 `use crate::menu::` 即违规」的判据相矛盾。
+- **[已结清] 原结转的两条架构裁决已全部落地（2026-09-29，见本文件顶部条目）**：
+  1. ~~ADR 0003「抽独立契约 crate」未落地~~ → **已落地**，`HostCode/Cargo.toml` 已删除 `cute_of_duty_server` 依赖；
+  2. ~~ADR 0004「`flow` 唯一 `ModalState`」未落地~~ → **已落地**，`hud` 横向 `use crate::menu::` 已清零。
 - **后续冻结落点**：原 `stop-doing.md` 已删除，今后「改了但未验证」的改动**直接写入本文件条目**，
   并在标题标注「**待实机验证**」（沿用 `0.6-SnapShot-10` 条的既有写法）。
 - **验证**：本条目为纯文档归档；`cargo-wrap check --workspace` 退出码 `0`（证明无代码残留引用）。

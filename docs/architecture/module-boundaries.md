@@ -1,6 +1,6 @@
 # 模块边界总览（v0.2 · 5 项冲突已全部裁决）
 
-> **状态：第五节 5 项冲突已全部裁决（2026-09-26）；代码全面暂停，正在按第七节清单补 `module.md` 与契约。**
+> **状态：第五节 5 项冲突已全部裁决（2026-09-26）；冲突 2/3 已落地（2026-09-29），冲突 4 决策 1 落地、决策 2 持续推进。**
 > 本文档回答三个问题：**每个模块拥有什么数据**、**模块之间允许怎么说话**、**它现在有多成熟（L0–L3）**。
 >
 > 目标架构一句话：**模块化单体 + 事件总线 + Trait 接口；模块间禁止直接调用；数据所有权划清；依赖无环。**
@@ -136,7 +136,7 @@
 
 详见 [ADR 0002 · 背包按域切开](../adr/0002-backpack-domain-split.md)。
 
-### 冲突 2 · 客户端跨 crate 直接依赖服务端**具体类型** 【🟢 已裁决 · ADR 0003 · 抽独立契约 crate】
+### 冲突 2 · 客户端跨 crate 直接依赖服务端**具体类型** 【✅ 已落地 · ADR 0003 · 抽独立契约 crate】
 
 - 现状：`hud_*` / `menu` / `world` 大量 `use cute_of_duty_server::{items::LootItem, interact::*, map::StationKind, operator::roster, net::protocol::*}`。
 - 违反铁律 1（禁直接调用）。后果：服务端内部重构必然打断客户端 → 无兼容承诺。
@@ -145,16 +145,17 @@
 
 | 项 | 结论 |
 |---|---|
-| 新增 crate | `ContractCode`（workspace 第 3 个成员），依赖只有 `serde` + `thiserror` |
+| 新增 crate | `ContractCode`（workspace 第 3 个成员），依赖只有 `serde` + `serde_json`（落地修正：原案写 `thiserror`，实际线格式 JSON 往返需 `serde_json`） |
 | 内容 | 线格式类型 + 跨域载荷类型（`LootItem`/`StationKind`/…）+ 共享常量 + Port Trait |
 | 禁止 | 任何 bevy / fs / 网络 / 模拟逻辑 |
 | 依赖方向 | `ServerCode → ContractCode ← HostCode`；**`HostCode` 不再依赖 `ServerCode`** |
-| 静态表 | roster / model preset 改为下发；地图布局过渡期保留客户端只读副本并注明"以服务端为准" |
+| 静态表 | roster / model preset 改为下发（**跟进项，本期未接入**）；地图布局过渡期保留客户端只读副本并注明"以服务端为准" |
 | 定义方式 | 手写类型 + YAML↔Rust 一致性测试（暂不引入代码生成） |
 
-详见 [ADR 0003 · 抽出独立契约 crate](../adr/0003-contract-crate.md)。
+**落地（2026-09-29）**：`HostCode/Cargo.toml` 已删除 `cute_of_duty_server` 依赖并改依赖 `cute_of_duty_contract`；
+客户端全部 `use` 已改指契约（判据达成）。详见 [ADR 0003 · 抽出独立契约 crate](../adr/0003-contract-crate.md)。
 
-### 冲突 3 · `hud` 内部横切依赖 `menu` 【🟢 已裁决 · ADR 0004 · `flow` 持 `ModalState`】
+### 冲突 3 · `hud` 内部横切依赖 `menu` 【✅ 已落地 · ADR 0004 · `flow` 持 `ModalState`】
 
 - 现状：`hud_bigmap.rs` 的 `gameplay_input_active` 直接读 `crate::menu::PauseMenu`；`launcher` 的 Update 链把 `pause_toggle` 与 HUD 系统混排。
 - 违反"同层禁横向调用"。
@@ -166,6 +167,9 @@
 - `menu` / `hud` 开关面板时发事件（`ModalKind` 载荷），`flow` 订阅并落状态。
 - `hud` / `net` 只读 `Res<ModalState>`；**`use crate::menu::` 出现即为违规**。
 - 收益：新增模态只需"加 variant + 发事件"，输入门控一行不改。
+
+**落地（2026-09-29）**：`flow` 已持 `ModalState` + `ModalKind` 事件与订阅系统；`hud`/`net` 输入门控
+统一改读 `blocks_gameplay_input()`；`HostCode/hud` 内 `use crate::menu::` 已清零（判据达成）。
 
 详见 [ADR 0004 · 客户端表现层收敛](../adr/0004-client-layer-convergence.md)。
 
@@ -180,9 +184,11 @@
 - 表现代码去向：相机 → `world/camera.rs`；体素绘制 → `world`；HUD → `hud/*`；面板装配态 → `menu/*`。
 - 收官判据：`launcher/mod.rs` 不含任何组件/资源定义；仍超 600 行则按语义化子文件拆分，`mod.rs` 保持薄网关。
 
-**实测现状（2026-09-26 复核）**：`launcher/mod.rs` 已缩至 **147 行**，相机/世界/HUD/面板的**表现代码均已迁出**（改为委托 `world::*` / `hud::*` / `menu::*`）——"承载全部渲染表现"的前提**已不成立**。**残留 2 处未达标**（待 ADR 0003/0004 实施）：
-1. `use cute_of_duty_server::net::protocol::{ClientMessage, EntitySnapshot}` —— 跨 crate 直连服务端类型（违铁律 1 判据②）；
-2. `spawn_scene` 内 `insert_resource(CubeMesh / AmbientLight)` —— 定义资源（违 ADR 0004「launcher 禁定义组件/资源」）。
+**实测现状（2026-09-26 复核）**：`launcher/mod.rs` 已缩至 **147 行**，相机/世界/HUD/面板的**表现代码均已迁出**（改为委托 `world::*` / `hud::*` / `menu::*`）——"承载全部渲染表现"的前提**已不成立**。
+
+**残留项进展（2026-09-29）**：
+1. ✅ 已消除 —— `launcher/mod.rs` 的跨 crate 直连已改指契约（`use cute_of_duty_contract::net::protocol::{ClientMessage, EntitySnapshot}`，铁律 1 判据②达标，随 ADR 0003 一并收敛）；
+2. ⏳ 待办 —— `spawn_scene` 内 `insert_resource(CubeMesh / AmbientLight)` 仍为资源定义（违 ADR 0004「launcher 禁定义组件/资源」），随决策 2 瘦身推进。
 
 详见 [ADR 0004 · 客户端表现层收敛](../adr/0004-client-layer-convergence.md)。
 

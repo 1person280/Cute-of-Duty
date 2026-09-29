@@ -209,7 +209,12 @@ mod tests {
     /// 小资源单片下发、单片重组。
     #[test]
     fn single_chunk_resource_roundtrips() {
-        let model = crate::model::catalog().into_iter().next().expect("应有焰狐模型");
+        // 契约 crate 不含服务端几何目录（`catalog()` 在 ServerCode），故手工构造一份最小规格。
+        let model = VoxelModelSpec {
+            preset: crate::model::ModelPreset::OperativeFire,
+            scale: crate::model::YANHU_SCALE,
+            bones: vec![],
+        };
         let msg = ResourceMessage::from_model(&model, Region::InUse).expect("构造应成功");
         let mut seq = 0;
         let mut w = PacketWriter::new(RES_PACKET_BYTES);
@@ -275,12 +280,18 @@ mod tests {
     /// 目录摊平：模型/动画各归其位、键非零。
     #[test]
     fn catalog_splits_into_resources() {
-        let items = split_catalog(
-            &crate::model::catalog(),
-            &crate::model::animations(),
-            Region::InUse,
-        )
-        .expect("摊平应成功");
+        // 契约 crate 不含服务端几何/动画目录，故手工构造最小规格验证摊平。
+        let models = vec![VoxelModelSpec {
+            preset: crate::model::ModelPreset::OperativeFire,
+            scale: crate::model::YANHU_SCALE,
+            bones: vec![],
+        }];
+        let anims = vec![VoxelAnimationSpec {
+            clip: "animation.test.idle".to_string(),
+            length: 1.0,
+            tracks: vec![],
+        }];
+        let items = split_catalog(&models, &anims, Region::InUse).expect("摊平应成功");
         assert!(!items.is_empty(), "应有资源");
         assert!(items.iter().all(|i| i.key != 0), "资源键不应为保留值 0");
         assert!(items.iter().any(|i| i.kind == ResourceKind::Model));

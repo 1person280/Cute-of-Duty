@@ -1,4 +1,4 @@
-//! 控制通道下载线程：把服务端下行的恒 256B 包解成快照/控制两路
+﻿//! 控制通道下载线程：把服务端下行的恒 256B 包解成快照/控制两路
 //!
 //! 设计动机（Why）：0.12 控制通道每包恒定 256B = 32B 头 + 7×32B 单元。本线程是**阻塞
 //! 单线程循环**：`read_exact` 恰好一包 → `PacketReader` 解头 → 按 [`PacketKind`] 分路：
@@ -14,11 +14,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use cute_of_duty_server::net::codec::{decode_server_data, decode_server_units, units_from_payload};
-use cute_of_duty_server::net::packet::{
+use cute_of_duty_contract::net::codec::{decode_server_data, decode_server_units, units_from_payload};
+use cute_of_duty_contract::net::packet::{
     ChunkAssembler, PacketHeader, PacketKind, PacketReader, PACKET_BYTES,
 };
-use cute_of_duty_server::net::protocol::ServerMessage;
+use cute_of_duty_contract::net::protocol::ServerMessage;
 
 use crate::net::network::{ClientInbound, SnapshotChannel};
 

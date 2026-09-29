@@ -285,13 +285,43 @@ mod tests {
             assert_eq!(&back, msg, "ClientMessage 往返应一致: {js}");
         }
 
+        // 手工构造最小几何/动画规格（契约层结构；不依赖服务端的造型解析，
+        // 服务端 `model::catalog`/`animations` 不属契约 crate）。
+        let model = crate::model::VoxelModelSpec {
+            preset: crate::model::ModelPreset::OperativeFire,
+            scale: crate::model::YANHU_SCALE,
+            bones: vec![crate::model::VoxelBone {
+                name: "body".into(),
+                parent: None,
+                pivot: [0.0, 0.0, 0.0],
+                rotation: [0.0, 0.0, 0.0],
+                cubes: vec![crate::model::VoxelCube {
+                    origin: [0.0, 0.0, 0.0],
+                    size: [1.0, 1.0, 1.0],
+                    mat: Some("cream".into()),
+                }],
+            }],
+        };
+        let clip = crate::model::VoxelAnimationSpec {
+            clip: "animation.firefox.idle".into(),
+            length: 1.0,
+            tracks: vec![crate::model::VoxelBoneTrack {
+                bone: "body".into(),
+                rotation: [
+                    crate::model::RotationExpr::Expr("query.anim_time".into()),
+                    crate::model::RotationExpr::Const(0.0),
+                    crate::model::RotationExpr::Const(0.0),
+                ],
+            }],
+        };
+
         let server_cases: Vec<ServerMessage> = vec![
             ServerMessage::Pong { seq: 7 },
             ServerMessage::ReturnToMenu,
             // 模型目录（0.10.0 加性变体）：几何/动画随协议下行必须可往返。
             ServerMessage::ModelCatalog {
-                models: crate::model::catalog(),
-                animations: crate::model::animations(),
+                models: vec![model],
+                animations: vec![clip],
             },
         ];
         for msg in &server_cases {

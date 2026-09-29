@@ -1,4 +1,4 @@
-//! 资源通道下载线程：把服务端下行的恒 4096B 包重组为整份资源落池
+﻿//! 资源通道下载线程：把服务端下行的恒 4096B 包重组为整份资源落池
 //!
 //! 设计动机（Why）：0.12 资源走**独立 TCP 连接**、每包恒定 4096B（= 32B 头 + 4064B 负载）。
 //! 本线程是独立的**阻塞单线程**，与控制通道（[`super::downlink`]）互不干扰：资源洪峰不会
@@ -14,8 +14,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use cute_of_duty_server::net::packet::{PacketKind, PacketReader, RES_PACKET_BYTES};
-use cute_of_duty_server::net::resource_stream::ResourceAssembler;
+use cute_of_duty_contract::net::packet::{PacketKind, PacketReader, RES_PACKET_BYTES};
+use cute_of_duty_contract::net::resource_stream::ResourceAssembler;
 
 use crate::net::remote::{PoolMessage, ResourceFrame};
 

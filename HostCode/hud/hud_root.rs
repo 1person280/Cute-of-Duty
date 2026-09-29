@@ -1,4 +1,4 @@
-//! 训练场 HUD：整屏根节点装配 + 撤离引导与撤离请求
+﻿//! 训练场 HUD：整屏根节点装配 + 撤离引导与撤离请求
 //!
 //! 设计动机：HUD 只读权威快照中本人条目（`LocalPlayer.entity_id`）来展示，血量/护甲/
 //! 弹药/技能 CD 全部为服务端裁决值，客户端不加改。本文件只做「装配根节点 + 撤离引导」；
@@ -6,7 +6,7 @@
 //! 撤离的距离提示为纯表现层引导，**进入判定**由服务端按玩家世界坐标裁决。
 
 use bevy::prelude::*;
-use cute_of_duty_server::net::protocol::ClientMessage;
+use cute_of_duty_contract::net::protocol::ClientMessage;
 
 use crate::flow::flow_state::{self as flow, AppState, CjkFont, KillCount, LocalPlayer, EXTRACTION_POINT, EXTRACTION_RANGE};
 use crate::net::network::NetOut;

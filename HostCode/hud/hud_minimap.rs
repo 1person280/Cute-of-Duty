@@ -1,4 +1,4 @@
-//! HUD 左上角小地图 + 罗盘：以玩家为中心的局部放大图（半径≈[`MINIMAP_RANGE`] 米）
+﻿//! HUD 左上角小地图 + 罗盘：以玩家为中心的局部放大图（半径≈[`MINIMAP_RANGE`] 米）
 //!
 //! 设计动机：小地图是**纯表现层**——静态层直接读服务端 `map::lawn::layout()` 的纯数据
 //! （不触碰任何模拟逻辑），动态层读权威 `EntitySnapshot`（位置/模型身份是服务端裁决值）。
@@ -13,7 +13,7 @@
 //! 八方位读数。朝向换算 `heading_rad(yaw) = (π - yaw) mod 2π`，与相机 yaw 同源。
 
 use bevy::prelude::*;
-use cute_of_duty_server::map::{lawn, MaterialKind, StationKind};
+use cute_of_duty_contract::map::{lawn, MaterialKind, StationKind};
 
 use crate::flow::flow_state::{self as flow, AimRig, CjkFont, LocalPlayer};
 use crate::world::model::voxel_for;
@@ -431,7 +431,7 @@ pub fn update_minimap(
 fn dot_style(
     id: u64,
     self_id: Option<u64>,
-    preset: cute_of_duty_server::model::ModelPreset,
+    preset: cute_of_duty_contract::model::ModelPreset,
 ) -> (f32, Color) {
     if Some(id) == self_id {
         return (7.0, Color::srgb(0.3, 0.9, 1.0));
@@ -452,8 +452,8 @@ enum DotKind {
     Other,
 }
 
-fn preset_group(preset: cute_of_duty_server::model::ModelPreset) -> DotKind {
-    use cute_of_duty_server::model::ModelPreset;
+fn preset_group(preset: cute_of_duty_contract::model::ModelPreset) -> DotKind {
+    use cute_of_duty_contract::model::ModelPreset;
     match preset {
         ModelPreset::AimTarget => DotKind::Target,
         ModelPreset::EnemyThug => DotKind::Enemy,

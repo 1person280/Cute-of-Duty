@@ -1,4 +1,4 @@
-//! HUD 背包面板（按 Tab 打开）：双武器槽 + 弹药池 + 4×3 补给品格位
+﻿//! HUD 背包面板（按 Tab 打开）：双武器槽 + 弹药池 + 4×3 补给品格位
 //!
 //! 设计动机（Why，对齐 legacy 0.3.2 操作表第 10 行「背包 · Tab · 打开背包（双武器 /
 //! 弹药池 / 补给品）」）：背包此前只能经 3/4 速用与物资箱面板间接看到，缺一块"看全局"
@@ -13,8 +13,8 @@
 //! 本面板是"本人装备总览 + 速用"，二者互不重叠。
 
 use bevy::prelude::*;
-use cute_of_duty_server::element::ElementType;
-use cute_of_duty_server::net::protocol::{ClientMessage, PlayerInput};
+use cute_of_duty_contract::element::ElementType;
+use cute_of_duty_contract::net::protocol::{ClientMessage, PlayerInput};
 
 use crate::flow::flow_state::{self as flow, AimRig, CjkFont, LocalPlayer, SeqCounter};
 use crate::net::network::NetOut;

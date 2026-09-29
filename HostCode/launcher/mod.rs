@@ -1,4 +1,4 @@
-//! launcher 模块 —— 客户端表现层装配入口（服务器权威架构的表现半边）
+﻿//! launcher 模块 —— 客户端表现层装配入口（服务器权威架构的表现半边）
 //!
 //! 设计动机：表现层各子域（`flow` 状态机、`net` 网络、`menu` 菜单、`hud` 战斗内 UI、
 //! `world` 3D 场景、`shared` 共享资源）是与本模块平级的六个顶层模块（见 main.rs 的
@@ -7,7 +7,7 @@
 use std::sync::mpsc;
 
 use bevy::prelude::*;
-use cute_of_duty_server::net::protocol::{ClientMessage, EntitySnapshot};
+use cute_of_duty_contract::net::protocol::{ClientMessage, EntitySnapshot};
 
 use crate::flow::AppState;
 
@@ -46,7 +46,11 @@ pub fn run(addr: &str) {
         // 中文字体句柄默认缺失（Default=None）但资源恒存在，避免任何 UI 系统
         // 在字体注入前的首帧对 `Res<CjkFont>` 取值 panic。
         .init_resource::<crate::flow::CjkFont>()
-        .init_resource::<crate::menu::GameSettings>()
+        // 模态仲裁资源（唯一所有者是 flow）：hud/menu 发事件、flow 落账、hud/net 只读。
+        .init_resource::<crate::flow::ModalState>()
+        .add_event::<crate::flow::ModalChange>()
+        .add_event::<crate::flow::PauseOpenRequest>()
+        .init_resource::<crate::flow::GameSettings>()
         .init_resource::<crate::menu::SelectedMode>()
         .init_resource::<crate::menu::SelectedCategory>()
         .init_resource::<crate::menu::ArsenalVisible>()
@@ -91,36 +95,48 @@ pub fn run(addr: &str) {
         .add_systems(
             Update,
             (
-                crate::net::receive_snapshots,
-                // 资源帧先落池，再由池增量同步进 ModelCatalog 视图（下游渲染消费）。
-                crate::net::receive_resources,
-                crate::net::sync_catalog_from_pool,
-                // 控制消息路由须先于实体对账：本人实体 ID 在此灌入，
-                // 若晚于 `apply_entities`，首帧快照会把本人按方块回退落成（随后不再重建）。
-                crate::flow::route_control_messages,
-                crate::net::apply_entities,
-                // 体素 idle 动画：对本人模型枢轴按服务端下发的表达式写入旋转。
-                crate::world::drive_idle,
-                // 本人模型朝向：每帧对齐视线偏航（第三人称「人随视线转」，修复"永远向北"）。
-                crate::world::face_aim_direction,
-                // 持雷态同步须先于视角/相机/上行：三处都要读同一份结论。
-                crate::hud::sync_held_grenade,
-                crate::world::mouse_look_system.run_if(crate::hud::gameplay_input_active),
-                // 持雷强制越肩：紧随鼠标视角之后叠加（`AimRig::aiming` 单点写入）。
-                crate::world::sync_grenade_aim,
-                // 投掷轨迹预览：读同一份持雷态与朝向，用与服务器同源的弹道常数画预测抛物线。
-                crate::world::draw_grenade_preview,
-                crate::world::follow_system.run_if(crate::menu::pause_closed),
-                crate::shared::refresh_ui_ready,
-                crate::net::caps_toggle,
-                crate::net::spawn_panel,
-                crate::net::panel_update,
-                crate::menu::settings_apply_fov,
-                crate::menu::settings_apply_ambient,
-                // 光标锁定随状态/暂停翻转，需在各状态下都跑（自身判态，无 run_if）。
-                // Esc「无 UI 时释放鼠标」先行置位软开关，再交由 cursor_lock_system 一并翻转。
-                crate::menu::cursor_release_toggle.run_if(in_state(AppState::InGame)),
-                crate::menu::cursor_lock_system,
+                (
+                    crate::net::receive_snapshots,
+                    // 资源帧先落池，再由池增量同步进 ModelCatalog 视图（下游渲染消费）。
+                    crate::net::receive_resources,
+                    crate::net::sync_catalog_from_pool,
+                    // 控制消息路由须先于实体对账：本人实体 ID 在此灌入，
+                    // 若晚于 `apply_entities`，首帧快照会把本人按方块回退落成（随后不再重建）。
+                    crate::flow::route_control_messages,
+                    crate::net::apply_entities,
+                    // 体素 idle 动画：对本人模型枢轴按服务端下发的表达式写入旋转。
+                    crate::world::drive_idle,
+                    // 本人模型朝向：每帧对齐视线偏航（第三人称「人随视线转」，修复"永远向北"）。
+                    crate::world::face_aim_direction,
+                    // 持雷态同步须先于视角/相机/上行：三处都要读同一份结论。
+                    crate::hud::sync_held_grenade,
+                    // 门控统一取自 `flow::ModalState`（见下方模态发布/落账组）。
+                    crate::world::mouse_look_system.run_if(crate::hud::gameplay_input_active),
+                    // 持雷强制越肩：紧随鼠标视角之后叠加（`AimRig::aiming` 单点写入）。
+                    crate::world::sync_grenade_aim,
+                    // 投掷轨迹预览：读同一份持雷态与朝向，用与服务器同源的弹道常数画预测抛物线。
+                    crate::world::draw_grenade_preview,
+                    crate::world::follow_system.run_if(crate::menu::pause_closed),
+                    crate::shared::refresh_ui_ready,
+                    crate::net::caps_toggle,
+                    crate::net::spawn_panel,
+                    crate::net::panel_update,
+                    crate::menu::settings_apply_fov,
+                    crate::menu::settings_apply_ambient,
+                    // 光标锁定随状态/暂停翻转，需在各状态下都跑（自身判态，无 run_if）。
+                    // Esc「无 UI 时释放鼠标」先行置位软开关，再交由 cursor_lock_system 一并翻转。
+                    crate::menu::cursor_release_toggle.run_if(in_state(AppState::InGame)),
+                    crate::menu::cursor_lock_system,
+                )
+                    .chain(),
+                // 模态仲裁：生产者（hud/menu）对照源状态发差量事件 → flow 落账进唯一 ModalState。
+                // 置于下一组（InGame 玩法输入）之前；消费者读到的结论最多滞后一帧，无观感影响。
+                (
+                    crate::hud::publish_modal_changes,
+                    crate::menu::publish_modal_changes,
+                    crate::flow::apply_modal_changes,
+                )
+                    .chain(),
             )
                 .chain(),
         )
@@ -164,40 +180,49 @@ pub fn run(addr: &str) {
             Update,
             (
                 // 组一：开关/引导/交互链（顺序敏感）。bevy 0.14 的 `.chain()` 只对 ≤20 元组
-                // 提供实现，故拆成两个内部链后再外层链，保持总的先后顺序不变。
+                // 提供实现，故拆成三个内部链后再外层链，保持总的先后顺序不变。
                 (
                     // 暂停开关与面板交互最先跑：同帧生效的暂停门控可立即冻结下方输入。
-                    crate::menu::pause_toggle,
-                    crate::menu::pause_menu_interaction,
-                    // 全景图开关紧随暂停之后：同帧生效的地图门控可立即冻结下方输入/视角。
-                    crate::hud::bigmap_toggle,
-                    crate::hud::update_bigmap,
-                    crate::hud::update_extract,
-                    crate::hud::extract_interaction,
-                    // 背包总览开关（Tab）：紧随其它模态开关之后，同帧生效的门控立即冻结下方输入。
-                    crate::hud::backpack_toggle,
-                    // 操作按钮组开关（B）：同帧生效的门控立即冻结下方玩法输入。
-                    crate::hud::button_panel_toggle,
-                    // 交互链：刷附近目标 → 轮盘/物资箱输入 → F/滚轮/点击输入 → 点击选项 → 上报 → 重建。
-                    // 注意：交互输入本身**不**受 `gameplay_input_active` 门控（面板打开时
-                    // 正是它负责响应选择/关闭），仅下游玩法输入（移动/开火/切枪）被面板状态冻结。
-                    // 轮盘与物资箱面板排在交互输入**之前**：同帧按下的 F/滚轮由它们优先接管，
-                    // 避免"开面板当帧就被交互链重复消费"。
-                    crate::hud::update_interact_entries,
-                    crate::hud::item_wheel_input,
-                    crate::hud::loot_panel_input,
-                    // 格位面板鼠标搬运（拖拽 / Shift+左键）：与键盘后备同帧，先于交互输入。
-                    crate::hud::loot_panel_drag,
-                    // 背包面板：R 使用悬停格物品（直接上报 use_slot 意图，服务端裁决）。
-                    crate::hud::backpack_use_hovered,
-                    // 操作按钮组：处理点击 → 合成并上报一条 `PlayerInput`（不受 gameplay 门控）。
-                    crate::hud::button_panel_click,
-                    crate::hud::button_panel_emit,
-                    crate::hud::interact_input,
-                    crate::hud::interact_menu_click,
-                    crate::hud::interact_commit,
-                    crate::hud::sync_interact_panel,
-                    crate::hud::sync_interact_menu,
+                    (
+                        crate::menu::pause_toggle,
+                        crate::menu::pause_menu_interaction,
+                        // 全景图开关紧随暂停之后：同帧生效的地图门控可立即冻结下方输入/视角。
+                        crate::hud::bigmap_toggle,
+                        crate::hud::update_bigmap,
+                        crate::hud::update_extract,
+                        crate::hud::extract_interaction,
+                        // 背包总览开关（Tab）：紧随其它模态开关之后，同帧生效的门控立即冻结下方输入。
+                        crate::hud::backpack_toggle,
+                        // 操作按钮组开关（B）：同帧生效的门控立即冻结下方玩法输入。
+                        crate::hud::button_panel_toggle,
+                        // 交互链：刷附近目标 → 轮盘/物资箱输入 → F/滚轮/点击输入 → 点击选项 → 上报 → 重建。
+                        // 注意：交互输入本身**不**受 `gameplay_input_active` 门控（面板打开时
+                        // 正是它负责响应选择/关闭），仅下游玩法输入（移动/开火/切枪）被面板状态冻结。
+                        // 轮盘与物资箱面板排在交互输入**之前**：同帧按下的 F/滚轮由它们优先接管，
+                        // 避免"开面板当帧就被交互链重复消费"。
+                        crate::hud::update_interact_entries,
+                        crate::hud::item_wheel_input,
+                        crate::hud::loot_panel_input,
+                        // 格位面板鼠标搬运（拖拽 / Shift+左键）：与键盘后备同帧，先于交互输入。
+                        crate::hud::loot_panel_drag,
+                        // 背包面板：R 使用悬停格物品（直接上报 use_slot 意图，服务端裁决）。
+                        crate::hud::backpack_use_hovered,
+                        // 操作按钮组：处理点击 → 合成并上报一条 `PlayerInput`（不受 gameplay 门控）。
+                        crate::hud::button_panel_click,
+                    )
+                        .chain(),
+                    // 按钮组「打开暂停」请求落到实际暂停态：hud 不直接写 menu 资源，改为发
+                    // `PauseOpenRequest`，由 menu 在这里同帧落账（保持 hud→menu 零直连）。
+                    (
+                        crate::menu::open_pause_on_request,
+                        crate::hud::button_panel_emit,
+                        crate::hud::interact_input,
+                        crate::hud::interact_menu_click,
+                        crate::hud::interact_commit,
+                        crate::hud::sync_interact_panel,
+                        crate::hud::sync_interact_menu,
+                    )
+                        .chain(),
                 )
                     .chain(),
                 // 组二：HUD 刷新 + 玩法输入。

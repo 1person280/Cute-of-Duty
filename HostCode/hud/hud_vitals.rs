@@ -1,4 +1,4 @@
-//! HUD 左下 vitals：干员名 / 血条 / 护甲条 / Q·E 技能图标 / 道具槽
+﻿//! HUD 左下 vitals：干员名 / 血条 / 护甲条 / Q·E 技能图标 / 道具槽
 //!
 //! 设计动机：Vitals 只读权威快照中本人条目。旧版的血条底图贴图已废弃（1920² 概念美术与
 //! 体素低模方向相悖），改为**过程化**填充条 + 数值文本；技能图标同样是过程化方块
@@ -12,8 +12,8 @@
 //! 只查询一种组件类型，从结构上杜绝 bevy 0.14 同一组件 `&mut` 多查询导致的 B0001 冲突。
 
 use bevy::prelude::*;
-use cute_of_duty_server::items::{ItemCategory, LootItem};
-use cute_of_duty_server::operator::roster;
+use cute_of_duty_contract::items::{ItemCategory, LootItem};
+use cute_of_duty_contract::operator::roster;
 
 use crate::flow::flow_state::{self as flow, CjkFont, LocalPlayer};
 use crate::net::snapshot::SnapshotBuffer;

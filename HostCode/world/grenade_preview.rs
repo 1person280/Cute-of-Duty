@@ -2,11 +2,11 @@
 //! 用点状弧线画出预计落点，供玩家判断投掷距离。
 //!
 //! 设计动机（Why）：手雷"先瞄准后释放"，没有预览就只能盲投。弹道常数（水平/竖直初速、
-//! 重力、出手点）直接复用 `ServerCode::combat::grenade` 导出的常量，保证预览与实际结算
+//! 重力、出手点）取自契约 crate 的共享弹道常数（与服务端同源），保证预览与实际结算
 //! **同源不漂移**；本系统纯为表现，不参与任何判定——真正落点仍由服务端结算。
 
 use bevy::prelude::*;
-use cute_of_duty_server::combat::grenade::{
+use cute_of_duty_contract::combat::{
     FUSE_SECS, GRAVITY, GROUND_Y, SPAWN_FWD, SPAWN_HEIGHT, THROW_SPEED, THROW_UP,
 };
 
@@ -23,7 +23,7 @@ const LANDING_R: f32 = 0.16;
 
 /// 持雷时每帧绘制预测抛物线（未持雷不画）。
 ///
-/// 出手点/初速逐项对齐 [`cute_of_duty_server::combat::grenade::spawn_projectile`]：
+/// 出手点/初速逐项对齐服务端 `ServerCode::combat::grenade::spawn_projectile`：
 /// 起点 = 玩家脚底 + 沿朝向 `SPAWN_FWD` + 抬高 `SPAWN_HEIGHT`；初速 = 朝向水平 `THROW_SPEED`
 /// + 竖直 `THROW_UP`；每步先从竖直速度扣 `GRAVITY * STEP`，再按速度推进。
 pub fn draw_grenade_preview(

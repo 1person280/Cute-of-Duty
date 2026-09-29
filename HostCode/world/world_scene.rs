@@ -1,4 +1,4 @@
-//! 静态世界生成：完整草坪训练场（1×1km 露天搜打撤大场）+ 光照
+﻿//! 静态世界生成：完整草坪训练场（1×1km 露天搜打撤大场）+ 光照
 //!
 //! 设计动机（服务器权威边界）：环境是「不易变」的稳定内容，正应由客户端承载。
 //! 这里复用服务端 `map::lawn::layout()` 的**纯数据**（不触碰任何服务端模拟逻辑），
@@ -11,7 +11,7 @@
 
 use bevy::prelude::*;
 use bevy::pbr::NotShadowCaster;
-use cute_of_duty_server::map::{
+use cute_of_duty_contract::map::{
     self, GlowKind, GlowSpec, MapLayout, MaterialKind, Prop, Shape,
 };
 

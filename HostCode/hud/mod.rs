@@ -15,6 +15,7 @@ pub(crate) mod hud_item_wheel;
 pub(crate) mod hud_kill_counter;
 pub(crate) mod hud_loot_panel;
 pub(crate) mod hud_minimap;
+pub(crate) mod hud_modal_publish;
 pub(crate) mod hud_root;
 pub(crate) mod hud_skills;
 pub(crate) mod hud_vitals;
@@ -49,5 +50,6 @@ pub(crate) use hud_loot_panel::{
     loot_panel_drag, loot_panel_input, reset_loot_panel, sync_loot_panel, LootPanelState,
 };
 pub(crate) use hud_minimap::update_minimap;
+pub(crate) use hud_modal_publish::publish_modal_changes;
 pub(crate) use hud_skills::{update_feed, update_skills};
 pub(crate) use hud_vitals::{update_vitals_bars, update_vitals_text};

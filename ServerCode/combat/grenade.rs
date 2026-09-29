@@ -10,20 +10,11 @@ use crate::entity::{Component, Entity, EntityId, EntityType, World};
 use crate::operator::SkillEffect;
 use std::any::Any;
 
-/// 投掷水平初速（m/s）：客户端轨迹预览须与此**同源**，否则预览与实际弹道不一致。
-pub const THROW_SPEED: f32 = 12.0;
-/// 投掷竖直初速（m/s）：固定抬升分量（当前弹道不随俯仰角变化）。
-pub const THROW_UP: f32 = 6.0;
-/// 手雷重力加速度（m/s²）：飞行期间每 Tick 从竖直速度扣减。
-pub const GRAVITY: f32 = 12.0;
-/// 引信时长（秒）：超时无论是否落地都引爆。
-pub const FUSE_SECS: f32 = 1.5;
-/// 落地判定高度（米）：投射物中心低于此值即视为触地引爆。
-pub const GROUND_Y: f32 = 0.15;
-/// 出手点相对玩家脚底的高度（米）。
-pub const SPAWN_HEIGHT: f32 = 2.5;
-/// 出手点沿朝向前移的距离（米）。
-pub const SPAWN_FWD: f32 = 0.5;
+/// 手雷弹道常数：客户端轨迹预览须与权威弹道**同源**，故这些数值是双端共享契约，
+/// 定义在契约 crate，此处经 `pub use` 保持 `crate::combat::grenade::*` 公开路径不变。
+pub use cute_of_duty_contract::combat::{
+    FUSE_SECS, GRAVITY, GROUND_Y, SPAWN_FWD, SPAWN_HEIGHT, THROW_SPEED, THROW_UP,
+};
 
 /// 飞行中手雷（组件）：携带速度、元素、伤害、半径与附加机制
 pub struct GrenadeState {

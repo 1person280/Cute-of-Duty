@@ -1,4 +1,4 @@
-//! 体素 idle 动画驱动（对服务端下发动画 clip 的极小表达式求值）
+﻿//! 体素 idle 动画驱动（对服务端下发动画 clip 的极小表达式求值）
 //!
 //! 设计动机（Why）：动画表达式是造型内容的一部分（属服务端易变内容），随 `ModelCatalog`
 //! 一并下发；客户端只负责求值 + 写旋转。为避免在表现层塞进一个通用表达式引擎，本模块
@@ -9,7 +9,7 @@
 //! `animation_length` 内循环回绕。
 
 use bevy::prelude::*;
-use cute_of_duty_server::model::RotationExpr;
+use cute_of_duty_contract::model::RotationExpr;
 
 use crate::flow::ModelCatalog;
 use crate::world::voxel_model::VoxelBoneNode;

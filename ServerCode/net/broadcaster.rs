@@ -54,7 +54,7 @@ pub fn build_snapshot(world: &World, seq: u64, observer: (f32, f32, f32)) -> Ser
                 Some(it) if it.kind == crate::interact::InteractKind::Station(crate::map::StationKind::SupplyCrate) => {
                     crate::model::ModelPreset::SupplyCrate
                 }
-                _ => crate::model::ModelPreset::from_entity_type(e.entity_type),
+                _ => crate::model::preset_for_entity_type(e.entity_type),
             };
             // 持握手雷：玩家处于"先瞄准后释放"的中间态时给出元素，客户端据此渲染持雷提示
             // 与强制越肩；非玩家实体无此组件，恒为 None。

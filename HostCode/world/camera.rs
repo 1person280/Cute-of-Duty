@@ -1,4 +1,4 @@
-//! 第三人称越肩镜头 + 鼠标自由视角
+﻿//! 第三人称越肩镜头 + 鼠标自由视角
 ///
 /// 设计动机（Why）：0.6 早期版本朝向由 WASD 位移方向推导，既没有鼠标自由视角、
 /// 也无法把瞄准朝向报给服务端（弹道与移动轴系都因此失真）。本模块改为**鼠标驱动**：
@@ -20,10 +20,10 @@
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 
-use cute_of_duty_server::map;
+use cute_of_duty_contract::map;
 
 use crate::flow::flow_state::{AimRig, LocalPlayer};
-use crate::menu::GameSettings;
+use crate::flow::GameSettings;
 use crate::net::snapshot::SnapshotBuffer;
 
 /// 第三人称越肩镜头标记（每帧由 `follow_system` 重写世界变换；`game_settings` 据此改 FOV）。
