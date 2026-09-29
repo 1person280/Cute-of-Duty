@@ -165,27 +165,40 @@ Cargo Workspace（虚拟 manifest）下平级三个 crate：
 
 ### 目录结构总览
 
-| 模块 | 职责 | 关键文件 |
-|---|---|---|
-| **客户端 · `HostCode/`** | | |
-| `launcher` | 纯装配层：动态装载 bevy 0.15 + 承载渲染表现全套（相机 Rig / 体素绘制 / HUD / 小地图 / 背包 UI），只吃快照 + 画 | `mod.rs` |
-| `flow` | AppState 状态机（Loading / MainMenu / InGame）、加载屏、状态迁移 | `state.rs` / `loading.rs` |
-| `net` | mpsc 后台线程消费服务端快照 + 上行 NetOut 命令通道 | `network.rs` |
-| `menu` | 主菜单 / 仓库·携带物资（拖拽 + Shift 选装）/ 模式 / 设置 / 暂停 | `mod.rs` / `arsenal/` / `pause.rs` |
-| `hud` | 血条 / 护甲 / 弹药 / 技能 CD / 小地图 / 战术大地图 / 背包面板 / 击杀通告 / 撤离提示 | `vitals.rs` / `minimap.rs` / `bigmap.rs` / `backpack/panel.rs` / `kill/counter.rs` |
-| `world` | 训练场几何 / 材质 / 光照 / 手雷弹道预览 | `scene.rs` / `camera.rs` / `grenade/preview.rs` |
-| `shared` | 主题色板、字体句柄 | `theme.rs` |
-| **服务端 · `ServerCode/`** | | |
-| `engine` | 权威 60Hz 固定 Tick + 确定性双缓冲快照 | `double/buffer.rs` |
-| `entity` | 自研 ECS（实体 = 组件容器） | `mod.rs` |
-| `combat` | 射击 / 手雷 / 技能 / 区域 / 干员切换·战斗判定 | `shooter.rs` / `grenade.rs` / `skill.rs` / `zone.rs` / `switch_operator.rs` |
-| `damage` | 伤害结算流水线 | `packet.rs` / `resolver.rs` / `effect.rs` |
-| `element` | 元素反应系统 | `mod.rs` |
-| `map` | 纯数据地图（训练场 CQB + `lawn` 1×1km 露天搜打撤大场） | `training/` + `lawn/` |
-| `model` | 模型文件（易变化资源）经快照下发客户端 | `mod.rs` |
-| `net` | TCP 网络层（AOI / 帧编解码 / 会话 / 广播 / 预取 / 协议） | `aoi.rs` / `packet.rs` / `session.rs` / `broadcaster.rs` / `prefetch.rs` / `protocol.rs` |
-| `config` / `operator` / `player` / `equipment` / `gamemode` / `hal` | 配置 / 干员 / 档案 / 装备 / 模式 / 时钟 | 各自 `mod.rs` |
-| **契约 · `ContractCode/`** | 线格式类型 + 跨域载荷 + 共享常量 + Port Trait（不依赖两端） | `docs/contracts/protocol.yaml` 为其机器可读描述 |
+| 模块 | 职责 | 关键文件 | 统计数据（行） |
+|---|---|---|---|
+| **客户端 · `HostCode/`** | | | **合计 10,093** |
+| `launcher` | 纯装配层：动态装载 bevy 0.15 + 承载渲染表现全套（相机 Rig / 体素绘制 / HUD / 小地图 / 背包 UI），只吃快照 + 画 | `mod.rs` | 264 |
+| `flow` | AppState 状态机（Loading / MainMenu / InGame）、加载屏、状态迁移、唯一 `ModalState` | `state.rs` / `loading.rs` / `modal.rs` | 592 |
+| `net` | mpsc 后台线程消费服务端快照 + 上行 NetOut 命令通道 + 16MB 定址远程对象池 | `network.rs` / `remote.rs` / `snapshot.rs` | 1,353 |
+| `menu` | 主菜单 / 仓库·携带物资（拖拽 + Shift 选装）/ 模式 / 设置 / 暂停 | `mod.rs` / `arsenal/` / `pause.rs` | 2,172 |
+| `hud` | 血条 / 护甲 / 弹药 / 技能 CD / 小地图 / 战术大地图 / 背包面板 / 径向轮盘 / 交互·物资箱 / 击杀通告 / 撤离提示 | `vitals.rs` / `minimap.rs` / `bigmap.rs` / `backpack/panel.rs` / `item/wheel.rs` / `loot/panel.rs` / `kill/counter.rs` | 4,393 |
+| `world` | 训练场几何 / 材质 / 光照 / 手雷弹道预览 / 体素模型绘制 | `scene.rs` / `camera.rs` / `grenade/preview.rs` / `voxel/` | 1,163 |
+| `shared` | 主题色板、字体句柄、干员元数据、UI 资源 | `theme.rs` / `operator/meta.rs` / `ui/assets.rs` | 135 |
+| **服务端 · `ServerCode/`** | | | **合计 10,465** |
+| `engine` | 权威 60Hz 固定 Tick + 确定性双缓冲快照 + 爆炸缓存 | `mod.rs` / `double/buffer.rs` / `explosion/cache.rs` | 650 |
+| `entity` | 自研 ECS（实体 = 组件容器） | `mod.rs` | 544 |
+| `combat` | 射击 / 手雷 / 技能 / 区域 / 干员切换·战斗判定 | `shooter.rs` / `grenade.rs` / `skill.rs` / `zone.rs` / `range.rs` / `combatant.rs` | 1,767 |
+| `damage` | 伤害结算流水线 | `packet.rs` / `resolver.rs` / `effect.rs` | 692 |
+| `element` | 元素反应系统 | `mod.rs` | 372 |
+| `map` | 纯网关（真身在契约 `ContractCode/map/`） | `mod.rs` | 9 |
+| `model` | 模型文件（易变化资源）经快照下发客户端 | `loader.rs` / `mod.rs` | 235 |
+| `net` | TCP 网络层（AOI / 会话 / 广播 / 预取 / 运行时 / 阶段编排）+ 原生 Web 子域（HTTP / WS / TLS） | `runtime.rs` / `session.rs` / `broadcaster.rs` / `prefetch.rs` / `stages.rs` / `web/` | 2,798 |
+| `config` | 配置表（含加载器，与核心代码物理相邻） | `mod.rs` | 197 |
+| `operator` | 干员（网关，真身在契约 `ContractCode/operator.rs`） | `mod.rs` | 9 |
+| `player` | 档案 | `mod.rs` | 415 |
+| `equipment` | 装备 | `mod.rs` | 375 |
+| `gamemode` | 模式 | `mod.rs` | 394 |
+| `hal` | 时钟 | `mod.rs` | 354 |
+| `interact` | 交互菜单 / 供应品类规则（类型真身在契约） | `mod.rs` | 329 |
+| `inventory` | 背包服务 | `service.rs` | 258 |
+| `items` | 物品逻辑（类型真身在契约） | `mod.rs` | 418 |
+| `storage` | 存档（JSONL 日志 + 冷库） | `log.rs` / `error.rs` / `cold/repo.rs` | 335 |
+| **契约 · `ContractCode/`** | 线格式类型 + 跨域载荷 + 共享常量 + Port Trait（不依赖两端）；`docs/contracts/protocol.yaml` / `web.yaml` 为其机器可读描述 | | **合计 4,095** |
+| `net/` | 定长包 / 指令优先调度 / 帧编解码 / 资源流（TCP 与浏览器桥共用） | `packet.rs` / `codec.rs` / `protocol.rs` / `scheduler.rs` / `stream.rs` | 1,784 |
+| `map/` | 纯数据地图（训练场 CQB + `lawn` 1×1km 露天搜打撤大场） | `training/mod.rs` / `lawn/mod.rs` | 1,461 |
+| 根类型文件 | 共享值类型（items / interact / equipment / model / operator / combat / element）+ Port Trait | `lib.rs` / `items.rs` / `interact.rs` / `equipment.rs` / `model.rs` / `operator.rs` / `port.rs` | 850 |
+| **全仓合计** | 三个 crate 全部 `.rs` 行数 | — | **合计 24,653** |
 
 ### 外部资源与配置
 
