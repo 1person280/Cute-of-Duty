@@ -24,6 +24,32 @@
 
 ---
 
+## [归档] · 2026-09-29 · 0.6 冻结区清零（不再跟踪 0.6 版本遗留问题）
+
+- **变更类型**：文档 / 流程（**无代码变更**）
+- **影响模块**：`docs/`（`stop-doing.md`、`frozen-tasks/snapshot-8-playtest-feedback.md` 已删除）
+- **兼容性**：兼容（不触碰线格式 / 契约 / 公共 Trait）
+- **内容**：
+  - 0.6 冻结区两份台账（`docs/stop-doing.md`、`docs/frozen-tasks/snapshot-8-playtest-feedback.md`）的
+    **全部条目已逐条取得实机回执并确认通过**（快照8 反馈 A 节 6 条 + D 节 5 条于 2026-09-29 确认；
+    C/F 节于 2026-09-27 随 0.6 复测确认；legacy 操作表 14 行由 owner 于 2026-09-29 确认全部可用）。
+  - 两文件与 `docs/frozen-tasks/` 目录一并**删除**，仓库**不再跟踪 0.6 版本遗留问题**。
+  - 对历史条目的引用改为纯文本，避免死链。
+- **结转（原 `stop-doing.md` §0 未结架构裁决 —— 非 0.6 玩法问题，仍在账，**不要**误认为已解决）**：
+  1. **ADR 0003「抽独立契约 crate `cute_of_duty_contract`」未落地**：`HostCode/Cargo.toml`
+     至今仍 `cute_of_duty_server = { path = "../ServerCode" }`，与模块边界「`HostCode` 不得依赖 `ServerCode`」
+     的判据相矛盾（判据 = 删掉该依赖）。
+  2. **ADR 0004「`flow` 拥有唯一 `ModalState` + 事件仲裁」未落地**：`hud` 仍在横向 `use crate::menu::`
+     （如 `launcher/mod.rs` 的 `crate::menu::pause_closed`、`crate::menu::cursor_lock_system`），
+     与「出现 `use crate::menu::` 即违规」的判据相矛盾。
+- **后续冻结落点**：原 `stop-doing.md` 已删除，今后「改了但未验证」的改动**直接写入本文件条目**，
+  并在标题标注「**待实机验证**」（沿用 `0.6-SnapShot-10` 条的既有写法）。
+- **验证**：本条目为纯文档归档；`cargo-wrap check --workspace` 退出码 `0`（证明无代码残留引用）。
+- **关联**：[ADR 0003](adr/0003-contract-crate.md)、[ADR 0004](adr/0004-client-layer-convergence.md)、
+  [模块边界](architecture/module-boundaries.md)
+
+---
+
 ## [0.12.1] · 2026-09-29 · 引擎底层小步升级 Bevy 0.14 → 0.15（仅迁强制破坏项）
 
 - **变更类型**：Refactor（无协议语义变化；客户端依赖升级 + API 平移）
@@ -160,7 +186,7 @@
     视角就转。现并入该门控（释放光标即冻结视角与上报），与暂停/各面板口径一致。
 - **验证**：`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server`
   **111 passed / 0 failed**（新增 `thrown_grenade_follows_parabola` 弹性回归用例）。
-- **关联**：[冻结任务 · 快照8 实机反馈](frozen-tasks/snapshot-8-playtest-feedback.md)（F-5）、
+- **关联**：冻结任务台账《快照8 实机反馈》（2026-09-29 已归档）（F-5）、
   [契约 `protocol.yaml`](contracts/protocol.yaml)
 
 ---
@@ -188,7 +214,7 @@
     `interact_input` 五处门控；关闭当帧补发全零输入以停止持续动作。
 - **验证**：`cargo-wrap check --workspace` 退出码 **0**；`cargo-wrap test -p cute_of_duty_server`
   **110 passed / 0 failed**；`cargo-wrap build --workspace --release` 退出码 **0**。
-- **关联**：[冻结任务 · 快照8 实机反馈](frozen-tasks/snapshot-8-playtest-feedback.md)（B#1/B#2/F）、
+- **关联**：冻结任务台账《快照8 实机反馈》（2026-09-29 已归档）（B#1/B#2/F）、
   [契约 `protocol.yaml`](contracts/protocol.yaml)
 
 ---
@@ -239,7 +265,7 @@
   ✅ **实机验证通过**（owner 复测：手雷可见投射物 / 跳跃 / Esc 呼出鼠标 / Tab 背包 /
   物资箱·消耗品·轮盘 全部正常）。**注**：先前一轮反馈"问题依旧"经排查为运行了 `target/release/`
   下 9:39 的**旧产物**（本轮改动只进了 debug），非代码缺陷——发布以 `--release` 重建为准。
-- **关联**：[冻结任务 · 快照8 实机反馈](frozen-tasks/snapshot-8-playtest-feedback.md)（C.5/C.6/D-1/E）、
+- **关联**：冻结任务台账《快照8 实机反馈》（2026-09-29 已归档）（C.5/C.6/D-1/E）、
   `_ref/Cute-of-Duty-0.3.2/README.md`
 
 ---
@@ -260,7 +286,7 @@
   - 根治「3/4 用后数量不减」（会话收尾改走 `reset_session` 保留 `pending_slot`）；
   - **扩物品表**：掉落池 **12 → 20**。
 - **验证**：`cargo-wrap check --workspace` 退出码 **0**（发布时随 tag `0.6-Snapshot-9` 打点）
-- **关联**：[冻结任务 · 快照8 实机反馈](frozen-tasks/snapshot-8-playtest-feedback.md)
+- **关联**：冻结任务台账《快照8 实机反馈》（2026-09-29 已归档）
 
 ---
 
@@ -299,7 +325,7 @@
     `launcher` 本轮瘦身为纯装配。
   - 新增 [模块边界总览](architecture/module-boundaries.md)：服务端 18 个 / 客户端 7 个模块的边界、
     数据所有权、接口、成熟度 L0–L3；**5 项冲突已全部裁决**。
-  - 新增 [stop-doing.md](stop-doing.md)：冻结区（本轮未验证的功能 + legacy 操作表未还原项）+ 本轮冻结裁决。
+  - 新增 `docs/stop-doing.md`：冻结区（本轮未验证的功能 + legacy 操作表未还原项）+ 本轮冻结裁决。（该文件已于 2026-09-29 归档删除，内容见本条顶部的归档条目。）
   - 新增 [契约 protocol.yaml](contracts/protocol.yaml)：线格式机器可读契约（v0.8.0 草案）。
   - 更新 `CONTRIBUTING.md`：增补架构/Rust/文档/开源四组规范与模块分级审核流程。
 - **验证**：文档评审（owner 已裁决全部 5 项冲突）
@@ -329,8 +355,8 @@
   3. 物资箱交互不再发送 `InteractChoice::OpenCrate`，改为打开本地 4×3 面板并发送 `LootTransfer` 逐格搬运；
   4. 服务端 `grant_supply` 的选项文案依赖 `SupplyKind::label()`，若下游有文案快照需同步刷新。
 - **验证**：❌ **未验证** —— `cargo-wrap check --workspace` 尚**未成功跑过**；
-  详见 [stop-doing.md A 节与 D 节](stop-doing.md)。**在通过 D 节清单前，本条不得升级为正式发布。**
-- **关联**：stop-doing.md（A1/A3/A4）
+  详见原 `docs/stop-doing.md` A 节与 D 节（2026-09-29 已归档删除）。**在通过 D 节清单前，本条不得升级为正式发布。**
+- **关联**：`stop-doing.md`（A1/A3/A4，已归档）
 
 ---
 

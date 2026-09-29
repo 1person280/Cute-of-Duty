@@ -6,7 +6,7 @@
 > 目标架构一句话：**模块化单体 + 事件总线 + Trait 接口；模块间禁止直接调用；数据所有权划清；依赖无环。**
 > 终局判据：**代码边界锁死，将来拆微服务无需重写。**
 
-相关文档：[stop-doing.md](../stop-doing.md) · [barek-history.md](../barek-history.md) · [ADR 0001](../adr/0001-modular-monolith-event-bus.md) · [ADR 0002](../adr/0002-backpack-domain-split.md) · [ADR 0003](../adr/0003-contract-crate.md) · [ADR 0004](../adr/0004-client-layer-convergence.md) · [契约 protocol.yaml](../contracts/protocol.yaml)
+相关文档：[barek-history.md](../barek-history.md) · [ADR 0001](../adr/0001-modular-monolith-event-bus.md) · [ADR 0002](../adr/0002-backpack-domain-split.md) · [ADR 0003](../adr/0003-contract-crate.md) · [ADR 0004](../adr/0004-client-layer-convergence.md) · [契约 protocol.yaml](../contracts/protocol.yaml)
 
 ---
 
@@ -261,7 +261,7 @@ L? — <依据>；破坏性变更流程…
 ## 八、裁决结果（全部完成）
 
 > **代码全面暂停**（owner 裁决 2026-09-26）：只允许补文档（`module.md`）+ 契约 YAML，不写重构代码。
-> 已建在未编译代码上的 A1/A3/A4 三批改动**保持冻结**（见 [stop-doing.md](../stop-doing.md)）。
+> 已建在未编译代码上的 A1/A3/A4 三批改动**保持冻结**（冻结落点已并入 [barek-history.md](../barek-history.md)）。
 
 | # | 冲突 | 裁决 | 记录 |
 |---|---|---|---|

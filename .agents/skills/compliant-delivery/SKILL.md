@@ -76,7 +76,7 @@ Rust 硬规范：生产路径禁 `unwrap()`/`expect()`（用 `?`）；错误统�
 
 ### 1.5 未验证改动只能进冻结区
 
-改了但没验证的功能，**只能**写进 [docs/stop-doing.md](../../../docs/stop-doing.md) 或 [docs/frozen-tasks/](../../../docs/frozen-tasks/)；**不得**在 README / CHANGELOG / release note 里被描述为"已完成"，也**不得**在其上继续叠加新代码。
+改了但没验证的功能，**只能**写进 [docs/barek-history.md](../../../docs/barek-history.md) 的条目（标题标注「**待实机验证**」）；**不得**在 README / CHANGELOG / release note 里被描述为"已完成"，也**不得**在其上继续叠加新代码。（原 `docs/stop-doing.md` 与 `docs/frozen-tasks/` 已于 2026-09-29 随 0.6 冻结区清零删除，冻结落点统一收敛到 BarekHistory。）
 
 ---
 
@@ -100,7 +100,7 @@ git push -u origin <branch>          # origin = https://github.com/1person280/Cu
 - **L2 模块**（`net` 线格式 / 契约层 `ContractCode` / 公共 Trait）或**新增顶层模块 / 提取独立 crate** → **先开 Issue 对齐**。
 - L2 变更须 **≥2 名 reviewer + maintainer 参与**；破坏性变更先写**迁移指南 + ADR**，再动代码。
 - PR 描述必附：改了哪个模块 / 为什么 / **依赖图**（证明无环）/ **验证命令 + 结果**；手工验收写清 **步骤 + 预期 + 实际**，未实测标注"未验证"。
-- 绕过 [stop-doing.md](../../../docs/stop-doing.md) 冻结项 → 直接关闭。
+- 绕过 [BarekHistory](../../../docs/barek-history.md) 中标注「待实机验证」的冻结项 → 直接关闭。
 
 ### 2.4 CI
 
@@ -131,7 +131,7 @@ git push -u origin <branch>          # origin = https://github.com/1person280/Cu
 - [ ] `cargo-wrap check --workspace` 退出码 **0**
 - [ ] `cargo-wrap test -p cute_of_duty_server` **全绿**
 - [ ] 客户端改动：`cargo-wrap build --workspace --release`（**debug 产物 >2GB 会触发 `os error 193`**）
-- [ ] **冻结项审计**：[stop-doing.md](../../../docs/stop-doing.md) / [frozen-tasks](../../../docs/frozen-tasks/) 里未了结的 ❌ 项，一律不得写成"已完成"
+- [ ] **冻结项审计**：[docs/barek-history.md](../../../docs/barek-history.md) 里标注「待实机验证」的条目，未了结的一律不得写成"已完成"
 - [ ] 协议 / L2 改动：BarekHistory 条目**已追加**（变更类型 / 兼容性 / 迁移指南 / 验证 / 关联）
 
 ### 3.3 发布五件套（必须一次性对齐）

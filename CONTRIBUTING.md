@@ -81,7 +81,7 @@ cargo-wrap build --release --workspace       # 客户端表现改动（debug 产
 | 客户端表现 | 上述 + `cargo-wrap build --workspace --release` |
 | 手工验收项 | PR 描述写**步骤 + 预期 + 实际**；未实测的标注"未验证" |
 
-> **未验证的改动不得写进 README 的"已完成"**，只能进 [docs/stop-doing.md](docs/stop-doing.md)。
+> **未验证的改动不得写进 README 的"已完成"**，只能进 [docs/barek-history.md](docs/barek-history.md) 的条目（标题标注「待实机验证」）。
 
 **什么时候必须先开 Issue 对齐**：新增顶层模块 / 把模块提取为独立 crate / 改配置加载语义（`ServerCode/config`）/ 改 L2 模块（`net` 线格式、`ContractCode`、公共 Trait）。
 
@@ -151,10 +151,9 @@ cargo-wrap build --release --workspace       # 客户端表现改动（debug 产
 | 文档 | 位置 | 必含内容 |
 |---|---|---|
 | `module.md` | **每个模块目录下** | `边界` / `数据所有权` / `接口` / `事件` / `成熟度(L0–L3)` |
-| `barek-history.md` | `docs/` | 变更类型 / 兼容性 / 迁移指南 |
+| `barek-history.md` | `docs/` | 变更类型 / 兼容性 / 迁移指南；**冻结区**（未验证 / 不许动 / 已确认不动）亦标注于此，标题加「待实机验证」 |
 | 契约 | `docs/contracts/*.yaml` | 机器可读的线格式与跨模块载荷定义 |
 | ADR | `docs/adr/*.md` | 重大决策：背景 / 决策 / 后果 / 未决事项 / 替代方案 |
-| `stop-doing.md` | `docs/` | 冻结区：未验证、不许动、已确认不动的事项 |
 
 | 级别 | 含义 | 变更纪律 | 审核要求 |
 |---|---|---|---|
@@ -182,7 +181,7 @@ cargo-wrap build --release --workspace       # 客户端表现改动（debug 产
 | L0 / L1 模块内的重构与功能 | ✅ 提 PR | 需附依赖图与验证方式 |
 | **L2 模块（`net` 线格式 / `ContractCode` / 公共 Trait）** | ⚠️ **先开 Issue 对齐** | 必须附迁移指南，≥2 reviewer |
 | 新增顶层模块 / 提取独立 crate | ⚠️ **先开 Issue 对齐** | 必须先在 `module-boundaries.md` 定边界 |
-| 绕过 `stop-doing.md` 冻结项 | ❌ 直接关闭 | — |
+| 绕过 `barek-history.md` 中标注「待实机验证」的冻结项 | ❌ 直接关闭 | — |
 
 ### 9.3 接口变更流程
 
@@ -209,4 +208,4 @@ cargo-wrap build --release --workspace       # 客户端表现改动（debug 产
 - [代码许可 GPLv3 + Linking Exception](LICENSE)（`HostCode/`·`ServerCode/`·`ContractCode/`·`tools/`）
 - [资产许可 CC BY-NC-SA 4.0](LICENSE-ASSETS)（美术 / 模型 / 音频 / 自有字体）
 - [模块边界总览](docs/architecture/module-boundaries.md) / [ADR 0001](docs/adr/0001-modular-monolith-event-bus.md)
-- [BarekHistory 变更台账](docs/barek-history.md) / [protocol.yaml](docs/contracts/protocol.yaml) / [stop-doing.md](docs/stop-doing.md)
+- [BarekHistory 变更台账](docs/barek-history.md)（含冻结区） / [protocol.yaml](docs/contracts/protocol.yaml)
