@@ -262,7 +262,7 @@ impl RemoteObjects {
 
     /// 把池中**尚未同步**的在用区资源解码进 `catalog`（模型/动画各归其位）。
     ///
-    /// 设计动机（Why）：下游渲染（`apply_entities`/`voxel_model`/`voxel_idle`）消费的是
+    /// 设计动机（Why）：下游渲染（`apply_entities`/`voxel::model`/`voxel::idle`）消费的是
     /// `ModelCatalog` 视图；池是传输侧的固定地址缓存。此系统做一次"池 → 视图"的增量搬运，
     /// 使「实体突现」直接命中已解码目录，而不是等下一批握手数据。仅遍历在用区（预取区资源
     /// 由 [`RemotePool::promote`] 提升后再进目录）。

@@ -14,14 +14,19 @@
 //!
 //! 布局约束（边界、出生区净空、射击道畅通、靶不埋掩体、移动靶扫掠
 //! 不越界）由本模块单元测试保证 —— 改坐标前先跑 `cargo test --lib`。
+//!
+//! 各分区按区块融合进本模块（`layout()` 后的分节函数）：早先拆成 `spawn_zone`
+//! / `search_zone` / `engage_zone` / `extract_zone` 等下划线文件，按反屎山公约
+//! （文件名禁下划线 · 嵌套 ≤2 层）统一融为模块内分节函数；外圈围墙仍在
+//! [`perimeter`]（单词名，无需改名）。
 
-use crate::map::MapLayout;
+use crate::element::ElementType;
+use crate::map::{
+    GlowKind, GlowSpec, MapLayout, MaterialKind, Motion, PickupKind, PickupSpec, Prop, Shape,
+    StationKind, StationSpec, TargetSpec,
+};
 
-mod engage_zone;
-mod extract_zone;
 mod perimeter;
-mod search_zone;
-mod spawn_zone;
 
 /// 场地半径（米）：场地 1×1km
 pub const HALF: f32 = 500.0;
@@ -47,31 +52,249 @@ pub fn layout() -> MapLayout {
         player_spawn: [0.0, 0.0, SPAWN_Z],
         props: [
             perimeter::walls(),
-            spawn_zone::spawn_tables(),
-            spawn_zone::spawn_decor(),
-            engage_zone::zone_markers(),
-            extract_zone::extract_boundary(),
+            spawn_tables(),
+            spawn_decor(),
+            zone_markers(),
+            extract_boundary(),
         ]
         .concat(),
         targets: [
-            search_zone::search_targets(),
-            engage_zone::engage_targets(),
-            engage_zone::engage_movers(),
-            extract_zone::extract_targets(),
+            search_targets(),
+            engage_targets(),
+            engage_movers(),
+            extract_targets(),
         ]
         .concat(),
         pickups: [
-            spawn_zone::supply_line(),
-            search_zone::search_pickups(),
+            supply_line(),
+            search_pickups(),
         ]
         .concat(),
         glows: [
-            spawn_zone::pad_glow(),
-            extract_zone::extract_glow(),
+            pad_glow(),
+            extract_glow(),
         ]
         .concat(),
-        stations: spawn_zone::stations(),
+        stations: stations(),
     }
+}
+
+// ============================================================================
+// 出生区（z 440..500，南端）—— 玩家落地即到的安全区与补给枢纽。
+//
+// 包含出生光垫、出生/搜索区边界线、补给横排（弹药/医疗/护甲/四系手雷/
+// 双武器）、两张功能台及对应站点与光条。玩家自 [0,0,470] 面向 -z 起步，
+// 先向左近探搜索区，再进入射击区，最终撤到北端信标。
+// ============================================================================
+
+/// 出生区与搜索区分界标线（z=440 白色虚线）：过了这条线即进入"搜"阶段。
+pub(crate) fn spawn_decor() -> Vec<Prop> {
+    let mut v = Vec::new();
+    for x in -12..=12 {
+        v.push(Prop::decor([x as f32 * 20.0, 0.02, 440.0], [8.0, 0.02, 0.12], MaterialKind::PaintWhite));
+    }
+    v
+}
+
+/// 出生区两张功能台：台面（实心可碰撞）+ 四条桌腿，对齐补给线
+pub(crate) fn spawn_tables() -> Vec<Prop> {
+    let mut v = Vec::new();
+    for (x, z) in [(-5.0, SUPPLY_LINE_Z), (5.0, SUPPLY_LINE_Z)] {
+        v.push(Prop::solid([x, 0.72, z], [1.1, 0.06, 0.55], MaterialKind::Steel));
+        for (dx, dz) in [(-0.9, -0.4), (0.9, -0.4), (-0.9, 0.4), (0.9, 0.4)] {
+            v.push(Prop::solid([x + dx, 0.33, z + dz], [0.06, 0.33, 0.06], MaterialKind::Dark));
+        }
+    }
+    v
+}
+
+/// 出生区补给横排：弹药/医疗/护甲/四系手雷/双武器，对齐补给线
+pub(crate) fn supply_line() -> Vec<PickupSpec> {
+    vec![
+        PickupSpec {
+            pos: [-2.5, 0.4, SUPPLY_LINE_Z],
+            label: "冰霜手雷",
+            kind: PickupKind::Grenade { element: ElementType::Ice },
+        },
+        PickupSpec { pos: [-1.0, 0.4, SUPPLY_LINE_Z], label: "步枪弹药", kind: PickupKind::Ammo { amount: 30 } },
+        PickupSpec { pos: [0.0, 0.4, SUPPLY_LINE_Z], label: "医疗包", kind: PickupKind::Health { amount: 25.0 } },
+        PickupSpec { pos: [1.0, 0.4, SUPPLY_LINE_Z], label: "护甲片", kind: PickupKind::Armor { amount: 20.0 } },
+        PickupSpec {
+            pos: [2.5, 0.4, SUPPLY_LINE_Z],
+            label: "烈焰手雷",
+            kind: PickupKind::Grenade { element: ElementType::Fire },
+        },
+        PickupSpec {
+            pos: [-10.0, 0.4, SUPPLY_LINE_Z],
+            label: "毒液步枪",
+            kind: PickupKind::Weapon { element: ElementType::Poison },
+        },
+        PickupSpec {
+            pos: [10.0, 0.4, SUPPLY_LINE_Z],
+            label: "雷电步枪",
+            kind: PickupKind::Weapon { element: ElementType::Electric },
+        },
+    ]
+}
+
+/// 出生点前方可交互物资箱的世界坐标（玩家自 [0,0,470] 面向 -z，箱子在其右前方 8m）。
+pub const CRATE_POS: [f32; 3] = [4.0, 0.45, 462.0];
+
+/// 功能站点登记：补给台 + 干员切换台 + 出生点物资箱（demo 侧据此生成可交互站点）
+pub(crate) fn stations() -> Vec<StationSpec> {
+    vec![
+        StationSpec { pos: [-5.0, 0.78, SUPPLY_LINE_Z], kind: StationKind::SupplyTable, label: "补给台" },
+        StationSpec { pos: [5.0, 0.78, SUPPLY_LINE_Z], kind: StationKind::OperatorDesk, label: "干员切换台" },
+        // 出生点右前方的物资箱：落地可交互，开箱一次性发放弹药/医疗/护甲。
+        StationSpec { pos: CRATE_POS, kind: StationKind::SupplyCrate, label: "物资箱" },
+    ]
+}
+
+/// 功能台台面语义光条（琥珀=补给，青色=干员）+ 出生光垫
+pub(crate) fn pad_glow() -> Vec<GlowSpec> {
+    vec![
+        GlowSpec { shape: Shape::Box, pos: [0.0, 0.02, SPAWN_Z], half: [2.5, 0.04, 2.5], glow: GlowKind::SpawnPad },
+        GlowSpec { shape: Shape::Box, pos: [-5.0, 0.83, SUPPLY_LINE_Z], half: [1.0, 0.03, 0.45], glow: GlowKind::Supply },
+        GlowSpec { shape: Shape::Box, pos: [5.0, 0.83, SUPPLY_LINE_Z], half: [1.0, 0.03, 0.45], glow: GlowKind::Operator },
+    ]
+}
+
+// ============================================================================
+// 搜索区（搜，z 200..440）—— 玩家离开出生区后先在本区"搜索"。
+//
+// 平坦草坪上散布搜索目标（静态靶）与拾取物（弹药/医疗/护甲/手雷），
+// 模拟侦察阶段逐一清除与收刮。本区无实心掩体，保证全向视野与直射。
+// ============================================================================
+
+/// 搜索目标：两列纵向散布，间距错开避免排成直线
+pub(crate) fn search_targets() -> Vec<TargetSpec> {
+    vec![
+        TargetSpec { pos: [-360.0, 1.5, 400.0], label: "搜索目标", motion: None },
+        TargetSpec { pos: [360.0, 1.5, 400.0], label: "搜索目标", motion: None },
+        TargetSpec { pos: [-240.0, 1.5, 360.0], label: "搜索目标", motion: None },
+        TargetSpec { pos: [240.0, 1.5, 360.0], label: "搜索目标", motion: None },
+        TargetSpec { pos: [-120.0, 1.5, 320.0], label: "搜索目标", motion: None },
+        TargetSpec { pos: [120.0, 1.5, 320.0], label: "搜索目标", motion: None },
+        TargetSpec { pos: [-300.0, 1.5, 280.0], label: "搜索目标", motion: None },
+        TargetSpec { pos: [300.0, 1.5, 280.0], label: "搜索目标", motion: None },
+        TargetSpec { pos: [-60.0, 1.5, 240.0], label: "搜索目标", motion: None },
+        TargetSpec { pos: [60.0, 1.5, 240.0], label: "搜索目标", motion: None },
+    ]
+}
+
+/// 搜索区拾取物：左右镜像成对散布，模拟"搜刮战利品"
+pub(crate) fn search_pickups() -> Vec<PickupSpec> {
+    vec![
+        PickupSpec { pos: [-180.0, 0.4, 380.0], label: "弹药箱", kind: PickupKind::Ammo { amount: 30 } },
+        PickupSpec { pos: [180.0, 0.4, 380.0], label: "大医疗包", kind: PickupKind::Health { amount: 50.0 } },
+        PickupSpec {
+            pos: [-40.0, 0.4, 300.0],
+            label: "毒素手雷",
+            kind: PickupKind::Grenade { element: ElementType::Poison },
+        },
+        PickupSpec {
+            pos: [40.0, 0.4, 300.0],
+            label: "雷电手雷",
+            kind: PickupKind::Grenade { element: ElementType::Electric },
+        },
+        PickupSpec { pos: [-260.0, 0.4, 260.0], label: "护甲片", kind: PickupKind::Armor { amount: 30.0 } },
+        PickupSpec { pos: [260.0, 0.4, 260.0], label: "弹药箱", kind: PickupKind::Ammo { amount: 60 } },
+    ]
+}
+
+// ============================================================================
+// 射击区（打，z -200..200）—— 玩家"搜"完后进入本区进行远程交战。
+//
+// 每 100m 一条警戒色距离标线（200/100/0/-100/-200），三排射击道
+// （x=-200/0/200）逐级抬高的静态靶 + 两具横移/巡逻移动目标。标线为
+// decor（无碰撞），射击道全净空，保证 400m 级直射视线不被切断。
+// ============================================================================
+
+/// 距离标线（虚线）+ 两侧标牌柱（立柱 + 白板标距）
+pub(crate) fn zone_markers() -> Vec<Prop> {
+    let mut v = Vec::new();
+    let lines = [
+        (200.0, MaterialKind::WarningYellow),
+        (100.0, MaterialKind::WarningOrange),
+        (0.0, MaterialKind::WarningRed),
+        (-100.0, MaterialKind::WarningOrange),
+        (-200.0, MaterialKind::WarningYellow),
+    ];
+    for (z, mat) in lines {
+        for x in -12..=12 {
+            v.push(Prop::decor([x as f32 * 40.0, 0.02, z], [16.0, 0.02, 0.12], mat));
+        }
+        // 两侧标牌柱（不影响中部射击道净空）
+        for sx in [-460.0, 460.0] {
+            v.push(Prop::decor([sx, 1.5, z], [0.12, 1.5, 0.12], MaterialKind::Steel));
+            v.push(Prop::decor([sx, 2.4, z + 0.2], [0.6, 0.35, 0.06], MaterialKind::PaintWhite));
+        }
+    }
+    v
+}
+
+/// 三排射击道静态靶：近（100m）/ 中（200m）/ 远（300m），逐级抬高
+pub(crate) fn engage_targets() -> Vec<TargetSpec> {
+    vec![
+        TargetSpec { pos: [-200.0, 1.5, 100.0], label: "射击目标", motion: None },
+        TargetSpec { pos: [0.0, 1.5, 100.0], label: "射击目标", motion: None },
+        TargetSpec { pos: [200.0, 1.5, 100.0], label: "射击目标", motion: None },
+        TargetSpec { pos: [-200.0, 1.8, 0.0], label: "射击目标", motion: None },
+        TargetSpec { pos: [0.0, 1.8, 0.0], label: "射击目标", motion: None },
+        TargetSpec { pos: [200.0, 1.8, 0.0], label: "射击目标", motion: None },
+        TargetSpec { pos: [-200.0, 2.2, -100.0], label: "射击目标", motion: None },
+        TargetSpec { pos: [0.0, 2.2, -100.0], label: "射击目标", motion: None },
+        TargetSpec { pos: [200.0, 2.2, -100.0], label: "射击目标", motion: None },
+    ]
+}
+
+/// 移动目标：150m 处快速横移 + 250m 处中速巡逻（扫掠不越界不穿掩体）
+pub(crate) fn engage_movers() -> Vec<TargetSpec> {
+    vec![
+        TargetSpec {
+            pos: [0.0, 1.8, 50.0],
+            label: "移动目标",
+            motion: Some(Motion { speed: 4.0, range: 40.0, start_dir: -1.0 }),
+        },
+        TargetSpec {
+            pos: [0.0, 1.8, -50.0],
+            label: "移动目标",
+            motion: Some(Motion { speed: 3.0, range: 60.0, start_dir: 1.0 }),
+        },
+    ]
+}
+
+// ============================================================================
+// 撤离区（撤，z -500..-200，北端）—— 玩家打完纵深后撤到信标完成循环。
+//
+// 包含撤离光垫、红色提取信标（柱 + 顶灯）、射击区/撤离区分界标线，
+// 以及两具"撤离途中仍需压制"的撤离目标，测试撤退阶段的战斗反馈。
+// ============================================================================
+
+/// 射击区与撤离区分界标线（z=-200 白色虚线）
+pub(crate) fn extract_boundary() -> Vec<Prop> {
+    let mut v = Vec::new();
+    for x in -12..=12 {
+        v.push(Prop::decor([x as f32 * 40.0, 0.02, -200.0], [16.0, 0.02, 0.12], MaterialKind::PaintWhite));
+    }
+    v
+}
+
+/// 撤离光垫 + 红色提取信标（柱 + 顶灯）
+pub(crate) fn extract_glow() -> Vec<GlowSpec> {
+    vec![
+        GlowSpec { shape: Shape::Box, pos: [0.0, 0.02, -440.0], half: [3.0, 0.04, 3.0], glow: GlowKind::SpawnPad },
+        GlowSpec { shape: Shape::Box, pos: [0.0, 2.0, -420.0], half: [0.2, 2.0, 0.2], glow: GlowKind::Red },
+        GlowSpec { shape: Shape::Box, pos: [0.0, 4.2, -420.0], half: [0.6, 0.15, 0.6], glow: GlowKind::Red },
+    ]
+}
+
+/// 撤离目标：撤离途中侧翼压制
+pub(crate) fn extract_targets() -> Vec<TargetSpec> {
+    vec![
+        TargetSpec { pos: [-150.0, 1.5, -320.0], label: "撤离目标", motion: None },
+        TargetSpec { pos: [150.0, 1.5, -320.0], label: "撤离目标", motion: None },
+    ]
 }
 
 #[cfg(test)]

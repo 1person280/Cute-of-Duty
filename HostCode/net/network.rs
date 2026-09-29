@@ -1,11 +1,12 @@
-﻿//! 客户端网络装配：连接服务端、起控制/资源两类线程、断线自动重连
+//! 客户端网络装配：连接服务端、起控制/资源两类线程、断线自动重连
 //!
 //! 服务器权威架构下，本模块只做：连接、转发 bevy 侧上行意图、接收下行消息并分发。
 //! **不做任何模拟/校订**。0.12 起线格式为**小定长包 + 双通道**（见服务端 `net::packet`）：
 //!
 //! - **控制连接**（恒 256B 包）：上行经 [`super::uplink`]、下行经 [`super::downlink`]，
 //!   各持 `try_clone` 独立句柄，故上传不阻塞下载；
-//! - **资源连接**（独立 TCP，恒 4096B 包）：只下行，经 [`super::resource_downlink`] 重组落池。
+//! - **资源连接**（独立 TCP，恒 4096B 包）：只下行，经 [`super::downlink`] 的
+//!   `resource_downlink_loop` 重组落池。
 //!
 //! 两条连接**同监听一个端口**，各自首发一条 256B **绑定包**（见 [`send_bind`]）声明角色；
 //! 服务端据角色把该连接固定为对应包长。资源通道先于指令/快照抵达，实体突现即复用（`net::remote`）。
@@ -151,7 +152,7 @@ pub fn run_network(
         let res = std::thread::spawn({
             let resource_tx = resource_tx.clone();
             let shutdown = Arc::clone(&shutdown);
-            move || crate::net::resource_downlink::resource_downlink_loop(resource, resource_tx, shutdown)
+            move || crate::net::downlink::resource_downlink_loop(resource, resource_tx, shutdown)
         });
 
         // 控制下行先退出即视为断链：置位 shutdown 让其余线程随短超时退出，再重连。

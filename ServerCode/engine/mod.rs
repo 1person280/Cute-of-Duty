@@ -16,10 +16,10 @@ use crate::entity::{World, RenderSnapshot, Entity, EntityType, EntityId};
 use crate::damage::Vec3;
 use crate::damage::DamageResolver;
 
-mod double_buffer;
-pub use double_buffer::DoubleBuffer;
-mod pre_explosion_cache;
-pub use pre_explosion_cache::PreExplosionCache;
+mod double;
+pub use double::buffer::DoubleBuffer;
+mod explosion;
+pub use explosion::cache::PreExplosionCache;
 
 /// Tick配置
 #[derive(Debug, Clone, Copy)]

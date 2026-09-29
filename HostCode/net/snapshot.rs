@@ -1,4 +1,4 @@
-﻿//! 实体渲染跟随：把服务端权威快照映射为场景中的体素造型
+//! 实体渲染跟随：把服务端权威快照映射为场景中的体素造型
 //!
 //! 设计动机（服务器权威）：本系统**只消费** `EntitySnapshot`（位置/存活/模型身份均为
 //! 服务端裁决值），为已存在的实体更新坐标系、为新实体生成造型、为消失实体销毁，
@@ -12,7 +12,7 @@ use cute_of_duty_contract::net::protocol::EntitySnapshot;
 
 use crate::flow::{LocalPlayer, ModelCatalog};
 use crate::world::model::{tint_code, tint_colors, voxel_for};
-use crate::world::voxel_model::{spawn_voxel_body, VoxelMaterials, VoxelRendered};
+use crate::world::voxel::model::{spawn_voxel_body, VoxelMaterials, VoxelRendered};
 
 /// 已渲染实体的根标记：记住服务端实体 ID，供跨帧对账。
 #[derive(Component)]

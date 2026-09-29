@@ -11,8 +11,12 @@
 pub mod codec;
 pub mod packet;
 pub mod protocol;
-pub mod resource_stream;
 pub mod scheduler;
+pub mod stream;
+
+/// 旧公开路径别名：`net::resource_stream` 经 `pub use ... as ...` 保持可用
+/// （拆分/改名不破坏既有公开路径，见反屎山公约「公开路径不变式」）。
+pub use stream as resource_stream;
 
 pub use packet::{Region, ResourceKind, ResourcePayload, Unit};
 pub use protocol::{ClientMessage, EntitySnapshot, PlayerInput, ServerMessage};

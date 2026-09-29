@@ -21,13 +21,12 @@ const ARMOR_CAP: f32 = 100.0;
 // 公开 grenade 子模块：客户端轨迹预览需复用其弹道常数（初速/重力/出手点），
 // 保证预览与实际结算**同源**、不各自硬编码副本（见 `combat::grenade` 顶部常量）。
 pub mod grenade;
-mod held_grenade;
 mod shooter;
 mod skill;
 mod zone;
 
 pub use combatant::Combatant;
-pub use held_grenade::HeldGrenade;
+pub use grenade::HeldGrenade;
 mod combatant;
 pub mod range;
 
@@ -119,9 +118,9 @@ impl CombatSystem {
             .unwrap_or(false);
         if holding {
             if intent.grenade_cancel {
-                held_grenade::cancel_held_grenade(world, eid);
+                grenade::cancel_held_grenade(world, eid);
             } else if intent.shoot {
-                held_grenade::throw_held_grenade(world, eid);
+                grenade::throw_held_grenade(world, eid);
             }
         } else if intent.shoot {
             shooter::try_fire(
@@ -233,7 +232,7 @@ pub fn spawn_player(world: &mut World, position: Vec3, operator_idx: usize) -> E
     entity.add_component(Box::new(Combatant::new(operator_idx)));
     // 开局携带 2 医疗包 + 2 手雷（宿主为 4×3 背包组件，权威格位见 `items`）。
     entity.add_component(Box::new(Backpack::starting()));
-    // 持雷态宿主：初始未持雷（手雷"先瞄准后释放"的中间状态，见 `held_grenade`）。
+    // 持雷态宿主：初始未持雷（手雷"先瞄准后释放"的中间状态，见 `grenade`）。
     entity.add_component(Box::new(HeldGrenade::default()));
     world.spawn(entity)
 }
@@ -287,7 +286,7 @@ pub fn push_item(world: &mut World, eid: EntityId, item: crate::items::LootItem)
 /// 二者在服务端收敛为同一件事——按**背包格位下标**取用。效果仍由服务端裁决：
 /// 恢复类（医疗包回血 / 护甲片加甲）按物品自身数值钳制到上限；战术类（手雷）**进入持握**
 /// ——"先瞄准后释放"的中间态，取出既不消耗也不生成投射物，待左键释放才投出、或取消放回
-/// （见 [`held_grenade`]）。空位或不可速用物（弹药/武器）静默忽略。
+/// （见 [`grenade::HeldGrenade`]）。空位或不可速用物（弹药/武器）静默忽略。
 pub fn use_item_at(world: &mut World, eid: EntityId, index: usize) {
     let Some(item) = ({
         let Some(entity) = world.get_entity_mut(eid) else { return };

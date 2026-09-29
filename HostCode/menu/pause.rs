@@ -16,10 +16,10 @@ use crate::flow::{
     apply_setting_step, setting_label, GameSettings, ModalChange, ModalKind, ModalState,
     PauseOpenRequest, SettingKind,
 };
-use super::game_settings::{
+use super::settings::{
     spawn_credits_panel, spawn_setting_row, SettingAdjust, SettingValueText,
 };
-use super::menu_main::{menu_button_palette, spawn_action_button, MenuButton};
+use super::{menu_button_palette, spawn_action_button, MenuButton};
 
 /// 暂停菜单状态：关闭 / 主面板 / 设置面板。
 #[derive(Resource, Default, Clone, Copy, PartialEq)]

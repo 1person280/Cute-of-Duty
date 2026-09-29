@@ -1,28 +1,39 @@
-﻿//! 控制通道下载线程：把服务端下行的恒 256B 包解成快照/控制两路
+//! 下载线程 —— 控制通道（恒 256B）与资源通道（恒 4096B）两路下行
 //!
-//! 设计动机（Why）：0.12 控制通道每包恒定 256B = 32B 头 + 7×32B 单元。本线程是**阻塞
-//! 单线程循环**：`read_exact` 恰好一包 → `PacketReader` 解头 → 按 [`PacketKind`] 分路：
-//! - `Command`：`unit_count` 个 32B 指令单元 → [`decode_server_units`]（握手/回显/回主菜单）；
-//! - `Data`：`Snapshot`/`Event`/`Control` 经 [`ChunkAssembler`] 重组后 [`decode_server_data`]，
-//!   快照灌 [`SnapshotBuffer`]、其余灌控制通道。
+//! 设计动机（Why）：0.12 双通道各自独立成线程、互不干扰——资源洪峰不会挤占延迟
+//! 敏感的指令/快照带宽，故两条下载循环共处本模块（同属"下行"职责）。
 //!
-//! 资源不在此处：资源走独立 4096B 连接（见 [`super::resource_downlink`]）。**不设时钟、
-//! 不 sleep**：收完一包立即读下一包。上传位于独立线程与独立 socket 句柄（见 [`super::uplink`]）。
+//! - **控制通道**（[`downlink_loop`]）：每包恒定 256B = 32B 头 + 7×32B 单元。本线程是
+//!   阻塞单线程循环：`read_exact` 恰好一包 → `PacketReader` 解头 → 按 [`PacketKind`] 分路：
+//!   `Command`：`unit_count` 个 32B 指令单元 → [`decode_server_units`]（握手/回显/回主菜单）；
+//!   `Data`：`Snapshot`/`Event`/`Control` 经 [`ChunkAssembler`] 重组后 [`decode_server_data`]，
+//!   快照灌 [`SnapshotBuffer`]、其余灌控制通道。**不设时钟、不 sleep**：收完一包立即读
+//!   下一包。上传位于独立线程与独立 socket 句柄（见 [`super::uplink`]）。
+//! - **资源通道**（[`resource_downlink_loop`]）：每包恒定 4096B（= 32B 头 + 4064B 负载）。
+//!   一份资源按 `chunk_index` 跨多包，[`ResourceAssembler`] 拼回整份负载后经
+//!   [`PoolMessage::Resource`] 投资源池通道（写进 64KB 固定槽位）；`ResourceEnd` 投批次终止
+//!   标记令目录就绪。读取带短超时以便周期性检查 `shutdown`（控制线程断链时同步退出）。
 
+use std::io::Read;
 use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use cute_of_duty_contract::net::codec::{decode_server_data, decode_server_units, units_from_payload};
 use cute_of_duty_contract::net::packet::{
-    ChunkAssembler, PacketHeader, PacketKind, PacketReader, PACKET_BYTES,
+    ChunkAssembler, PacketHeader, PacketKind, PacketReader, PACKET_BYTES, RES_PACKET_BYTES,
 };
 use cute_of_duty_contract::net::protocol::ServerMessage;
+use cute_of_duty_contract::net::resource_stream::ResourceAssembler;
 
 use crate::net::network::{ClientInbound, SnapshotChannel};
+use crate::net::remote::{PoolMessage, ResourceFrame};
 
-/// 下载循环：阻塞读 256B 包直到连接关闭或出错。
+/// 资源连接读超时：仅供周期性检查 `shutdown`，不做传输节流。
+const READ_TIMEOUT: Duration = Duration::from_millis(200);
+
+/// 控制通道下载循环：阻塞读 256B 包直到连接关闭或出错。
 ///
 /// `start` 为连接起点，用于握手时折算 `connect_ms`；`pending` 与上传线程共享，
 /// 记录 Ping 写入 socket 的时刻，收到 Pong 时折现真实往返。
@@ -133,6 +144,78 @@ fn route(
         }
         other => {
             let _ = control_tx.send(ClientInbound::Server(other));
+        }
+    }
+}
+
+/// 资源下载循环：阻塞读 4096B 包直到连接关闭、出错或 `shutdown` 置位。
+///
+/// 与控制通道（[`downlink_loop`]）互不干扰：本线程独占 4096B 资源连接，重组后的整份
+/// 资源经资源池通道落进固定槽位。
+pub fn resource_downlink_loop(
+    mut stream: TcpStream,
+    resource_tx: std::sync::mpsc::Sender<PoolMessage>,
+    shutdown: Arc<AtomicBool>,
+) {
+    let _ = stream.set_read_timeout(Some(READ_TIMEOUT));
+    let mut reader = PacketReader::new(RES_PACKET_BYTES);
+    let mut buf = vec![0u8; RES_PACKET_BYTES];
+    let mut asm = ResourceAssembler::default();
+
+    loop {
+        if shutdown.load(Ordering::Relaxed) {
+            return;
+        }
+        // 手工累积一整包：`read_exact` 遇超时中途报错会丢半包，故按 `read` 续读。
+        let mut filled = 0usize;
+        while filled < RES_PACKET_BYTES {
+            if shutdown.load(Ordering::Relaxed) {
+                return;
+            }
+            match stream.read(&mut buf[filled..]) {
+                Ok(0) => return,
+                Ok(n) => filled += n,
+                Err(e)
+                    if e.kind() == std::io::ErrorKind::WouldBlock
+                        || e.kind() == std::io::ErrorKind::TimedOut =>
+                {
+                    continue
+                }
+                Err(_) => return,
+            }
+        }
+        reader.feed(&buf);
+        loop {
+            let next = match reader.next_packet() {
+                Ok(next) => next,
+                Err(e) => {
+                    eprintln!("[网络] 资源包解析失败: {e}");
+                    return;
+                }
+            };
+            let Some((header, payload)) = next else {
+                break;
+            };
+            match header.kind {
+                PacketKind::Resource => match asm.push(&header, &payload) {
+                    Ok(Some(assembled)) => {
+                        let frame = ResourceFrame {
+                            kind: assembled.kind,
+                            key: assembled.key,
+                            region: assembled.region,
+                            bytes: assembled.payload,
+                        };
+                        let _ = resource_tx.send(PoolMessage::Resource(frame));
+                    }
+                    Ok(None) => {}
+                    Err(e) => eprintln!("[网络] 资源重组失败: {e}"),
+                },
+                PacketKind::ResourceEnd => {
+                    let _ = resource_tx.send(PoolMessage::BatchEnd);
+                }
+                // 资源通道只承载资源包；其余忽略。
+                _ => {}
+            }
         }
     }
 }
