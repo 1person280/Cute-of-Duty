@@ -11,6 +11,7 @@
 [![License: CC BY-NC-SA 4.0 (assets)](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-lightgrey.svg)](LICENSE-ASSETS)
 [![Version](https://img.shields.io/badge/Version-0.12.3-blue.svg)](#五版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
+[![Server Safe](https://img.shields.io/badge/Server_Safe-by_Let%27s_Encrypt-green.svg)](https://letsencrypt.org)
 
 **外部依赖 · 站在开源社区的肩膀上** · [![by Bevy](https://img.shields.io/badge/by-Bevy-E90000)](https://bevyengine.org)
 [![by Tokio](https://img.shields.io/badge/by-Tokio-blue)](https://tokio.rs)
