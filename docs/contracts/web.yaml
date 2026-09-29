@@ -1,0 +1,131 @@
+# =============================================================================
+# Cute Of Duty · 内置 Web 服务契约（machine-readable contract）
+# =============================================================================
+# 状态：草案 v0.12.3 —— 与代码同步维护（权威实现见 ServerCode/net/web/）。
+# 版本：统一版本号 x.y.z（协议 = 游戏 = 发布号，与 docs/contracts/protocol.yaml 同号）。
+#   y+1 = 路由 / 鉴权 / JSON 形状 / WS 通道映射**不兼容**（删字段、改语义、改类型）
+#   z+1 = 无兼容性变化的细节（加性：新增路由/新增字段，老调用方忽略即可）
+#
+# 变更纪律：
+#   1. 路由与 JSON 字段只增不减、语义不可改；删路由/改语义 = y+1。
+#   2. 每次改动必须同步 docs/barek-history.md 一条记录。
+#   3. net 属 L2（线格式）/ 本契约随其定级；改动需 ≥2 名 reviewer，maintainer 必须参与。
+# =============================================================================
+
+contract: web
+version: 0.12.3
+status: draft
+owner_module: ServerCode/net
+authoritative_impl: ServerCode/net/web
+compat:
+  previous: null          # 0.12.3 首次引入内置 Web 服务
+  breaking: false        # 加性：不触碰线格式，老客户端零感知
+  migration_guide: 不适用（z+1，纯加性；未触碰 256B/4096B 线格式）
+
+# -----------------------------------------------------------------------------
+# 监听
+# -----------------------------------------------------------------------------
+listen:
+  http:
+    default_addr: "0.0.0.0"
+    default_port: 8080
+    note: 明文；建议仅内网或置于反向代理后
+  https:
+    default_addr: "0.0.0.0"
+    default_port: 8443
+    enabled_default: true
+    cert_path: "certs/fullchain.pem"    # Let's Encrypt（win-acme / certbot / Caddy 签发）
+    key_path: "certs/privkey.pem"
+    note: 内置证书加载（rustls + ring），不依赖反向代理；证书缺失/无法解析时降级为告警，仅 HTTP 可用
+  game_tcp:
+    default_port: 8888
+    note: 原生客户端线格式端口，**不受本服务影响**
+  config_file: ServerCode/config/web.yaml    # 单一事实来源（include_str! 嵌入 + 运行时覆盖）
+
+# -----------------------------------------------------------------------------
+# 路由表
+# -----------------------------------------------------------------------------
+routes:
+  - path: /
+    method: GET
+    auth: public
+    response: text/html                 # 门户/状态页（portal.html 模板 + WebStatus 注入）
+  - path: /api/status
+    method: GET
+    auth: bearer                        # Authorization: Bearer <token>；token 只从环境变量读
+    response: application/json          # -> WebStatus
+  - path: /api/players
+    method: GET
+    auth: bearer
+    response: application/json          # -> [ { conn_id, name, level } ]
+  - path: /api/announce
+    method: POST
+    auth: bearer
+    request: application/json           # { "text": "<公告文本>" }
+    response: application/json          # { "ok": true }
+  - path: /api/kick
+    method: POST
+    auth: bearer
+    request: application/json           # { "conn_id": <u64> }
+    response: application/json          # { "ok": true }
+  - path: /ws
+    method: GET
+    auth: public
+    response: websocket                 # 101 Switching Protocols（RFC6455）
+    note: 非升级请求（缺 Upgrade: websocket）返回 426
+
+# -----------------------------------------------------------------------------
+# 鉴权
+# -----------------------------------------------------------------------------
+auth:
+  scheme: bearer
+  header: "Authorization"
+  format: "Bearer <token>"
+  token_source: 环境变量（默认名 COD_WEB_TOKEN，见 web.yaml admin.token_env）
+  token_in_file: false                  # token 不落配置文件
+  unauthenticated: 503                  # 未配置 token -> /api/* 返回 503
+  unauthorized: 401                     # token 不匹配 -> 401
+  scope: "/api/*"                       # 门户页与静态资源一律公开
+
+# -----------------------------------------------------------------------------
+# JSON 形状（机器可读）
+# -----------------------------------------------------------------------------
+shapes:
+  WebStatus:
+    version: string                     # 服务端版本号（x.y.z）
+    online: integer                     # 在线连接数
+    map: string                         # 当前活动地图名
+    uptime_secs: integer                # 服务端启动至今秒数
+    motd: string                        # 门户公告
+  WebPlayerInfo:
+    conn_id: integer                    # u64 连接编号（与 kick 对齐）
+    name: string
+    level: integer
+
+# -----------------------------------------------------------------------------
+# WebSocket 通道映射（浏览器游玩桥）
+# -----------------------------------------------------------------------------
+websocket:
+  carrier: RFC6455 二进制帧             # 承载与原生 TCP **完全相同**的定长包
+  wire:
+    unchanged: true                     # 不改线格式；wire_version 仍为 12（见 protocol.yaml）
+    frames:
+      control: 256B                     # 主/控制通道包（32B 头 + 7×32B 单元）
+      resource: 4096B                   # 资源通道包（32B 头 + 4064B 负载）
+    frame_length_distinguishes: true    # 收侧按帧长区分控制帧 / 资源帧
+  handshake:
+    first_frame: 256B 绑定包            # PacketKind::Bind，sub_kind=Role::Control，负载=档案名
+    then: 与原生 TCP 一致               # -> 服务端回 Handshake / ModelCatalog，随后周期性 Snapshot
+  direction:
+    up: WS 二进制帧 -> ControlSession::feed -> NetCommand -> 权威主循环
+    down: NetRuntime::send_to -> control_rx / resource_rx -> 编码为定长包 -> WS 二进制帧
+  scope: 首期仅"能连上、握手、打印收到的快照"的极简 JS 骨架；完整 3D JS 客户端另立版本
+
+# -----------------------------------------------------------------------------
+# 关联
+# -----------------------------------------------------------------------------
+related:
+  adr: docs/adr/0007-native-web-service.md
+  protocol: docs/contracts/protocol.yaml    # transport.carriers 节：websocket 为同一包格式的另一载体
+  module: ServerCode/net/module.md
+  barek_history: docs/barek-history.md

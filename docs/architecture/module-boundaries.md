@@ -88,8 +88,8 @@
 | `damage` | 伤害管线（packet → resolver → effect） | 伤害结算中间态 | 纯函数 + 事件 | 消费伤害包 | L1 |
 | `gamemode` | 玩法模式规则 | 模式状态 | 模式查询 | 无 | L0 |
 | `interact` | 站点/拾取交互与结算（`settle`、`InteractChoice`） | 交互目标与结算 | `INTERACT_RANGE`、`SupplyKind` | Event 回执 | **L1→L2 待定**（定级前按 L2 流程，见 [CONTRIBUTING 第九节](../../CONTRIBUTING.md)） |
-| `net` | 协议线格式、小定长包双通道（`packet` 256B 主通道 / 4096B 资源通道）、指令优先组包（`scheduler`）、资源分片流（`resource_stream`）、二进制编解码（`codec`）、会话、AOI、广播、AOI 边缘预取（`prefetch`） | 连接会话 | `protocol`、`packet`、`scheduler`、`resource_stream`、`codec`、`session`、`broadcaster`、`prefetch` | 收发消息 | **L2（线格式）** |
-| `storage` | 冷数据持久化（json_log / cold_repo） | 落盘数据 | `thiserror` 错误类型 | 无 | L1 |
+| `net` | 协议线格式、小定长包双通道（`packet` 256B 主通道 / 4096B 资源通道）、指令优先组包（`scheduler`）、资源分片流（`resource_stream`）、二进制编解码（`codec`）、会话（`session`）、传输无关核心（`runtime`）、主循环阶段（`stages`）、AOI、广播、AOI 边缘预取（`prefetch`）、内置 Web 服务（`web`：HTTP/HTTPS 门户 + 运维 API + WebSocket 桥，见 ADR 0007） | 连接会话 | `protocol`、`packet`、`scheduler`、`resource_stream`、`codec`、`session`、`runtime`、`stages`、`broadcaster`、`prefetch`、`web` | 收发消息 | **L2（线格式）** |
+| `storage` | 冷数据持久化（log / cold/repo） | 落盘数据 | `thiserror` 错误类型 | 无 | L1 |
 | `hal` | 硬件抽象（平台相关） | 无 | Trait | 无 | L0 |
 
 > ⚠️ 表中 `?` 缺项：事件名称清单与订阅关系**待补**（需通读 `ServerCode/net/` 与 `main.rs` 的编排段）。这一栏填完之前，事件总线不得动工。
@@ -106,7 +106,7 @@
 | `menu` | 主菜单 / 设置 / 暂停 / 模式面板 / arsenal | 各面板资源 | 面板系统 | L1 |
 | `hud` | HUD 面板族（vitals / minimap / bigmap / interact / loot / wheel / alert …） | 各 HUD 资源 | 面板系统 | L1 |
 | `world` | 3D 世界表现（相机 Rig、场景、体素绘制） | `AimRig` | 相机系统 | L1 |
-| `shared` | 共享主题/资产/干员元数据（**纯只读**） | `theme`、`operator_meta` | 常量与查表 | L1 |
+| `shared` | 共享主题/资产/干员元数据（**纯只读**） | `theme`、`operator::meta` | 常量与查表 | L1 |
 
 ---
 
@@ -249,7 +249,7 @@ L? — <依据>；破坏性变更流程…
 - [ ] `ServerCode/equipment/module.md`〔依据 ADR 0002：显式写"不负责手持/弹夹"〕
 - [ ] `ServerCode/combat/module.md`〔依据 ADR 0002：显式写"不负责装备等级/元素"〕
 - [ ] `ServerCode/interact/module.md`
-- [ ] `ServerCode/net/module.md`（L2，须与 protocol.yaml 同步）
+- [x] `ServerCode/net/module.md`（L2，须与 protocol.yaml 同步）—— **已于 2026-09-29 补（0.12.3，见 `ServerCode/net/module.md`）**
 - [ ] `ContractCode/module.md`（新 crate，依据 ADR 0003）
 - [ ] `HostCode/launcher/module.md`（依据 ADR 0004：只写装配职责）
 - [ ] `HostCode/flow/module.md`（依据 ADR 0004：`ModalState` 唯一所有者）
@@ -258,7 +258,7 @@ L? — <依据>；破坏性变更流程…
 - [ ] 其余模块（见第三节/第四节表）
 - [ ] 服务端事件清单与订阅关系图（补第三节 `?` 列）
 
-**过渡纪律（当前 `module.md` 落地 = 0）**
+**过渡纪律（当前 `module.md` 落地 = 1：`ServerCode/net/module.md`）**
 - 未补期间：任何触碰某模块的 PR，必须**同时**补该模块 `module.md`，否则不予合入（"碰到就补，不碰不堵"）。
 - `L2` 集合以本文件成熟度列为准；标注 `待定` 的模块（`interact`）定级前按 L2 流程处理。
 

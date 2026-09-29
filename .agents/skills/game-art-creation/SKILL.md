@@ -133,8 +133,8 @@ powershell -NoProfile -Command "$p='tools\xxx.ps1'; $t=[System.IO.File]::ReadAll
 
 - 文件名全小写 snake_case；UI/物品图标统一 128×128。
 - 需要透明的图（图标、HUD 元素）**必须 PNG**——JPG 没有透明通道。
-- 游戏内代码引用路径相对 `HostCode/` 包根，如 `assets.load("menu/icon/settings.png")`，见 [menu_main.rs](../../../HostCode/menu/menu_main.rs)。
-- 角色/武器/环境等造型已改由**服务端体素模型 + 过程化配色**生成（见 [voxel_model.rs](../../../HostCode/world/voxel_model.rs)），
+- 游戏内代码引用路径相对 `HostCode/` 包根，如 `assets.load("menu/icon/settings.png")`，见 [mod.rs](../../../HostCode/menu/mod.rs)。
+- 角色/武器/环境等造型已改由**服务端体素模型 + 过程化配色**生成（见 [model.rs](../../../HostCode/world/voxel/model.rs)），
   不再依赖客户端概念美术贴图；旧 `assets/` 目录已废弃。
 
 ## 第五步：自检后再交付

@@ -1,7 +1,7 @@
 # =============================================================================
 # Cute Of Duty · 线格式契约（machine-readable contract）
 # =============================================================================
-# 状态：草案 v0.12.2 —— 【尚不是权威源】
+# 状态：草案 v0.12.3 —— 【尚不是权威源】
 #   本文件目前是「手工整理的意图」，权威实现已随 0.12.2 契约拆分迁至 ContractCode/net/protocol.rs。
 #   权威源反转（YAML 为准、代码由 YAML 校验）是后续独立任务，见 docs/barek-history.md。
 #
@@ -17,7 +17,7 @@
 # =============================================================================
 
 contract: protocol
-version: 0.12.2
+version: 0.12.3
 status: draft
 owner_module: ContractCode/net
 authoritative_impl: ContractCode/net/protocol.rs
@@ -56,7 +56,12 @@ transport:
     resource:
       packet_bytes: 4096         # 恒定 4096B = 32B 头 + 4064B 负载
       payload_bytes: 4064
-      stream: ContractCode/net/resource_stream.rs # 单份资源跨多包分片 + 收侧重组
+      stream: ContractCode/net/stream.rs # 单份资源跨多包分片 + 收侧重组
+  carriers:
+    # 同一 256B/4096B 包格式可经不同传输载体承载，**包内语义零变化**（见 ADR 0007）。
+    # 换载体不改 wire_version：浏览器端与原生端收发的是同一批定长包，服务端协议解析零改动复用。
+    tcp: 原生客户端（默认 127.0.0.1:8888；同端口按首条绑定包分角色）
+    websocket: 浏览器（ServerCode/net/web 桥；RFC6455 二进制帧承载同一批定长包；HTTP 门户 8080 / HTTPS 8443）
   bind:
     packet_bytes: 256            # 首条绑定包恒 256B
     sub_kind: 场景角色           # 0=Control（此后 256B）1=Resource（此后 4096B）

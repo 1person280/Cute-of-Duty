@@ -24,6 +24,27 @@
 
 ---
 
+## [0.12.3] · 2026-09-29 · 服务端内置原生 Web 服务（HTTP/HTTPS 门户 + 运维 API + WebSocket 桥）
+
+- **变更类型**：Additive（**不触碰线格式**；新增 ServerCode 内置 Web 服务与传输无关核心）
+- **影响模块**：`ServerCode/net`（`runtime` 新增、`session` 精简为纯 TCP、`stages` 新增、`web/*` 新增）、`ServerCode/config`（`web.yaml` 新增 + `load_web_config`）、`ServerCode/Cargo.toml`（新增 `tokio-rustls`/`rustls`/`rustls-pemfile`/`thiserror`）、`ServerCode/main.rs`（装配外移到 `net::web::spawn`）；**`ContractCode` / `HostCode` 仅随版本号对齐，无契约/表现改动**
+- **兼容性**：**兼容**（`z+1`）
+  - `docs/contracts/protocol.yaml` 的 `wire_version` **仍为 `12`**，256B/4096B 包格式与所有 `ServerMessage`/`ClientMessage` 字节级不变；双端 `0.12.3` 与 `0.12.2`/`0.12.1` **仍互通**。
+  - 浏览器端是**同一批定长包的另一载体**（RFC6455 二进制帧），不改协议语义；新增路由/JSON 字段均为加性，老调用方零感知。
+  - `net` 公开路径保持不变（`pub use`）；`HostCode/Cargo.toml` 未新增任何依赖。
+- **迁移指南**：不适用（`z+1`，未触碰线格式）。仅对**运维部署**提示：
+  - Web 默认监听 HTTP `8080` / HTTPS `8443`（游戏 TCP `8888` 不动）；配置见 `ServerCode/config/web.yaml`。
+  - 运维 token **只从环境变量读**（默认 `COD_WEB_TOKEN`），未设置时 `/api/*` 返回 503；不落配置文件。
+  - HTTPS 由内置 `rustls`（首个 C/汇编依赖 `ring`）承载；证书缺失/无法解析时**降级为告警**（仅 HTTP 可用）。若 Windows 工具链无法编译 `ring`，置 `https.enabled: false` 并由前置反向代理终止 TLS。
+- **验证**：
+  - `cargo-wrap check --workspace` 退出码 `0`（无新增 warning）。
+  - `cargo-wrap test -p cute_of_duty_server` → **119 passed / 0 failed**（较 0.12.2 的 89 增 30：`web::{http,ws,router,portal}`、`config::load_web_config` 等）。
+  - 全仓扫描：无下划线 `.rs`、无超 600 行文件（本轮同时收口「文件名禁下划线」公约）。
+  - **待实机验证**：浏览器打开 `http://127.0.0.1:8080/` 门户、`/api/status`（Bearer token）、`ws://…/ws` 握手后收到 `Handshake` 与周期性 `Snapshot`、HTTPS 门户；Windows 工具链对 `ring` 的编译可行性（`cargo-wrap build --workspace --release`）。
+- **关联**：[ADR 0007](adr/0007-native-web-service.md)、[web.yaml](contracts/web.yaml)、[protocol.yaml](contracts/protocol.yaml)、[`ServerCode/net/module.md`](../ServerCode/net/module.md)
+
+---
+
 ## [0.12.2] · 2026-09-29 · 契约拆分落地（ADR 0003 / 0004 结清）
 
 - **变更类型**：Refactor（无协议语义变化；仅物理归属与公开路径）
