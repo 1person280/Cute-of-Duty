@@ -107,8 +107,8 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
 
     p.spawn((
         BigMapRoot,
-        NodeBundle {
-            style: Style {
+        (
+            Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(0.0),
                 top: Val::Px(0.0),
@@ -120,37 +120,35 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                 row_gap: Val::Px(8.0),
                 ..default()
             },
-            background_color: Color::srgba(0.02, 0.03, 0.05, 0.6).into(),
-            visibility: Visibility::Hidden,
-            ..default()
-        },
+            BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.6)),
+            Visibility::Hidden,
+        ),
     ))
     .with_children(|root| {
         // 标题栏
-        root.spawn(TextBundle::from_section(
+        root.spawn(flow::text(
             "战术全景图 · 搜打撤草坪训练场（1×1km）· 按 M / Esc 关闭",
             flow::style(fonts, 16.0, Color::srgb(0.95, 0.95, 0.9)),
         ));
 
         // 方形地图
-        root.spawn(NodeBundle {
-            style: Style {
+        root.spawn((
+            Node {
                 width: Val::Px(BIGMAP_PX),
                 height: Val::Px(BIGMAP_PX),
                 border: UiRect::all(Val::Px(BIGMAP_BORDER)),
                 overflow: Overflow::clip(),
                 ..default()
             },
-            background_color: Color::srgba(0.04, 0.05, 0.07, 0.9).into(),
-            border_color: BorderColor(Color::srgba(0.6, 0.63, 0.67, 0.95)),
-            ..default()
-        })
+            BackgroundColor(Color::srgba(0.04, 0.05, 0.07, 0.9)),
+            BorderColor(Color::srgba(0.6, 0.63, 0.67, 0.95)),
+        ))
         .with_children(|map| {
             // ---- 分区色带 + 标签（最底层）----
             for (label, z_top, z_bottom, rgb) in ZONES {
                 let (top, height) = band_top_height(z_top, z_bottom, half);
-                map.spawn(NodeBundle {
-                    style: Style {
+                map.spawn((
+                    Node {
                         position_type: PositionType::Absolute,
                         left: Val::Px(BIGMAP_BORDER),
                         top: Val::Px(top),
@@ -158,23 +156,21 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                         height: Val::Px(height),
                         ..default()
                     },
-                    background_color: Color::srgba(rgb[0], rgb[1], rgb[2], 0.16).into(),
-                    ..default()
-                });
+                    BackgroundColor(Color::srgba(rgb[0], rgb[1], rgb[2], 0.16)),
+                ));
                 // 色带中央标签
                 let z_mid = (z_top + z_bottom) * 0.5;
-                map.spawn(NodeBundle {
-                    style: Style {
+                map.spawn((
+                    Node {
                         position_type: PositionType::Absolute,
                         left: Val::Px(BIGMAP_BORDER + 6.0),
                         top: Val::Px(world_to_px(z_mid, half) - 8.0),
                         ..default()
                     },
-                    background_color: Color::srgba(0.0, 0.0, 0.0, 0.45).into(),
-                    ..default()
-                })
+                    BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.45)),
+                ))
                 .with_children(|t| {
-                    t.spawn(TextBundle::from_section(
+                    t.spawn(flow::text(
                         label,
                         flow::style(fonts, 12.0, Color::srgb(0.95, 0.95, 0.9)),
                     ));
@@ -183,8 +179,8 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
 
             // ---- 分区边界线 ----
             for z in BOUNDARY_Z {
-                map.spawn(NodeBundle {
-                    style: Style {
+                map.spawn((
+                    Node {
                         position_type: PositionType::Absolute,
                         left: Val::Px(BIGMAP_BORDER),
                         top: Val::Px(world_to_px(z, half) - 1.0),
@@ -192,14 +188,13 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                         height: Val::Px(2.0),
                         ..default()
                     },
-                    background_color: Color::srgba(0.95, 0.95, 0.95, 0.7).into(),
-                    ..default()
-                });
+                    BackgroundColor(Color::srgba(0.95, 0.95, 0.95, 0.7)),
+                ));
             }
 
             // ---- 撤离信标（北端红色，比普通目标更大）----
-            map.spawn(NodeBundle {
-                style: Style {
+            map.spawn((
+                Node {
                     position_type: PositionType::Absolute,
                     left: Val::Px(world_to_px(0.0, half) - 4.0),
                     top: Val::Px(world_to_px(-440.0, half) - 4.0),
@@ -207,9 +202,8 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                     height: Val::Px(8.0),
                     ..default()
                 },
-                background_color: Color::srgb(1.0, 0.2, 0.15).into(),
-                ..default()
-            });
+                BackgroundColor(Color::srgb(1.0, 0.2, 0.15)),
+            ));
 
             // ---- 围墙（有碰撞且高过膝的 solid 掩体）----
             for prop in &layout.props {
@@ -223,8 +217,8 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                 let scale = BIGMAP_INNER / (2.0 * half);
                 let w = (aabb[0] * 2.0 * scale).max(2.0);
                 let h = (aabb[2] * 2.0 * scale).max(2.0);
-                map.spawn(NodeBundle {
-                    style: Style {
+                map.spawn((
+                    Node {
                         position_type: PositionType::Absolute,
                         left: Val::Px(world_to_px(prop.pos[0], half) - w * 0.5),
                         top: Val::Px(world_to_px(prop.pos[2], half) - h * 0.5),
@@ -232,15 +226,14 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                         height: Val::Px(h),
                         ..default()
                     },
-                    background_color: Color::srgba(0.58, 0.6, 0.64, 0.85).into(),
-                    ..default()
-                });
+                    BackgroundColor(Color::srgba(0.58, 0.6, 0.64, 0.85)),
+                ));
             }
 
             // ---- 静态目标（红芯小点）----
             for t in &layout.targets {
-                map.spawn(NodeBundle {
-                    style: Style {
+                map.spawn((
+                    Node {
                         position_type: PositionType::Absolute,
                         left: Val::Px(world_to_px(t.pos[0], half) - 2.5),
                         top: Val::Px(world_to_px(t.pos[2], half) - 2.5),
@@ -248,15 +241,14 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                         height: Val::Px(5.0),
                         ..default()
                     },
-                    background_color: Color::srgba(0.95, 0.35, 0.3, 0.95).into(),
-                    ..default()
-                });
+                    BackgroundColor(Color::srgba(0.95, 0.35, 0.3, 0.95)),
+                ));
             }
 
             // ---- 拾取物（按类型配色）----
             for pk in &layout.pickups {
-                map.spawn(NodeBundle {
-                    style: Style {
+                map.spawn((
+                    Node {
                         position_type: PositionType::Absolute,
                         left: Val::Px(world_to_px(pk.pos[0], half) - 2.0),
                         top: Val::Px(world_to_px(pk.pos[2], half) - 2.0),
@@ -264,15 +256,14 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                         height: Val::Px(4.0),
                         ..default()
                     },
-                    background_color: pickup_color(pk.kind).into(),
-                    ..default()
-                });
+                    BackgroundColor(pickup_color(pk.kind)),
+                ));
             }
 
             // ---- 功能站点（补给=琥珀 / 干员=青）----
             for st in &layout.stations {
-                map.spawn(NodeBundle {
-                    style: Style {
+                map.spawn((
+                    Node {
                         position_type: PositionType::Absolute,
                         left: Val::Px(world_to_px(st.pos[0], half) - 3.0),
                         top: Val::Px(world_to_px(st.pos[2], half) - 3.0),
@@ -280,9 +271,8 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                         height: Val::Px(6.0),
                         ..default()
                     },
-                    background_color: station_color(st.kind).into(),
-                    ..default()
-                });
+                    BackgroundColor(station_color(st.kind)),
+                ));
             }
 
             // ---- 玩家：白色定位点 + 朝向箭头（后生成者在上层）----
@@ -290,8 +280,8 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             let py = world_to_px(layout.player_spawn[2], half);
             map.spawn((
                 BigMapPlayerDot,
-                NodeBundle {
-                    style: Style {
+                (
+                    Node {
                         position_type: PositionType::Absolute,
                         left: Val::Px(px - 2.0),
                         top: Val::Px(py - 2.0),
@@ -299,14 +289,13 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                         height: Val::Px(4.0),
                         ..default()
                     },
-                    background_color: Color::srgb(0.95, 0.95, 0.95).into(),
-                    ..default()
-                },
+                    BackgroundColor(Color::srgb(0.95, 0.95, 0.95)),
+                ),
             ));
             map.spawn((
                 BigMapPlayerArrow,
-                NodeBundle {
-                    style: Style {
+                (
+                    Node {
                         position_type: PositionType::Absolute,
                         left: Val::Px(px - 5.5),
                         top: Val::Px(py - 5.5),
@@ -314,17 +303,13 @@ pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                         height: Val::Px(11.0),
                         ..default()
                     },
-                    background_color: Color::srgba(0.35, 0.95, 0.6, 0.5).into(),
-                    transform: Transform::from_rotation(Quat::from_rotation_z(
-                        std::f32::consts::FRAC_PI_4,
-                    )),
-                    ..default()
-                },
+                    BackgroundColor(Color::srgba(0.35, 0.95, 0.6, 0.5)),
+                ),
             ));
         });
 
         // 图例说明
-        root.spawn(TextBundle::from_section(
+        root.spawn(flow::text(
             "绿=出生 · 黄=搜索(搜) · 橙=射击(打) · 红=撤离(撤)　白点=玩家 · 红点=目标 · 彩点=拾取物",
             flow::style(fonts, 12.0, Color::srgb(0.85, 0.87, 0.9)),
         ));
@@ -397,8 +382,8 @@ pub fn update_bigmap(
     snap: Res<SnapshotBuffer>,
     player: Res<LocalPlayer>,
     rig: Res<AimRig>,
-    mut dot: Query<&mut Style, (With<BigMapPlayerDot>, Without<BigMapPlayerArrow>)>,
-    mut arrow: Query<(&mut Style, &mut Transform), (With<BigMapPlayerArrow>, Without<BigMapPlayerDot>)>,
+    mut dot: Query<&mut Node, (With<BigMapPlayerDot>, Without<BigMapPlayerArrow>)>,
+    mut arrow: Query<(&mut Node, &mut Transform), (With<BigMapPlayerArrow>, Without<BigMapPlayerDot>)>,
 ) {
     let half = lawn::HALF;
     let Some(m) = snap.current.iter().find(|e| e.entity_id == player.entity_id) else {

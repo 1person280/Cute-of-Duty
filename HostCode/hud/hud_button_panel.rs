@@ -101,8 +101,8 @@ const BTN_H: f32 = 46.0;
 pub fn spawn_button_panel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     p.spawn((
         ButtonPanelRoot,
-        NodeBundle {
-            style: Style {
+        (
+            Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(0.0),
                 top: Val::Px(0.0),
@@ -114,27 +114,23 @@ pub fn spawn_button_panel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                 row_gap: Val::Px(16.0),
                 ..default()
             },
-            background_color: Color::srgba(0.02, 0.03, 0.05, 0.68).into(),
-            visibility: Visibility::Hidden,
-            ..default()
-        },
+            BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.68)),
+            Visibility::Hidden,
+        ),
     ))
     .with_children(|root| {
-        root.spawn(TextBundle::from_section(
+        root.spawn(flow::text(
             "操作按钮 · 按 B / Esc 关闭",
             flow::style(fonts, 24.0, theme::TASK_GOLD),
         ));
-        root.spawn(NodeBundle {
-            style: Style {
-                width: Val::Px(BTN_W * 5.0 + 12.0 * 4.0),
-                flex_direction: FlexDirection::Row,
-                flex_wrap: FlexWrap::Wrap,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                row_gap: Val::Px(12.0),
-                column_gap: Val::Px(12.0),
-                ..default()
-            },
+        root.spawn(Node {
+            width: Val::Px(BTN_W * 5.0 + 12.0 * 4.0),
+            flex_direction: FlexDirection::Row,
+            flex_wrap: FlexWrap::Wrap,
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(12.0),
+            column_gap: Val::Px(12.0),
             ..default()
         })
         .with_children(|grid| {
@@ -173,8 +169,8 @@ fn spawn_button(p: &mut ChildBuilder<'_>, fonts: &CjkFont, kind: ButtonKind, lab
     p.spawn((
         kind,
         Interaction::default(),
-        NodeBundle {
-            style: Style {
+        (
+            Node {
                 width: Val::Px(BTN_W),
                 height: Val::Px(BTN_H),
                 justify_content: JustifyContent::Center,
@@ -182,13 +178,12 @@ fn spawn_button(p: &mut ChildBuilder<'_>, fonts: &CjkFont, kind: ButtonKind, lab
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
-            background_color: Color::srgba(0.10, 0.12, 0.16, 0.92).into(),
-            border_color: BorderColor(theme::PANEL_BORDER),
-            ..default()
-        },
+            BackgroundColor(Color::srgba(0.10, 0.12, 0.16, 0.92)),
+            BorderColor(theme::PANEL_BORDER),
+        ),
     ))
     .with_children(|btn| {
-        btn.spawn(TextBundle::from_section(
+        btn.spawn(flow::text(
             label,
             flow::style(fonts, 15.0, theme::TEXT_WHITE),
         ));

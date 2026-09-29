@@ -1,4 +1,4 @@
-﻿//! HUD 右上击杀计数（旧版右上橙黄计数）。
+//! HUD 右上击杀计数（旧版右上橙黄计数）。
 //!
 //! 设计动机：纯展示聚合——计数值 `KillCount` 只由 `flow::route_control_messages` 在收到
 //! 服务端 `EventKind::Kill { killer_id == 本人 }` 时递增（权威在服务端），本模块只把它
@@ -17,19 +17,18 @@ pub struct KillCounterText;
 pub fn spawn_kill_counter(p: &mut ChildBuilder<'_>, fonts: &CjkFont, count: &KillCount) {
     p.spawn((
         KillCounterText,
-        TextBundle {
-            style: Style {
+        (
+            flow::text(
+                format!("击杀 {}", count.0),
+                flow::style(fonts, 18.0, theme::KILL_AMBER),
+            ),
+            Node {
                 position_type: PositionType::Absolute,
                 top: Val::Px(14.0),
                 right: Val::Px(16.0),
                 ..default()
             },
-            text: Text::from_section(
-                format!("击杀 {}", count.0),
-                flow::style(fonts, 18.0, theme::KILL_AMBER),
-            ),
-            ..default()
-        },
+        ),
     ));
 }
 
@@ -38,5 +37,5 @@ pub fn update_kill(mut counter: Query<&mut Text, With<KillCounterText>>, count: 
     let Ok(mut text) = counter.get_single_mut() else {
         return;
     };
-    text.sections[0].value = format!("击杀 {}", count.0);
+    text.0 = format!("击杀 {}", count.0);
 }

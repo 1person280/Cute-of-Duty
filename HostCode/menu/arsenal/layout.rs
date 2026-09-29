@@ -11,8 +11,8 @@ use crate::shared::theme;
 use super::state::*;
 
 /// 4 列网格容器样式（自动换行成 3 行）。
-fn grid_style() -> Style {
-    Style {
+fn grid_style() -> Node {
+    Node {
         width: Val::Px(ARSENAL_COLS as f32 * CELL_W + (ARSENAL_COLS - 1) as f32 * CELL_GAP),
         flex_direction: FlexDirection::Row,
         flex_wrap: FlexWrap::Wrap,
@@ -23,8 +23,8 @@ fn grid_style() -> Style {
 }
 
 /// 单个格位样式（内容居中）。
-fn cell_style() -> Style {
-    Style {
+fn cell_style() -> Node {
+    Node {
         width: Val::Px(CELL_W),
         height: Val::Px(CELL_H),
         align_items: AlignItems::Center,
@@ -46,7 +46,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
             StateScoped(AppState::MainMenu),
             NodeBundle {
                 visibility: Visibility::Hidden,
-                style: Style {
+                node: Node {
                     position_type: PositionType::Absolute,
                     left: Val::Px(OVERLAY_OFFSET),
                     top: Val::Px(OVERLAY_OFFSET),
@@ -60,17 +60,17 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
             },
         ))
         .with_children(|o| {
-            o.spawn(TextBundle::from_section(
+            o.spawn(flow::text(
                 "仓库 · 携带物资",
                 flow::style(&fonts, 28.0, theme::TASK_GOLD),
             ));
-            o.spawn(TextBundle::from_section(
+            o.spawn(flow::text(
                 "拖拽仓库物资到右侧背包=携带 · 拖回左侧=不带 · Shift+左键 快捷移动",
                 flow::style(&fonts, 15.0, theme::TEXT_DIM),
             ));
 
             o.spawn(NodeBundle {
-                style: Style {
+                node: Node {
                     flex_direction: FlexDirection::Row,
                     column_gap: Val::Px(28.0),
                     align_items: AlignItems::FlexStart,
@@ -84,7 +84,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                     WarehouseZone,
                     Interaction::default(),
                     NodeBundle {
-                        style: Style {
+                        node: Node {
                             flex_direction: FlexDirection::Column,
                             row_gap: Val::Px(8.0),
                             align_items: AlignItems::Center,
@@ -94,12 +94,12 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                     },
                 ))
                 .with_children(|wa| {
-                    wa.spawn(TextBundle::from_section(
+                    wa.spawn(flow::text(
                         "仓库（物资池）",
                         flow::style(&fonts, 20.0, accent),
                     ));
                     wa.spawn(NodeBundle {
-                        style: grid_style(),
+                        node: grid_style(),
                         ..default()
                     })
                     .with_children(|grid| {
@@ -111,19 +111,19 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                                         ArsenalRow { index: i },
                                         Interaction::default(),
                                         NodeBundle {
-                                            style: cell_style(),
+                                            node: cell_style(),
                                             background_color: Color::srgb(0.20, 0.22, 0.25).into(),
                                             ..default()
                                         },
                                     ))
                                     .with_children(|r| {
-                                        r.spawn(TextBundle::from_section(
+                                        r.spawn(flow::text(
                                             name.to_string(),
                                             flow::style(&fonts, 18.0, ITEM_COLORS[i]),
                                         ));
                                         r.spawn((
                                             WhStatusText(i),
-                                            TextBundle::from_section(
+                                            flow::text(
                                                 String::new(),
                                                 flow::style(&fonts, 15.0, Color::srgb(0.4, 0.85, 0.4)),
                                             ),
@@ -132,7 +132,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                                 }
                                 None => {
                                     grid.spawn(NodeBundle {
-                                        style: cell_style(),
+                                        node: cell_style(),
                                         background_color: Color::srgb(0.13, 0.14, 0.17).into(),
                                         ..default()
                                     });
@@ -147,7 +147,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                     BackpackZone,
                     Interaction::default(),
                     NodeBundle {
-                        style: Style {
+                        node: Node {
                             flex_direction: FlexDirection::Column,
                             row_gap: Val::Px(8.0),
                             align_items: AlignItems::Center,
@@ -157,19 +157,19 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                     },
                 ))
                 .with_children(|bk| {
-                    bk.spawn(TextBundle::from_section(
+                    bk.spawn(flow::text(
                         "携 带 背 包",
                         flow::style(&fonts, 20.0, accent),
                     ));
                     bk.spawn((
                         BackpackCapacity,
-                        TextBundle::from_section(
+                        flow::text(
                             format!("0 / {}", LOADOUT_CAPACITY),
                             flow::style(&fonts, 16.0, theme::TEXT_DIM),
                         ),
                     ));
                     bk.spawn(NodeBundle {
-                        style: grid_style(),
+                        node: grid_style(),
                         ..default()
                     })
                     .with_children(|grid| {
@@ -178,7 +178,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                                 BackpackRow { index: s },
                                 Interaction::default(),
                                 NodeBundle {
-                                    style: cell_style(),
+                                    node: cell_style(),
                                     background_color: Color::srgb(0.20, 0.22, 0.25).into(),
                                     ..default()
                                 },
@@ -186,7 +186,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                             .with_children(|slot| {
                                 slot.spawn((
                                     CarriedSlotText(s),
-                                    TextBundle::from_section(
+                                    flow::text(
                                         "空".to_string(),
                                         flow::style(&fonts, 18.0, Color::srgb(0.85, 0.85, 0.85)),
                                     ),
@@ -199,7 +199,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
 
             // 底部操作行：返回 / 开始游戏。
             o.spawn(NodeBundle {
-                style: Style {
+                node: Node {
                     flex_direction: FlexDirection::Row,
                     column_gap: Val::Px(12.0),
                     ..default()
@@ -211,7 +211,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                     BackButton,
                     Interaction::default(),
                     NodeBundle {
-                        style: Style {
+                        node: Node {
                             width: Val::Px(120.0),
                             height: Val::Px(44.0),
                             align_items: AlignItems::Center,
@@ -223,7 +223,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                     },
                 ))
                 .with_children(|b| {
-                    b.spawn(TextBundle::from_section(
+                    b.spawn(flow::text(
                         "返 回",
                         flow::style(&fonts, 22.0, Color::WHITE),
                     ));
@@ -232,7 +232,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                     JinButton,
                     Interaction::default(),
                     NodeBundle {
-                        style: Style {
+                        node: Node {
                             width: Val::Px(376.0),
                             height: Val::Px(44.0),
                             align_items: AlignItems::Center,
@@ -244,7 +244,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                     },
                 ))
                 .with_children(|b| {
-                    b.spawn(TextBundle::from_section(
+                    b.spawn(flow::text(
                         "开始游戏",
                         flow::style(&fonts, 22.0, Color::WHITE),
                     ));
@@ -259,7 +259,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
             StateScoped(AppState::MainMenu),
             NodeBundle {
                 visibility: Visibility::Hidden,
-                style: Style {
+                node: Node {
                     position_type: PositionType::Absolute,
                     left: Val::Px(0.0),
                     top: Val::Px(0.0),
@@ -273,7 +273,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
         .with_children(|g| {
             g.spawn((
                 LoadoutGhostText,
-                TextBundle::from_section(String::new(), flow::style(&fonts, 22.0, Color::WHITE)),
+                flow::text(String::new(), flow::style(&fonts, 22.0, Color::WHITE)),
             ));
         });
 }

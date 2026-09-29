@@ -57,13 +57,13 @@ pub fn draw_grenade_preview(
         t += STEP;
         // 触地或引信到点：在落点画一个更大的标记，结束。
         if pos.y <= GROUND_Y {
-            gizmos.sphere(Vec3::new(pos.x, GROUND_Y, pos.z), Quat::IDENTITY, LANDING_R, color);
+            gizmos.sphere(Vec3::new(pos.x, GROUND_Y, pos.z), LANDING_R, color);
             break;
         }
         if t >= FUSE_SECS {
-            gizmos.sphere(pos, Quat::IDENTITY, LANDING_R, color);
+            gizmos.sphere(pos, LANDING_R, color);
             break;
         }
-        gizmos.sphere(pos, Quat::IDENTITY, DOT_R, color);
+        gizmos.sphere(pos, DOT_R, color);
     }
 }

@@ -1,4 +1,4 @@
-﻿//! Loading 画面：连接握手过渡 + v0.3.2 视觉（大标题 / 进度条 / 分步文案 / 任意键跳过）。
+//! Loading 画面：连接握手过渡 + v0.3.2 视觉（大标题 / 进度条 / 分步文案 / 任意键跳过）。
 //!
 //! 设计动机（Why）：加载屏是启动到主菜单之间的过渡。与 v0.3.2 的"计时 + 任意键盲跳"
 //! 不同——本端必须在**服务端握手**（`LocalPlayer.entity_id` 就位）后才可靠进入主菜单，
@@ -55,8 +55,8 @@ pub fn spawn_loading(
         .spawn((
             LoadingScreenRoot,
             StateScoped(AppState::Loading),
-            NodeBundle {
-                style: Style {
+            (
+                Node {
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),
                     flex_direction: FlexDirection::Column,
@@ -65,57 +65,58 @@ pub fn spawn_loading(
                     row_gap: Val::Px(14.0),
                     ..default()
                 },
-                background_color: BackgroundColor(Color::srgb(0.04, 0.06, 0.09)),
-                ..default()
-            },
+                BackgroundColor(Color::srgb(0.04, 0.06, 0.09)),
+            ),
         ))
         .with_children(|root| {
             // 标题区
-            root.spawn(TextBundle::from_section(
+            root.spawn(flow_state::text(
                 "CUTE OF DUTY",
                 flow_state::style(&fonts, 84.0, Color::srgb(0.92, 0.95, 1.0)),
             ));
-            root.spawn(TextBundle::from_section(
+            root.spawn(flow_state::text(
                 "SIMPLE · 像素战术撤离 · PRE-ALPHA",
                 flow_state::style(&fonts, 20.0, Color::srgb(0.55, 0.62, 0.72)),
             ));
-            root.spawn(NodeBundle {
-                style: Style { height: Val::Px(40.0), ..default() },
+            root.spawn(Node {
+                height: Val::Px(40.0),
                 ..default()
             });
             step_id = root
-                .spawn(TextBundle::from_section(
+                .spawn(flow_state::text(
                     LOADING_STEPS[0],
                     flow_state::style(&fonts, 18.0, Color::srgb(0.70, 0.78, 0.88)),
                 ))
                 .id();
             // 进度条：容器 + 百分比宽度的填充条
-            root.spawn(NodeBundle {
-                style: Style {
+            root.spawn((
+                Node {
                     width: Val::Px(520.0),
                     height: Val::Px(16.0),
                     padding: UiRect::all(Val::Px(2.0)),
                     ..default()
                 },
-                background_color: BackgroundColor(Color::srgb(0.10, 0.13, 0.18)),
-                ..default()
-            })
+                BackgroundColor(Color::srgb(0.10, 0.13, 0.18)),
+            ))
             .with_children(|bar| {
                 fill_id = bar
-                    .spawn(NodeBundle {
-                        style: Style { width: Val::Percent(0.0), height: Val::Percent(100.0), ..default() },
-                        background_color: BackgroundColor(menu_accent()),
-                        ..default()
-                    })
+                    .spawn((
+                        Node {
+                            width: Val::Percent(0.0),
+                            height: Val::Percent(100.0),
+                            ..default()
+                        },
+                        BackgroundColor(menu_accent()),
+                    ))
                     .id();
             });
             pct_id = root
-                .spawn(TextBundle::from_section(
+                .spawn(flow_state::text(
                     "0%",
                     flow_state::style(&fonts, 15.0, menu_accent()),
                 ))
                 .id();
-            root.spawn(TextBundle::from_section(
+            root.spawn(flow_state::text(
                 "正在连接服务器…按任意键跳过（需已连接）",
                 flow_state::style(&fonts, 13.0, Color::srgb(0.40, 0.46, 0.55)),
             ));
@@ -135,7 +136,7 @@ pub fn loading_tick(
     // 握手后停留计时（保证加载屏至少展示 `LOADING_MIN_SECS`）。
     mut held: Local<f32>,
     mut texts: Query<&mut Text>,
-    mut styles: Query<&mut Style>,
+    mut styles: Query<&mut Node>,
     mut next_state: ResMut<NextState<AppState>>,
 ) {
     // 保护：`spawn_loading` 需等字体就绪且可能与本系统同帧先后不一，资源未生成时跳过本帧。
@@ -144,16 +145,16 @@ pub fn loading_tick(
     };
     let connected = player.entity_id != 0;
     // 未连接时进度随时间平移（封顶 90%）；握手后即时到 100%，并累计停留时长。
-    *held = if connected { *held + time.delta_seconds() } else { 0.0 };
+    *held = if connected { *held + time.delta_secs() } else { 0.0 };
     *progress = if connected {
         1.0
     } else {
-        (*progress + time.delta_seconds() / LOADING_DURATION_SECS).min(0.9)
+        (*progress + time.delta_secs() / LOADING_DURATION_SECS).min(0.9)
     };
     let step_index = ((*progress * LOADING_STEPS.len() as f32) as usize).min(LOADING_STEPS.len() - 1);
 
     if let Ok(mut text) = texts.get_mut(screen.step) {
-        text.sections[0].value = if connected {
+        text.0 = if connected {
             "已连接服务器…".to_string()
         } else {
             LOADING_STEPS[step_index].to_string()
@@ -163,7 +164,7 @@ pub fn loading_tick(
         style.width = Val::Percent(*progress * 100.0);
     }
     if let Ok(mut text) = texts.get_mut(screen.percent) {
-        text.sections[0].value = format!("{:.0}%", *progress * 100.0);
+        text.0 = format!("{:.0}%", *progress * 100.0);
     }
 
     // 已握手后，停留满最短时长（或任意键/点击提前）才切入主菜单。

@@ -35,22 +35,21 @@ pub fn spawn_panel(mut commands: Commands, fonts: Res<CjkFont>, spawned: Res<Pan
     commands
         .spawn((
             LatencyPanel,
-            NodeBundle {
-                visibility: Visibility::Hidden,
-                style: Style {
+            (
+                Node {
                     position_type: PositionType::Absolute,
                     top: Val::Px(4.0),
                     width: Val::Percent(100.0),
                     justify_content: JustifyContent::Center,
                     ..default()
                 },
-                ..default()
-            },
+                Visibility::Hidden,
+            ),
         ))
         .with_children(|p| {
             p.spawn((
                 LatencyText,
-                TextBundle::from_section("", flow::style(&fonts, 18.0, Color::WHITE)),
+                flow::text("", flow::style(&fonts, 18.0, Color::WHITE)),
             ));
         });
 }
@@ -84,7 +83,7 @@ pub fn panel_update(
 
     // 2) 刷新文本内容（连接含握手 + 常态 RTT）
     if let Ok(mut text) = text_q.get_single_mut() {
-        text.sections[0].value = format!(
+        text.0 = format!(
             "test   连接(含握手) {:.1} ms    RTT {:.1} ms",
             connect.ms, live.rtt_ms
         );

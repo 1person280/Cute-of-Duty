@@ -54,7 +54,7 @@ pub fn spawn_setting_row(
 ) {
     parent
         .spawn(NodeBundle {
-            style: Style {
+            node: Node {
                 width: Val::Px(460.0),
                 height: Val::Px(46.0),
                 flex_direction: FlexDirection::Row,
@@ -70,12 +70,12 @@ pub fn spawn_setting_row(
             ..default()
         })
         .with_children(|row| {
-            row.spawn(TextBundle::from_section(
+            row.spawn(flow::text(
                 label,
                 flow::style(fonts, 19.0, Color::srgb(0.85, 0.89, 0.95)),
             ));
             row.spawn(NodeBundle {
-                style: Style {
+                node: Node {
                     flex_direction: FlexDirection::Row,
                     align_items: AlignItems::Center,
                     column_gap: Val::Px(8.0),
@@ -86,7 +86,7 @@ pub fn spawn_setting_row(
             .with_children(|ctrl| {
                 spawn_step_button(ctrl, fonts, "<", kind, -setting_step(kind));
                 ctrl.spawn((
-                    TextBundle::from_section(
+                    flow::text(
                         setting_label(settings, kind),
                         flow::style(fonts, 18.0, menu_accent()),
                     ),
@@ -108,7 +108,7 @@ pub fn spawn_step_button(
     parent
         .spawn((
             NodeBundle {
-                style: Style {
+                node: Node {
                     width: Val::Px(40.0),
                     height: Val::Px(34.0),
                     justify_content: JustifyContent::Center,
@@ -126,7 +126,7 @@ pub fn spawn_step_button(
             SettingAdjust { kind, delta },
         ))
         .with_children(|btn| {
-            btn.spawn(TextBundle::from_section(
+            btn.spawn(flow::text(
                 glyph,
                 flow::style(fonts, 18.0, Color::srgb(0.92, 0.95, 1.0)),
             ));
@@ -153,7 +153,7 @@ pub fn spawn_credits_panel(parent: &mut ChildBuilder, fonts: &CjkFont) {
 
     parent
         .spawn(NodeBundle {
-            style: Style {
+            node: Node {
                 width: Val::Px(760.0),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
@@ -168,22 +168,22 @@ pub fn spawn_credits_panel(parent: &mut ChildBuilder, fonts: &CjkFont) {
             ..default()
         })
         .with_children(|panel| {
-            panel.spawn(TextBundle::from_section(
+            panel.spawn(flow::text(
                 "开 源 代 码 鸣 谢",
                 flow::style(fonts, 17.0, menu_accent()),
             ));
-            panel.spawn(TextBundle::from_section(
+            panel.spawn(flow::text(
                 "本项目代码以 GPL-3.0 with linking exception 开源、美术资产以 CC BY-NC-SA 4.0 授权，站在下列开源库的肩膀上",
                 flow::style(fonts, 12.0, Color::srgb(0.55, 0.62, 0.72)),
             ));
             panel.spawn(NodeBundle {
-                style: Style { height: Val::Px(4.0), ..default() },
+                node: Node { height: Val::Px(4.0), ..default() },
                 ..default()
             });
             for (name, desc) in CREDITS {
                 panel
                     .spawn(NodeBundle {
-                        style: Style {
+                        node: Node {
                             width: Val::Percent(100.0),
                             flex_direction: FlexDirection::Row,
                             justify_content: JustifyContent::SpaceBetween,
@@ -193,11 +193,11 @@ pub fn spawn_credits_panel(parent: &mut ChildBuilder, fonts: &CjkFont) {
                         ..default()
                     })
                     .with_children(|row| {
-                        row.spawn(TextBundle::from_section(
+                        row.spawn(flow::text(
                             *name,
                             flow::style(fonts, 13.0, Color::srgb(0.85, 0.89, 0.95)),
                         ));
-                        row.spawn(TextBundle::from_section(
+                        row.spawn(flow::text(
                             *desc,
                             flow::style(fonts, 13.0, Color::srgb(0.62, 0.70, 0.80)),
                         ));

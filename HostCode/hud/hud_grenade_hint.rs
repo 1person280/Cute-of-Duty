@@ -36,8 +36,8 @@ pub struct GrenadeHintRoot;
 pub fn spawn_grenade_hint(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     p.spawn((
         GrenadeHintRoot,
-        NodeBundle {
-            style: Style {
+        (
+            Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(0.0),
                 bottom: Val::Px(126.0),
@@ -45,23 +45,21 @@ pub fn spawn_grenade_hint(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                 justify_content: JustifyContent::Center,
                 ..default()
             },
-            visibility: Visibility::Hidden,
-            ..default()
-        },
+            Visibility::Hidden,
+        ),
     ))
     .with_children(|row| {
-        row.spawn(NodeBundle {
-            style: Style {
+        row.spawn((
+            Node {
                 padding: UiRect::axes(Val::Px(16.0), Val::Px(6.0)),
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
-            background_color: theme::PANEL_BG.into(),
-            border_color: BorderColor(theme::ACCENT_AMBER),
-            ..default()
-        })
+            BackgroundColor(theme::PANEL_BG),
+            BorderColor(theme::ACCENT_AMBER),
+        ))
         .with_children(|card| {
-            card.spawn(TextBundle::from_section(
+            card.spawn(flow::text(
                 HINT,
                 flow::style(fonts, 16.0, theme::ACCENT_AMBER),
             ));

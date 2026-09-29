@@ -108,7 +108,7 @@ pub fn spawn_pause_ui(commands: &mut Commands, fonts: &CjkFont, settings: &GameS
 
     let root = commands
         .spawn(NodeBundle {
-            style: Style {
+            node: Node {
                 position_type: PositionType::Absolute,
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
@@ -124,7 +124,7 @@ pub fn spawn_pause_ui(commands: &mut Commands, fonts: &CjkFont, settings: &GameS
     commands.entity(root).with_children(|root_node| {
         // 全屏压暗层：独立绝对定位节点（与 HUD 边缘光同款写法，可靠渲染）。
         root_node.spawn(NodeBundle {
-            style: Style {
+            node: Node {
                 position_type: PositionType::Absolute,
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
@@ -136,7 +136,7 @@ pub fn spawn_pause_ui(commands: &mut Commands, fonts: &CjkFont, settings: &GameS
 
         main_panel = root_node
             .spawn(NodeBundle {
-                style: Style {
+                node: Node {
                     flex_direction: FlexDirection::Column,
                     align_items: AlignItems::Center,
                     row_gap: Val::Px(14.0),
@@ -145,16 +145,16 @@ pub fn spawn_pause_ui(commands: &mut Commands, fonts: &CjkFont, settings: &GameS
                 ..default()
             })
             .with_children(|panel| {
-                panel.spawn(TextBundle::from_section(
+                panel.spawn(flow::text(
                     "游 戏 暂 停",
                     flow::style(fonts, 46.0, Color::srgb(0.92, 0.95, 1.0)),
                 ));
-                panel.spawn(TextBundle::from_section(
+                panel.spawn(flow::text(
                     "按 / 或 ~ 键继续游戏",
                     flow::style(fonts, 14.0, Color::srgb(0.55, 0.62, 0.72)),
                 ));
                 panel.spawn(NodeBundle {
-                    style: Style { height: Val::Px(18.0), ..default() },
+                    node: Node { height: Val::Px(18.0), ..default() },
                     ..default()
                 });
                 resume_btn = spawn_action_button(panel, fonts, "返 回 游 戏", 360.0, 52.0, 22.0);
@@ -165,7 +165,7 @@ pub fn spawn_pause_ui(commands: &mut Commands, fonts: &CjkFont, settings: &GameS
 
         settings_panel = root_node
             .spawn(NodeBundle {
-                style: Style {
+                node: Node {
                     flex_direction: FlexDirection::Column,
                     align_items: AlignItems::Center,
                     row_gap: Val::Px(14.0),
@@ -175,19 +175,19 @@ pub fn spawn_pause_ui(commands: &mut Commands, fonts: &CjkFont, settings: &GameS
                 ..default()
             })
             .with_children(|panel| {
-                panel.spawn(TextBundle::from_section(
+                panel.spawn(flow::text(
                     "游 戏 设 置",
                     flow::style(fonts, 40.0, Color::srgb(0.92, 0.95, 1.0)),
                 ));
                 panel.spawn(NodeBundle {
-                    style: Style { height: Val::Px(10.0), ..default() },
+                    node: Node { height: Val::Px(10.0), ..default() },
                     ..default()
                 });
                 spawn_setting_row(panel, fonts, settings, SettingKind::Sensitivity, "鼠标灵敏度");
                 spawn_setting_row(panel, fonts, settings, SettingKind::Fov, "视野 (FOV)");
                 spawn_setting_row(panel, fonts, settings, SettingKind::Ambient, "环境亮度");
                 panel.spawn(NodeBundle {
-                    style: Style { height: Val::Px(12.0), ..default() },
+                    node: Node { height: Val::Px(12.0), ..default() },
                     ..default()
                 });
                 spawn_credits_panel(panel, fonts);
@@ -295,7 +295,7 @@ pub fn pause_menu_interaction(
     }
     if adjusted {
         for (value, mut text) in value_texts.iter_mut() {
-            text.sections[0].value = setting_label(&settings, value.0);
+            text.0 = setting_label(&settings, value.0);
         }
     }
 }
@@ -331,9 +331,9 @@ pub fn cursor_lock_system(
         && !released.0;
     for mut window in &mut windows {
         let grab = if lock { CursorGrabMode::Locked } else { CursorGrabMode::None };
-        if window.cursor.grab_mode != grab {
-            window.cursor.grab_mode = grab;
-            window.cursor.visible = !lock;
+        if window.cursor_options.grab_mode != grab {
+            window.cursor_options.grab_mode = grab;
+            window.cursor_options.visible = !lock;
         }
     }
 }

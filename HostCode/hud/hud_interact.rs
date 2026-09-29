@@ -124,7 +124,7 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     p.spawn((
         InteractPanel,
         NodeBundle {
-            style: Style {
+            node: Node {
                 position_type: PositionType::Absolute,
                 left: Val::Percent(55.0),
                 top: Val::Percent(40.0),
@@ -139,14 +139,14 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         },
     ))
     .with_children(|panel| {
-        panel.spawn(TextBundle::from_section(
+        panel.spawn(flow::text(
             "附近可交互",
             flow::style(fonts, 20.0, theme::TEXT_WHITE),
         ));
         // 行区（左） + 滚动条（右）并排
         panel
             .spawn(NodeBundle {
-                style: Style {
+                node: Node {
                     flex_direction: FlexDirection::Row,
                     column_gap: Val::Px(6.0),
                     align_items: AlignItems::FlexStart,
@@ -156,7 +156,7 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             })
             .with_children(|body| {
                 body.spawn(NodeBundle {
-                    style: Style {
+                    node: Node {
                         flex_direction: FlexDirection::Column,
                         row_gap: Val::Px(INTERACT_ROW_GAP),
                         min_width: Val::Px(260.0),
@@ -169,7 +169,7 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                         list.spawn((
                             InteractRowSlot(j),
                             NodeBundle {
-                                style: Style {
+                                node: Node {
                                     padding: UiRect::axes(Val::Px(10.0), Val::Px(3.0)),
                                     height: Val::Px(INTERACT_ROW_H),
                                     align_items: AlignItems::Center,
@@ -185,7 +185,7 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                         .with_children(|row| {
                             row.spawn((
                                 InteractRowText(j),
-                                TextBundle::from_section(
+                                flow::text(
                                     "",
                                     flow::style(fonts, 15.0, theme::TEXT_WHITE),
                                 ),
@@ -197,7 +197,7 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                 let track_h = INTERACT_VISIBLE_ROWS as f32 * (INTERACT_ROW_H + INTERACT_ROW_GAP)
                     - INTERACT_ROW_GAP;
                 body.spawn(NodeBundle {
-                    style: Style {
+                    node: Node {
                         width: Val::Px(4.0),
                         height: Val::Px(track_h),
                         overflow: Overflow::clip(),
@@ -210,7 +210,7 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                     track.spawn((
                         InteractScrollThumb,
                         NodeBundle {
-                            style: Style {
+                            node: Node {
                                 position_type: PositionType::Absolute,
                                 left: Val::Px(0.0),
                                 top: Val::Px(0.0),
@@ -226,7 +226,7 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             });
         panel.spawn((
             InteractHintText,
-            TextBundle::from_section(
+            flow::text(
                 "滚轮翻页 · F 确认",
                 flow::style(fonts, 13.0, theme::TEXT_DIM),
             ),
@@ -237,7 +237,7 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     p.spawn((
         InteractMenuRoot,
         NodeBundle {
-            style: Style {
+            node: Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(0.0),
                 top: Val::Px(0.0),
@@ -257,12 +257,12 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     .with_children(|root| {
         root.spawn((
             InteractMenuTitle,
-            TextBundle::from_section("交互", flow::style(fonts, 24.0, theme::TEXT_WHITE)),
+            flow::text("交互", flow::style(fonts, 24.0, theme::TEXT_WHITE)),
         ));
         root.spawn((
             InteractMenuList,
             NodeBundle {
-                style: Style {
+                node: Node {
                     flex_direction: FlexDirection::Column,
                     row_gap: Val::Px(8.0),
                     min_width: Val::Px(260.0),
@@ -271,7 +271,7 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                 ..default()
             },
         ));
-        root.spawn(TextBundle::from_section(
+        root.spawn(flow::text(
             "滚轮选择 · F 确认 · Esc 关闭",
             flow::style(fonts, 13.0, theme::TEXT_DIM),
         ));

@@ -66,8 +66,8 @@ pub struct BpHintText;
 pub fn spawn_backpack_panel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     p.spawn((
         BackpackPanelRoot,
-        NodeBundle {
-            style: Style {
+        (
+            Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(0.0),
                 top: Val::Px(0.0),
@@ -79,78 +79,65 @@ pub fn spawn_backpack_panel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                 row_gap: Val::Px(14.0),
                 ..default()
             },
-            background_color: Color::srgba(0.02, 0.03, 0.05, 0.62).into(),
-            visibility: Visibility::Hidden,
-            ..default()
-        },
+            BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.62)),
+            Visibility::Hidden,
+        ),
     ))
     .with_children(|root| {
-        root.spawn(TextBundle::from_section(
+        root.spawn(flow::text(
             "背 包",
             flow::style(fonts, 26.0, theme::TASK_GOLD),
         ));
-        root.spawn(NodeBundle {
-            style: Style {
-                flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(48.0),
-                align_items: AlignItems::FlexStart,
-                ..default()
-            },
+        root.spawn(Node {
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(48.0),
+            align_items: AlignItems::FlexStart,
             ..default()
         })
         .with_children(|cols| {
             // 左列：双武器槽 + 弹药池概览。
-            cols.spawn(NodeBundle {
-                style: Style {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(10.0),
-                    align_items: AlignItems::FlexStart,
-                    ..default()
-                },
+            cols.spawn(Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(10.0),
+                align_items: AlignItems::FlexStart,
                 ..default()
             })
             .with_children(|col| {
-                col.spawn(TextBundle::from_section(
+                col.spawn(flow::text(
                     "武器",
                     flow::style(fonts, 18.0, theme::ACCENT_CYAN),
                 ));
                 col.spawn((
                     BpWeaponText,
-                    TextBundle::from_section("", flow::style(fonts, 15.0, theme::TEXT_WHITE)),
+                    flow::text("", flow::style(fonts, 15.0, theme::TEXT_WHITE)),
                 ));
-                col.spawn(TextBundle::from_section(
+                col.spawn(flow::text(
                     "备用弹药",
                     flow::style(fonts, 18.0, theme::ACCENT_CYAN),
                 ));
                 col.spawn((
                     BpAmmoText,
-                    TextBundle::from_section("", flow::style(fonts, 15.0, theme::TEXT_WHITE)),
+                    flow::text("", flow::style(fonts, 15.0, theme::TEXT_WHITE)),
                 ));
             });
             // 右列：4×3 补给品格位。
-            cols.spawn(NodeBundle {
-                style: Style {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(8.0),
-                    align_items: AlignItems::Center,
-                    ..default()
-                },
+            cols.spawn(Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(8.0),
+                align_items: AlignItems::Center,
                 ..default()
             })
             .with_children(|col| {
-                col.spawn(TextBundle::from_section(
+                col.spawn(flow::text(
                     "补给品",
                     flow::style(fonts, 18.0, theme::ACCENT_CYAN),
                 ));
-                col.spawn(NodeBundle {
-                    style: Style {
-                        width: Val::Px(GRID_COLS as f32 * CELL + (GRID_COLS - 1) as f32 * CELL_GAP),
-                        flex_direction: FlexDirection::Row,
-                        flex_wrap: FlexWrap::Wrap,
-                        row_gap: Val::Px(CELL_GAP),
-                        column_gap: Val::Px(CELL_GAP),
-                        ..default()
-                    },
+                col.spawn(Node {
+                    width: Val::Px(GRID_COLS as f32 * CELL + (GRID_COLS - 1) as f32 * CELL_GAP),
+                    flex_direction: FlexDirection::Row,
+                    flex_wrap: FlexWrap::Wrap,
+                    row_gap: Val::Px(CELL_GAP),
+                    column_gap: Val::Px(CELL_GAP),
                     ..default()
                 })
                 .with_children(|grid| {
@@ -158,8 +145,8 @@ pub fn spawn_backpack_panel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                         grid.spawn((
                             BpCell { index },
                             Interaction::default(),
-                            NodeBundle {
-                                style: Style {
+                            (
+                                Node {
                                     width: Val::Px(CELL),
                                     height: Val::Px(CELL),
                                     justify_content: JustifyContent::Center,
@@ -167,15 +154,14 @@ pub fn spawn_backpack_panel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                                     border: UiRect::all(Val::Px(1.0)),
                                     ..default()
                                 },
-                                background_color: Color::srgba(0.10, 0.12, 0.16, 0.9).into(),
-                                border_color: BorderColor(theme::PANEL_BORDER),
-                                ..default()
-                            },
+                                BackgroundColor(Color::srgba(0.10, 0.12, 0.16, 0.9)),
+                                BorderColor(theme::PANEL_BORDER),
+                            ),
                         ))
                         .with_children(|cell| {
                             cell.spawn((
                                 BpCellText { index },
-                                TextBundle::from_section("空", flow::style(fonts, 12.0, theme::TEXT_DIM)),
+                                flow::text("空", flow::style(fonts, 12.0, theme::TEXT_DIM)),
                             ));
                         });
                     }
@@ -184,7 +170,7 @@ pub fn spawn_backpack_panel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         });
         root.spawn((
             BpHintText,
-            TextBundle::from_section("", flow::style(fonts, 14.0, theme::TEXT_DIM)),
+            flow::text("", flow::style(fonts, 14.0, theme::TEXT_DIM)),
         ));
     });
 }
@@ -271,7 +257,7 @@ pub fn sync_backpack_panel(
         &mut BorderColor,
     )>,
     mut texts: ParamSet<(
-        Query<(&BpCellText, &mut Text)>,
+        Query<(&BpCellText, &mut Text, &mut TextColor)>,
         Query<&mut Text, With<BpWeaponText>>,
         Query<&mut Text, With<BpAmmoText>>,
         Query<&mut Text, With<BpHintText>>,
@@ -313,22 +299,22 @@ pub fn sync_backpack_panel(
 
     // 格内物品名（数量 > 1 时带 `×N`）。
     let backpack = me.and_then(|e| e.backpack.as_deref()).unwrap_or(&[]);
-    for (cell, mut text) in &mut texts.p0() {
+    for (cell, mut text, mut color) in &mut texts.p0() {
         match backpack.get(cell.index).and_then(|s| s.as_ref()) {
             Some(item) => {
-                text.sections[0].value = item.display_label();
-                text.sections[0].style.color = theme::TEXT_WHITE;
+                text.0 = item.display_label();
+                color.0 = theme::TEXT_WHITE;
             }
             None => {
-                text.sections[0].value = "空".to_string();
-                text.sections[0].style.color = theme::TEXT_DIM;
+                text.0 = "空".to_string();
+                color.0 = theme::TEXT_DIM;
             }
         }
     }
 
     // 双武器槽概览：手持槽以 `▸` 标注，弹夹数（服务端只下发挥当前手持槽）仅随手持槽显示。
     if let Ok(mut t) = texts.p1().get_single_mut() {
-        t.sections[0].value = match me {
+        t.0 = match me {
             Some(e) => match e.weapon_elements {
                 Some([a, b]) => {
                     let line = |slot: u8, el: ElementType| {
@@ -351,7 +337,7 @@ pub fn sync_backpack_panel(
     // 备用弹药总量（弹池 + 背包弹药合计，服务端权威合计）。
     if let Ok(mut t) = texts.p2().get_single_mut() {
         let reserve = me.map(|e| e.ammo_reserve).unwrap_or(-1);
-        t.sections[0].value = if reserve < 0 {
+        t.0 = if reserve < 0 {
             "—".to_string()
         } else {
             format!("备用 {reserve}")
@@ -359,7 +345,7 @@ pub fn sync_backpack_panel(
     }
 
     if let Ok(mut t) = texts.p3().get_single_mut() {
-        t.sections[0].value =
+        t.0 =
             "鼠标悬停物品 · 按 R 使用 · Tab / Esc 关闭".to_string();
     }
 }

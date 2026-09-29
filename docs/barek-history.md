@@ -24,6 +24,29 @@
 
 ---
 
+## [0.12.1] · 2026-09-29 · 引擎底层小步升级 Bevy 0.14 → 0.15（仅迁强制破坏项）
+
+- **变更类型**：Refactor（无协议语义变化；客户端依赖升级 + API 平移）
+- **影响模块**：`HostCode`（`flow`/`hud`/`menu`/`net`/`world`/`launcher` 的生成侧与更新侧）；`ServerCode` **零改动**
+- **兼容性**：**兼容**（`z+1`）
+  - 线格式 / 契约 / `ServerMessage` / `ClientMessage` **完全不变**，`docs/contracts/protocol.yaml` 的 `wire_version` 仍为 `12`；双端 `0.12.1` 与 `0.12.0` 可互通。
+  - `ServerCode` 不依赖 bevy，本次升级不触及服务端模拟与网络层。
+  - 破坏点仅限**客户端源码编译面**（非对外契约）：0.15 删除了 `TextBundle`/`TextStyle`，`Style` 类型改名 `Node`，`SpatialBundle` 被移除，`PbrBundle` 字段类型改为 `Mesh3d`/`MeshMaterial3d`。这不是协议不兼容，故不升 `y`。
+- **迁移指南**：不适用（`z+1`，非协议不兼容）。仅对**后续在本仓新增客户端 UI 代码**者提示：
+  - 文本一律用适配层 `flow::text(内容, flow::style(&fonts, 字号, 颜色))` 生成，勿再用 `TextBundle::from_section`（0.15 已无此 API）。
+  - UI 样式类型是 `Node`（不是 `Style`），`NodeBundle`/`ButtonBundle` 的样式字段名是 `node`（不是 `style`）。
+  - 需要根节点带变换 + 可见性时用 `(Transform::.., Visibility::default())`，勿再找 `SpatialBundle`（0.15 已移除）。
+  - 画网格用 `PbrBundle { mesh: Mesh3d(handle), material: MeshMaterial3d(handle), .. }`（字段已被新类型包装）。
+- **迁移边界（只做强制项）**：已弃用但仍可编译的 `NodeBundle`/`PbrBundle`/`Camera3dBundle`/`DirectionalLightBundle`/`PointLightBundle` **一律未动**，留待 0.16；构建期 276 条弃用告警属预期。
+- **验证**：
+  - `cargo-wrap check --workspace` 退出码 `0`（无错误）
+  - `cargo-wrap test -p cute_of_duty_server` **138 passed / 0 failed**
+  - `cargo-wrap build --workspace --release` 成功产出双端 exe
+  - **实机**：启动双端进训练场，确认 UI（主菜单 / HUD / 背包 / 轮盘 / 大地图）与 3D（场景光照 / 焰狐体素模型 / 相机）无回归
+- **关联**：`HostCode/Cargo.toml`、README「已知坑 · 底层冻结红线（2026-09-29 修订为小步升级）」、[ADR 0004](../adr/0004-client-layer-convergence.md)
+
+---
+
 ## [0.12.0] · 2026-09-28 · 线格式改为小定长包 + 指令优先组包 + 双通道
 
 - **变更类型**：**Breaking**（线格式由恒定 64KB 槽帧改为 256B 主通道 + 4096B 资源通道，协议不兼容 → `y+1`）

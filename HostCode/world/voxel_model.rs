@@ -190,10 +190,8 @@ fn build_bone(
 
     parent
         .spawn((
-            SpatialBundle {
-                transform: Transform::from_translation(local).with_rotation(bone_quat(bone.rotation)),
-                ..default()
-            },
+            Transform::from_translation(local).with_rotation(bone_quat(bone.rotation)),
+            Visibility::default(),
             VoxelBoneNode(bone.name.clone()),
         ))
         .with_children(|p| {
@@ -202,8 +200,8 @@ fn build_bone(
                 let size = px_size(c.size, s);
                 let material = cache.handle(materials, cube_color(c, &bone.name));
                 p.spawn(PbrBundle {
-                    mesh: mesh.clone(),
-                    material,
+                    mesh: Mesh3d(mesh.clone()),
+                    material: MeshMaterial3d(material),
                     transform: Transform::from_translation(center).with_scale(size),
                     ..default()
                 });

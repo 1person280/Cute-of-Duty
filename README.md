@@ -4,12 +4,12 @@
 
 **战术撤离射击游戏** · 核心差异化 **元素互斥生态 + 反护航经济架构**
 
-基于 Rust + Bevy 0.14 的 3D 像素风 FPS · 服务端权威模拟与客户端表现层双 crate
+基于 Rust + Bevy 0.15 的 3D 像素风 FPS · 服务端权威模拟与客户端表现层双 crate
 配置文件表驱动的全部玩法规则 · 单一事实来源
 
 [![License: GPL-3.0 (code)](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
 [![License: CC BY-NC-SA 4.0 (assets)](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-lightgrey.svg)](LICENSE-ASSETS)
-[![Version](https://img.shields.io/badge/Version-0.12.0-blue.svg)](#五版本历史)
+[![Version](https://img.shields.io/badge/Version-0.12.1-blue.svg)](#五版本历史)
 [![Rust](https://img.shields.io/badge/Rust-stable%20%28edition%202021%29-orange.svg)](Cargo.toml)
 
 **外部依赖 · 站在开源社区的肩膀上** · [![by Bevy](https://img.shields.io/badge/by-Bevy-E90000)](https://bevyengine.org)
@@ -102,7 +102,7 @@ cargo-wrap build --release --workspace      # 发布构建，产出 cod_server.e
 
 | 游戏 / 技术栈 | 源码开源 | 可 Mod / 社区内容 | 平衡调整成本 | 核心与渲染架构 |
 |---|---|---|---|---|
-| **Cute Of Duty**（Rust + Bevy 0.14） | ✅ 全开源 GPL-3.0-with-linking-exception | ✅ **配置表驱动**：改玩法 = 改 YAML，社区即可做平衡 Mod | **核心零 bevy + 改表即生效**，`cargo test` 秒级验证 | **服务端权威 + 核心逻辑与服务端物理分离**：核心零 bevy、可无头确定性模拟，渲染为客户端表现层 |
+| **Cute Of Duty**（Rust + Bevy 0.15） | ✅ 全开源 GPL-3.0-with-linking-exception | ✅ **配置表驱动**：改玩法 = 改 YAML，社区即可做平衡 Mod | **核心零 bevy + 改表即生效**，`cargo test` 秒级验证 | **服务端权威 + 核心逻辑与服务端物理分离**：核心零 bevy、可无头确定性模拟，渲染为客户端表现层 |
 | **CS:GO / CS2**（Source 2） | ❌ 闭源 | ✅ 创意工坊（地图/皮肤） | 官方平衡，改引擎/服务器逻辑 | 引擎一体，无逻辑分离 |
 | **Valorant**（Unreal 魔改自研） | ❌ 闭源 | ❌ 官方严格管控 | 官方改技能数值包 | 引擎一体，无逻辑分离 |
 | **Overwatch 2**（自研引擎） | ❌ 闭源 | ❌ | 官方改英雄平衡 | 引擎一体，无逻辑分离 |
@@ -150,7 +150,7 @@ Cargo Workspace（虚拟 manifest）下平级三个 crate：
 | Crate | 角色定位 | 内容 | 依赖 bevy |
 |---|---|---|---|
 | **ServerCode** | 领域层 + 基础设施（**权威真理源**） | 权威 60Hz Tick · TCP 网络层 · 配置 · 存档 | ❌ 核心零 bevy |
-| **HostCode** | 客户端表现层（**只吃快照 + 画**） | 动态装载 bevy 0.14 · `launcher` 纯装配 + HUD / 相机 Rig | ✅ 独占 bevy |
+| **HostCode** | 客户端表现层（**只吃快照 + 画**） | 动态装载 bevy 0.15 · `launcher` 纯装配 + HUD / 相机 Rig | ✅ 独占 bevy |
 | **ContractCode** | 契约层（被两端共用，**不依赖两端**） | 线格式类型 + Port Trait + 共享常量 | ❌ |
 
 > 数据流向：`ServerCode`（权威算）— 线格式/Port Trait → `HostCode`（只画，消费快照）。
@@ -167,7 +167,7 @@ Cargo Workspace（虚拟 manifest）下平级三个 crate：
 | 模块 | 职责 | 关键文件 |
 |---|---|---|
 | **客户端 · `HostCode/`** | | |
-| `launcher` | 纯装配层：动态装载 bevy 0.14 + 承载渲染表现全套（相机 Rig / 体素绘制 / HUD / 小地图 / 背包 UI），只吃快照 + 画 | `mod.rs` |
+| `launcher` | 纯装配层：动态装载 bevy 0.15 + 承载渲染表现全套（相机 Rig / 体素绘制 / HUD / 小地图 / 背包 UI），只吃快照 + 画 | `mod.rs` |
 | `flow` | AppState 状态机（Loading / MainMenu / InGame）、加载屏、状态迁移 | `flow_state.rs` / `loading.rs` |
 | `net` | mpsc 后台线程消费服务端快照 + 上行 NetOut 命令通道 | `network.rs` |
 | `menu` | 主菜单 / 仓库·携带物资（拖拽 + Shift 选装）/ 模式 / 设置 / 暂停 | `menu_main.rs` / `arsenal.rs` / `pause.rs` |
@@ -273,6 +273,7 @@ TCP 的可靠传输更好保障**元素状态、技能效果、背包交互**等
 
 | 版本 | 日期 | 说明 |
 |---|---|---|
+| **0.12.1** | 2026-09-29 | **引擎升级**：客户端底层 Bevy `0.14 → 0.15`（**预发布**，线格式与协议**不变**，双端仍互通）。**只迁强制破坏项**，弃用但可编译的 bundle 一律不动。**代码更改**：①**文本 API 换代**——0.15 删除了 `TextBundle`/`TextStyle`，新增本地适配层 `flow::text()`（返回 `Text + TextFont + TextColor` 组合），全项目 ~120 处生成侧、~40 处更新侧平移，调用点仅改名不改参数；②**UI 类型改名**——`Style` → `Node`、`NodeBundle.style` → `node`（含 `ButtonBundle`）；③**`SpatialBundle` 被引擎移除**——改用 `Transform` + `Visibility`（引擎 `require` 自动补齐 `GlobalTransform` / 可见性链），共 3 处；④**`PbrBundle` 字段类型变化**——`mesh: Mesh3d(..)`、`material: MeshMaterial3d(..)`，共 7 处；⑤**其它 0.15 改名**——`ZIndex::Global(n)` → `ZIndex(n)`、`UiImage` → `ImageNode`、`Window.cursor` → `cursor_options`、`Time::delta_seconds/elapsed_seconds` → `delta_secs/elapsed_secs`、`Gizmos::sphere` 去掉旋转参数。**扁平化更新**：新增 `flow::text()` 单点收敛文本生成，取代散落各处的 `TextBundle::from_section`。**未做**：已弃用的 `NodeBundle`/`PbrBundle`/`Camera3dBundle`/`DirectionalLightBundle`/`PointLightBundle` 留待 0.16；276 条弃用告警属预期。**下一版本目标**：继续小步升级（0.16+）或转回 `0.6.1` 网游版本（①多玩家 → ②匹配机制 → ③无掩体竞技场）。**本轮冻结（下次修）**：无新增，遗留项见 [docs/frozen-tasks](docs/frozen-tasks/snapshot-8-playtest-feedback.md)。 |
 | **0.12.0** | 2026-09-28 | **更快传输（协议不兼容）**：线格式由恒定 64KB 槽帧改为**小定长包 + 指令优先组包 + 双通道**。①**主通道恒 256B**（32B 头 + 7×32B 单元），`SendScheduler` **指令优先**——装满 7 指令再发数据切片，指令永不被大数据饿死；②**指令二进制紧凑**——热路径 `PlayerInput` 15 个 bool 位打包进单 32B 单元，含字符串控制消息降级为 `DataKind::Control` 数据流；③**资源通道恒 4096B** 走独立第二条 TCP 连接，资源跨包分片、收侧按 `key` 重组，**客户端 16MB 定址对象池语义不变**；④**同端口双通道**——首条 256B 绑定包按 `sub_kind` 分角色（0=Control / 1=Resource），两条线程**不合并数据包**；⑤对象池淘汰经主通道 `PoolSync` 上报。**代码更改**：`ServerCode/net/packet.rs` 改小定长包、新增 `scheduler.rs`/`resource_stream.rs`/`codec.rs`、重写 `session.rs`（同端口分角色）；`HostCode/net` 重写 `network`/`uplink`/`downlink`、新增 `resource_downlink.rs`。**扁平化更新**：`HostCode/net/remote.rs` 槽位常量统一为 `SLOT_BYTES`、`ServerCode/net/mod.rs` 网关重导出新增子模块。**未做**：预取推送端到端接线、客户端 LRU 淘汰触发。详见 [ADR 0006](docs/adr/0006-small-fixed-packet-dual-channel.md)（取代 ADR 0005）。 |
 | **0.11.0** | 2026-09-28 | **通信优化（协议不兼容）**：线格式由 NDJSON 行帧改为**统一固定 64KB 槽帧**；客户端新增**固定 16MB（250 在用 + 6 预取，各 64KB 固定地址）远程对象池**，资源按 `key` 落槽、实体突现即复用；**上传/下载双线单线程**（各持 `try_clone` 句柄，上传不阻塞下载）；**传输不设时钟**；新增 AOI 边缘预取算法（预测 6 个即将进入视野的实体）。**代码更改**：移除 `Combatant::ammo_pool` 中间弹池，换弹改为计时耗尽后直接从背包弹药堆抽满 —— 修「备弹诡异归零 / 要多按一次 R」（协议 `ammo_pool` → `ammo_reserve`）。**扁平化更新**：`ServerCode/net/packet.rs` 统一帧编解码、`HostCode/net/remote.rs` 定址对象池、`downlink.rs`/`uplink.rs` 双线拆分。**未做**：预取推送端到端接线。**下一版本目标**：`0.6.1` 网游版本（①多玩家 → ②匹配机制 → ③无掩体竞技场）。详见 [ADR 0005](docs/adr/0005-slot-frame-transport.md)。 |
 | **0.10.0** | 2026-09-28 | **模型修复**：客户端首次可见本人「焰狐」体素模型。①**服务端下发模型目录**（几何+动画随握手一次性下行，协议 `0.10.0`，仅增不改、向后兼容）；②**焰狐几何重建**——修「四肢左右镜像颠倒 / 枪悬空 1.15m / 狐耳内折」三处硬伤，35→43 盒并优化造型；③**逐盒材质键**（`VoxelCube.mat`）——此前只按骨名着色致细节全被抹平、模型退化为一坨纯色方块，现按 0.3.2 色板逐盒上色；④**朝向随视线**（修「永远向北」）+ 相机按 3.52m 体型重新标定；⑤**扁平化**——解析器 `voxel_spec.rs`→`loader.rs`、两份 JSON 合并为单文件 `FireFox.json`、`mod.rs` 网关重导出保路径稳定。**未做**：多人联机 / 匹配机制 / 无掩体竞技场。**下一版本目标**：`0.6.1` 网游版本（①多玩家 → ②匹配机制 → ③无掩体竞技场）。**本轮冻结（下次修）**：无新增，遗留项见 [docs/frozen-tasks](docs/frozen-tasks/snapshot-8-playtest-feedback.md)。 |
@@ -325,7 +326,7 @@ TCP 的可靠传输更好保障**元素状态、技能效果、背包交互**等
 
 ### 已知坑（开发 / 部署实测）
 
-- **底层冻结红线（2026-09-25 起生效）**：在 bevy 及其大版本依赖（wgpu / naga / winit / glam 等）出稳定版本前**不要更新底层**。曾把 bevy 升到 0.19 又因大量 API 变动与稳定性问题回退到 0.14（本机离线缓存 0.14.2）。`ServerCode` 不依赖 bevy，回退不影响服务端分离。
+- **底层冻结红线（2026-09-25 起生效，2026-09-29 修订为「小步升级」）**：仍**禁止一次性大跳**——曾把 bevy 直接升到 0.19，因大量 API 变动与稳定性问题回退到 0.14。自 `0.12.1` 起改为**逐个小版本推进**（`0.14 → 0.15 → …`）：每次只迁「不迁就编译不过」的**强制破坏项**（如 0.15 的 `TextBundle`/`TextStyle` 删除、`Style` 改名 `Node`、`SpatialBundle` 移除、`PbrBundle` 字段类型改 `Mesh3d`/`MeshMaterial3d`），已弃用但仍可编译的 bundle 留待下一小步，每步都要实机验证后再发。`ServerCode` 不依赖 bevy，升级不影响服务端分离。
 - **release 构建偶发 `os error 3`（路径找不到）**：编译 bevy crate 写 `.fingerprint` 时失败，非代码错误，疑似 target 残留 + LTO / `codegen-units=1` 重负载；重试会触发整树重建，必要时先 `cargo clean`。
 - **ServerCode 遗留 dead_code 告警**：`combat/shooter.rs` 的 `Vec3Helper::dot` 暂未被调用，属无碍告警，后续接入近战/命中反馈时可复用。
 

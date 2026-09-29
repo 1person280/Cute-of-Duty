@@ -108,8 +108,8 @@ pub struct LootGhostText;
 pub fn spawn_loot_panel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     p.spawn((
         LootPanelRoot,
-        NodeBundle {
-            style: Style {
+        (
+            Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(0.0),
                 top: Val::Px(0.0),
@@ -121,23 +121,19 @@ pub fn spawn_loot_panel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                 row_gap: Val::Px(14.0),
                 ..default()
             },
-            background_color: Color::srgba(0.02, 0.03, 0.05, 0.62).into(),
-            visibility: Visibility::Hidden,
-            ..default()
-        },
+            BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.62)),
+            Visibility::Hidden,
+        ),
     ))
     .with_children(|root| {
         root.spawn((
             LootTitleText,
-            TextBundle::from_section("物资箱", flow::style(fonts, 26.0, theme::TASK_GOLD)),
+            flow::text("物资箱", flow::style(fonts, 26.0, theme::TASK_GOLD)),
         ));
-        root.spawn(NodeBundle {
-            style: Style {
-                flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(48.0),
-                align_items: AlignItems::FlexStart,
-                ..default()
-            },
+        root.spawn(Node {
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(48.0),
+            align_items: AlignItems::FlexStart,
             ..default()
         })
         .with_children(|cols| {
@@ -146,63 +142,56 @@ pub fn spawn_loot_panel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         });
         root.spawn((
             LootHintText,
-            TextBundle::from_section("", flow::style(fonts, 14.0, theme::TEXT_DIM)),
+            flow::text("", flow::style(fonts, 14.0, theme::TEXT_DIM)),
         ));
     });
 
     // 拖拽幽灵：作为面板之后的兄弟节点（绘制在上层），不参与命中判定（无 `Interaction`）。
     p.spawn((
         LootGhost,
-        NodeBundle {
-            visibility: Visibility::Hidden,
-            style: Style {
+        (
+            Visibility::Hidden,
+            Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(0.0),
                 top: Val::Px(0.0),
                 padding: UiRect::px(10.0, 10.0, 4.0, 4.0),
                 ..default()
             },
-            background_color: Color::srgba(0.12, 0.13, 0.16, 0.95).into(),
-            ..default()
-        },
+            BackgroundColor(Color::srgba(0.12, 0.13, 0.16, 0.95)),
+        ),
     ))
     .with_children(|g| {
         g.spawn((
             LootGhostText,
-            TextBundle::from_section("", flow::style(fonts, 16.0, theme::TEXT_WHITE)),
+            flow::text("", flow::style(fonts, 16.0, theme::TEXT_WHITE)),
         ));
     });
 }
 
 /// 生成一侧网格（标题 + `GRID_ROWS × GRID_COLS` 格位；网格容器本身是拖拽落区）。
 fn spawn_grid(cols: &mut ChildBuilder<'_>, fonts: &CjkFont, side: u8, title: &str) {
-    cols.spawn(NodeBundle {
-        style: Style {
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(8.0),
-            align_items: AlignItems::Center,
-            ..default()
-        },
+    cols.spawn(Node {
+        flex_direction: FlexDirection::Column,
+        row_gap: Val::Px(8.0),
+        align_items: AlignItems::Center,
         ..default()
     })
     .with_children(|col| {
         col.spawn((
             LootSideTitle { side },
-            TextBundle::from_section(title, flow::style(fonts, 18.0, theme::ACCENT_CYAN)),
+            flow::text(title, flow::style(fonts, 18.0, theme::ACCENT_CYAN)),
         ));
         // 网格容器 = 落区：`Interaction` 让光标悬停可判定"松手落在哪一侧"。
         col.spawn((
             LootZone { side },
             Interaction::default(),
-            NodeBundle {
-                style: Style {
-                    width: Val::Px(GRID_COLS as f32 * CELL + (GRID_COLS - 1) as f32 * CELL_GAP),
-                    flex_direction: FlexDirection::Row,
-                    flex_wrap: FlexWrap::Wrap,
-                    row_gap: Val::Px(CELL_GAP),
-                    column_gap: Val::Px(CELL_GAP),
-                    ..default()
-                },
+            Node {
+                width: Val::Px(GRID_COLS as f32 * CELL + (GRID_COLS - 1) as f32 * CELL_GAP),
+                flex_direction: FlexDirection::Row,
+                flex_wrap: FlexWrap::Wrap,
+                row_gap: Val::Px(CELL_GAP),
+                column_gap: Val::Px(CELL_GAP),
                 ..default()
             },
         ))
@@ -211,8 +200,8 @@ fn spawn_grid(cols: &mut ChildBuilder<'_>, fonts: &CjkFont, side: u8, title: &st
                 grid.spawn((
                     LootCell { side, index },
                     Interaction::default(),
-                    NodeBundle {
-                        style: Style {
+                    (
+                        Node {
                             width: Val::Px(CELL),
                             height: Val::Px(CELL),
                             justify_content: JustifyContent::Center,
@@ -220,15 +209,14 @@ fn spawn_grid(cols: &mut ChildBuilder<'_>, fonts: &CjkFont, side: u8, title: &st
                             border: UiRect::all(Val::Px(1.0)),
                             ..default()
                         },
-                        background_color: Color::srgba(0.10, 0.12, 0.16, 0.9).into(),
-                        border_color: BorderColor(theme::PANEL_BORDER),
-                        ..default()
-                    },
+                        BackgroundColor(Color::srgba(0.10, 0.12, 0.16, 0.9)),
+                        BorderColor(theme::PANEL_BORDER),
+                    ),
                 ))
                 .with_children(|cell| {
                     cell.spawn((
                         LootCellText { side, index },
-                        TextBundle::from_section("空", flow::style(fonts, 12.0, theme::TEXT_DIM)),
+                        flow::text("空", flow::style(fonts, 12.0, theme::TEXT_DIM)),
                     ));
                 });
             }
@@ -292,7 +280,7 @@ pub fn loot_panel_drag(
     zones: Query<(&LootZone, &Interaction)>,
     texts: Query<(&LootCellText, &Text), Without<LootGhostText>>,
     window: Query<&Window, With<PrimaryWindow>>,
-    mut ghost: Query<(&mut Visibility, &mut Style), With<LootGhost>>,
+    mut ghost: Query<(&mut Visibility, &mut Node), With<LootGhost>>,
     mut ghost_text: Query<&mut Text, (With<LootGhostText>, Without<LootCellText>)>,
 ) {
     if !state.open {
@@ -336,7 +324,7 @@ pub fn loot_panel_drag(
             let label = texts
                 .iter()
                 .find(|(c, _)| c.side == side && c.index == index)
-                .map(|(_, t)| t.sections[0].value.clone())
+                .map(|(_, t)| t.0.clone())
                 .unwrap_or_default();
             if let Ok((mut vis, mut style)) = ghost.get_single_mut() {
                 *vis = Visibility::Visible;
@@ -348,9 +336,7 @@ pub fn loot_panel_drag(
                 }
             }
             if let Ok(mut t) = ghost_text.get_single_mut() {
-                if !t.sections.is_empty() {
-                    t.sections[0].value = label;
-                }
+                t.0 = label;
             }
         }
         None => {
@@ -439,7 +425,7 @@ pub fn sync_loot_panel(
     mut root: Query<&mut Visibility, With<LootPanelRoot>>,
     mut cells: Query<(&LootCell, &mut BackgroundColor, &mut BorderColor)>,
     mut texts: ParamSet<(
-        Query<(&LootCellText, &mut Text)>,
+        Query<(&LootCellText, &mut Text, &mut TextColor)>,
         Query<&mut Text, With<LootHintText>>,
         Query<&mut Text, With<LootTitleText>>,
         Query<(&LootSideTitle, &mut Text)>,
@@ -490,7 +476,7 @@ pub fn sync_loot_panel(
     }
 
     // 文本：来源侧按形态取容器格 / 补给清单，背包侧取本人背包。
-    for (cell, mut text) in &mut texts.p0() {
+    for (cell, mut text, mut color) in &mut texts.p0() {
         let label = if cell.side == 0 && state.mode == LootMode::Supply {
             SUPPLY_OFFERINGS
                 .get(cell.index)
@@ -505,18 +491,18 @@ pub fn sync_loot_panel(
         };
         match label {
             Some(label) => {
-                text.sections[0].value = label;
-                text.sections[0].style.color = theme::TEXT_WHITE;
+                text.0 = label;
+                color.0 = theme::TEXT_WHITE;
             }
             None => {
-                text.sections[0].value = "空".to_string();
-                text.sections[0].style.color = theme::TEXT_DIM;
+                text.0 = "空".to_string();
+                color.0 = theme::TEXT_DIM;
             }
         }
     }
 
     if let Ok(mut t) = texts.p2().get_single_mut() {
-        t.sections[0].value = match state.mode {
+        t.0 = match state.mode {
             LootMode::Crate => "物资箱",
             LootMode::Supply => "补给台 · 领取补给",
         }
@@ -528,7 +514,7 @@ pub fn sync_loot_panel(
             (_, 0) => "容器",
             (_, _) => "背包",
         };
-        text.sections[0].value = name.to_string();
+        text.0 = name.to_string();
     }
 
     if let Ok(mut t) = texts.p1().get_single_mut() {
@@ -547,6 +533,6 @@ pub fn sync_loot_panel(
             Some(_) => "拖拽中：拖到「背包」松手即可",
             None => "鼠标拖拽 / Shift+左键 快捷移动 · W/S/A/D 移格 · F 确认 · Esc 关闭",
         };
-        t.sections[0].value = format!("{verb} · {tail}");
+        t.0 = format!("{verb} · {tail}");
     }
 }

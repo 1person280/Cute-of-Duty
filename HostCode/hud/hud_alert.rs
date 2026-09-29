@@ -37,7 +37,7 @@ pub fn spawn_alert_overlay(p: &mut ChildBuilder<'_>) {
         p.spawn((
             HudEdgeGlow { weight },
             NodeBundle {
-                style: Style {
+                node: Node {
                     position_type: PositionType::Absolute,
                     left: Val::Px(0.0),
                     top: Val::Px(0.0),

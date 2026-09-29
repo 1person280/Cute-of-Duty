@@ -34,7 +34,7 @@ pub fn spawn_hud(mut commands: Commands, fonts: Res<CjkFont>, kills: Res<KillCou
             HudRoot,
             StateScoped(AppState::InGame),
             NodeBundle {
-                style: Style {
+                node: Node {
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),
                     position_type: PositionType::Absolute,
@@ -72,7 +72,7 @@ fn spawn_extract_label(p: &mut ChildBuilder, fonts: &CjkFont) {
     p.spawn((
         ExtractLabel,
         NodeBundle {
-            style: Style {
+            node: Node {
                 position_type: PositionType::Absolute,
                 top: Val::Px(48.0),
                 left: Val::Percent(50.0),
@@ -82,7 +82,7 @@ fn spawn_extract_label(p: &mut ChildBuilder, fonts: &CjkFont) {
         },
     ))
     .with_children(|label| {
-        label.spawn(TextBundle::from_section(
+        label.spawn(flow::text(
             "前往北端撤离区",
             flow::style(&fonts, 20.0, Color::srgb(1.0, 0.95, 0.6)),
         ));
@@ -92,7 +92,7 @@ fn spawn_extract_label(p: &mut ChildBuilder, fonts: &CjkFont) {
     p.spawn((
         ExtractPrompt,
         NodeBundle {
-            style: Style {
+            node: Node {
                 position_type: PositionType::Absolute,
                 top: Val::Percent(60.0),
                 width: Val::Percent(100.0),
@@ -104,7 +104,7 @@ fn spawn_extract_label(p: &mut ChildBuilder, fonts: &CjkFont) {
         },
     ))
     .with_children(|prompt| {
-        prompt.spawn(TextBundle::from_section(
+        prompt.spawn(flow::text(
             "已到撤离区 · 按 Enter 撤离",
             flow::style(&fonts, 38.0, Color::srgb(1.0, 0.9, 0.3)),
         ));
@@ -132,7 +132,7 @@ pub fn update_extract(
     let in_zone = dist <= EXTRACTION_RANGE;
 
     if let Ok(mut text) = extract.get_single_mut() {
-        text.sections[0].value = if in_zone {
+        text.0 = if in_zone {
             "已到撤离区 · 按 Enter 撤离".to_string()
         } else {
             format!("前往北端撤离区  距离 {dist:.0} m")
@@ -141,7 +141,7 @@ pub fn update_extract(
 
     // 居中大字：仅入区时显示，并按 0.5s 节拍闪烁以强化提示。
     if let Ok(mut vis) = prompt.get_single_mut() {
-        let blink = (time.elapsed_seconds() * 2.0) as u32 % 2 == 0;
+        let blink = (time.elapsed_secs() * 2.0) as u32 % 2 == 0;
         *vis = if in_zone && blink {
             Visibility::Visible
         } else {

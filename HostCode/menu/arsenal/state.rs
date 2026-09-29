@@ -114,7 +114,7 @@ pub(super) type WhTextQ<'w, 's> = Query<
 pub(super) type BpTextQ<'w, 's> = Query<
     'w,
     's,
-    (&'static CarriedSlotText, &'static mut Text),
+    (&'static CarriedSlotText, &'static mut Text, &'static mut TextColor),
     (Without<WhStatusText>, Without<BackpackCapacity>, Without<LoadoutGhostText>),
 >;
 /// 容量计数文本（与其余 &mut Text 互斥）。
@@ -128,13 +128,13 @@ pub(super) type CapTextQ<'w, 's> = Query<
 pub(super) type GhostTextQ<'w, 's> = Query<
     'w,
     's,
-    &'static mut Text,
+    (&'static mut Text, &'static mut TextColor),
     (With<LoadoutGhostText>, Without<WhStatusText>, Without<CarriedSlotText>, Without<BackpackCapacity>),
 >;
 /// 幽灵根（&mut Visibility/Style；与背包行 Visibility 互斥）。
 pub(super) type GhostQ<'w, 's> = Query<
     'w,
     's,
-    (&'static mut Visibility, &'static mut Style),
+    (&'static mut Visibility, &'static mut Node),
     (With<LoadoutGhost>, Without<ArsenalRoot>, Without<BackpackRow>),
 >;

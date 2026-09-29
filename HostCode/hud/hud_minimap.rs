@@ -124,8 +124,8 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     let layout = lawn::layout();
 
     // ---- 罗盘条：刻度滚动，中央指针 + 读数固定 ----
-    p.spawn(NodeBundle {
-        style: Style {
+    p.spawn((
+        Node {
             position_type: PositionType::Absolute,
             left: Val::Px(16.0),
             top: Val::Px(14.0),
@@ -136,9 +136,8 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             overflow: Overflow::clip(),
             ..default()
         },
-        background_color: Color::srgba(0.05, 0.06, 0.08, 0.7).into(),
-        ..default()
-    })
+        BackgroundColor(Color::srgba(0.05, 0.06, 0.08, 0.7)),
+    ))
     .with_children(|strip| {
         // 每 15° 一根刻度；45° 倍数加高，正方位最亮
         for deg in (0..360).step_by(15) {
@@ -146,24 +145,22 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             let cardinal = deg % 90 == 0;
             strip.spawn((
                 CompassTick { angle: deg as f32 },
-                NodeBundle {
-                    style: Style {
+                (
+                    Node {
                         position_type: PositionType::Absolute,
                         top: Val::Px(0.0),
                         width: Val::Px(if cardinal { 3.0 } else { 2.0 }),
                         height: Val::Px(if major { 9.0 } else { 6.0 }),
                         ..default()
                     },
-                    background_color: if cardinal {
+                    BackgroundColor(if cardinal {
                         Color::srgba(0.95, 0.95, 0.95, 0.9)
                     } else if major {
                         Color::srgba(0.85, 0.85, 0.85, 0.55)
                     } else {
                         Color::srgba(0.7, 0.7, 0.7, 0.3)
-                    }
-                    .into(),
-                    ..default()
-                },
+                    }),
+                ),
             ));
         }
         // 四个方位字随刻度滚动
@@ -171,29 +168,26 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             strip
                 .spawn((
                     CompassLabel { angle: deg },
-                    NodeBundle {
-                        style: Style {
-                            position_type: PositionType::Absolute,
-                            top: Val::Px(9.0),
-                            width: Val::Px(14.0),
-                            height: Val::Px(12.0),
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            ..default()
-                        },
+                    Node {
+                        position_type: PositionType::Absolute,
+                        top: Val::Px(9.0),
+                        width: Val::Px(14.0),
+                        height: Val::Px(12.0),
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
                         ..default()
                     },
                 ))
                 .with_children(|label| {
-                    label.spawn(TextBundle::from_section(
+                    label.spawn(flow::text(
                         name,
                         flow::style(fonts, 10.0, Color::srgb(0.95, 0.95, 0.95)),
                     ));
                 });
         }
         // 中央固定指针
-        strip.spawn(NodeBundle {
-            style: Style {
+        strip.spawn((
+            Node {
                 position_type: PositionType::Absolute,
                 top: Val::Px(0.0),
                 left: Val::Px(MAP_SIZE * 0.5 - 1.0),
@@ -201,26 +195,24 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                 height: Val::Px(8.0),
                 ..default()
             },
-            background_color: Color::srgb(1.0, 0.8, 0.25).into(),
-            ..default()
-        });
+            BackgroundColor(Color::srgb(1.0, 0.8, 0.25)),
+        ));
         // 中央方位读数（in-flow 子节点，由 justify_content 居中）
         strip
-            .spawn(NodeBundle {
-                style: Style {
+            .spawn((
+                Node {
                     width: Val::Px(64.0),
                     height: Val::Px(14.0),
                     justify_content: JustifyContent::Center,
                     align_items: AlignItems::Center,
                     ..default()
                 },
-                background_color: Color::srgba(0.0, 0.0, 0.0, 0.75).into(),
-                ..default()
-            })
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.75)),
+            ))
             .with_children(|readout| {
                 readout.spawn((
                     CompassHeadingText,
-                    TextBundle::from_section(
+                    flow::text(
                         "正北 0°",
                         flow::style(fonts, 10.0, Color::srgb(0.95, 0.95, 0.9)),
                     ),
@@ -231,8 +223,8 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     // ---- 方形小地图（局部放大，玩家居中，随玩家滚动） ----
     p.spawn((
         MinimapLayer,
-        NodeBundle {
-            style: Style {
+        (
+            Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(16.0),
                 top: Val::Px(14.0 + COMPASS_H),
@@ -242,10 +234,9 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                 overflow: Overflow::clip(),
                 ..default()
             },
-            background_color: Color::srgba(0.04, 0.05, 0.07, 0.78).into(),
-            border_color: BorderColor(Color::srgba(0.6, 0.63, 0.67, 0.9)),
-            ..default()
-        },
+            BackgroundColor(Color::srgba(0.04, 0.05, 0.07, 0.78)),
+            BorderColor(Color::srgba(0.6, 0.63, 0.67, 0.9)),
+        ),
     ))
     .with_children(|map| {
         // 静态掩体：只画有碰撞且高过膝的，标线/管道等装饰不上图；位置每帧重投影
@@ -261,8 +252,8 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             let h = (aabb[2] * 2.0 * MAP_SCALE).max(2.0);
             map.spawn((
                 MinimapStatic { wx: prop.pos[0], wz: prop.pos[2], w, h },
-                NodeBundle {
-                    style: Style {
+                (
+                    Node {
                         position_type: PositionType::Absolute,
                         left: Val::Px(MAP_CENTER - w * 0.5),
                         top: Val::Px(MAP_CENTER - h * 0.5),
@@ -270,17 +261,16 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                         height: Val::Px(h),
                         ..default()
                     },
-                    background_color: material_color(prop.material).into(),
-                    ..default()
-                },
+                    BackgroundColor(material_color(prop.material)),
+                ),
             ));
         }
         // 功能站点：补给台（琥珀）/ 干员切换台（青）/ 物资箱（橙）
         for station in &layout.stations {
             map.spawn((
                 MinimapStatic { wx: station.pos[0], wz: station.pos[2], w: 6.0, h: 6.0 },
-                NodeBundle {
-                    style: Style {
+                (
+                    Node {
                         position_type: PositionType::Absolute,
                         left: Val::Px(MAP_CENTER - 3.0),
                         top: Val::Px(MAP_CENTER - 3.0),
@@ -288,9 +278,8 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                         height: Val::Px(6.0),
                         ..default()
                     },
-                    background_color: station_color(station.kind).into(),
-                    ..default()
-                },
+                    BackgroundColor(station_color(station.kind)),
+                ),
             ));
         }
         // 动态点容器：每帧被 `update_minimap` 清空重建
@@ -298,8 +287,8 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         // 玩家：白色定位点 + 朝向菱形（恒居中，后生成者在上层）
         map.spawn((
             MinimapPlayerDot,
-            NodeBundle {
-                style: Style {
+            (
+                Node {
                     position_type: PositionType::Absolute,
                     left: Val::Px(MAP_CENTER - 2.0),
                     top: Val::Px(MAP_CENTER - 2.0),
@@ -307,14 +296,13 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                     height: Val::Px(4.0),
                     ..default()
                 },
-                background_color: Color::srgb(0.95, 0.95, 0.95).into(),
-                ..default()
-            },
+                BackgroundColor(Color::srgb(0.95, 0.95, 0.95)),
+            ),
         ));
         map.spawn((
             MinimapPlayerArrow,
-            NodeBundle {
-                style: Style {
+            (
+                Node {
                     position_type: PositionType::Absolute,
                     left: Val::Px(MAP_CENTER - 5.5),
                     top: Val::Px(MAP_CENTER - 5.5),
@@ -322,10 +310,8 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                     height: Val::Px(11.0),
                     ..default()
                 },
-                background_color: Color::srgba(0.35, 0.95, 0.6, 0.5).into(),
-                transform: Transform::from_rotation(Quat::from_rotation_z(std::f32::consts::FRAC_PI_4)),
-                ..default()
-            },
+                BackgroundColor(Color::srgba(0.35, 0.95, 0.6, 0.5)),
+            ),
         ));
     });
 }
@@ -334,19 +320,19 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
 type TicksQuery<'w, 's> = Query<
     'w,
     's,
-    (&'static CompassTick, &'static mut Style),
+    (&'static CompassTick, &'static mut Node),
     (Without<CompassLabel>, Without<MinimapStatic>),
 >;
 type LabelsQuery<'w, 's> = Query<
     'w,
     's,
-    (&'static CompassLabel, &'static mut Style),
+    (&'static CompassLabel, &'static mut Node),
     (Without<CompassTick>, Without<MinimapStatic>),
 >;
 type StaticsQuery<'w, 's> = Query<
     'w,
     's,
-    (&'static MinimapStatic, &'static mut Style),
+    (&'static MinimapStatic, &'static mut Node),
     (Without<CompassTick>, Without<CompassLabel>),
 >;
 
@@ -394,7 +380,7 @@ pub fn update_minimap(
         const DIR_NAMES: [&str; 8] =
             ["正北", "东北", "正东", "东南", "正南", "西南", "正西", "西北"];
         let dir = DIR_NAMES[((heading_deg + 22.5) / 45.0) as usize % 8];
-        text.sections[0].value = format!("{} {:.0}°", dir, heading_deg);
+        text.0 = format!("{} {:.0}°", dir, heading_deg);
     }
 
     // ---- 静态层：随玩家中心重投影（尺寸不变，仅平移；越界由画布 clip 裁掉） ----
@@ -425,8 +411,8 @@ pub fn update_minimap(
                 dot_style(e.entity_id, me.map(|m| m.entity_id), e.model_preset);
             p.spawn((
                 MinimapDot,
-                NodeBundle {
-                    style: Style {
+                (
+                    Node {
                         position_type: PositionType::Absolute,
                         left: Val::Px(px - size / 2.0),
                         top: Val::Px(py - size / 2.0),
@@ -434,9 +420,8 @@ pub fn update_minimap(
                         height: Val::Px(size),
                         ..default()
                     },
-                    background_color: color.into(),
-                    ..default()
-                },
+                    BackgroundColor(color),
+                ),
             ));
         }
     });

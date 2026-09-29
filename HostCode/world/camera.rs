@@ -179,7 +179,7 @@ pub fn follow_system(
     // 越肩瞄准过渡：`aim_blend` 按「dt / 过渡时长」朝目标推进（帧率无关），
     // 再取 smoothstep 缓动，使收臂 / 收 FOV 起步与收尾都不生硬。
     let target = if rig.aiming { 1.0 } else { 0.0 };
-    let step = time.delta_seconds() / AIM_BLEND_SECS;
+    let step = time.delta_secs() / AIM_BLEND_SECS;
     for (mut tf, mut cam) in &mut query {
         cam.aim_blend = (cam.aim_blend + (target - cam.aim_blend).clamp(-step, step)).clamp(0.0, 1.0);
         let b = cam.aim_blend;
@@ -203,7 +203,7 @@ pub fn follow_system(
             cam.arm_dist = if target_arm < cam.arm_dist {
                 target_arm
             } else {
-                (cam.arm_dist + ARM_RECOVER_SPEED * time.delta_seconds()).min(target_arm)
+                (cam.arm_dist + ARM_RECOVER_SPEED * time.delta_secs()).min(target_arm)
             };
         }
         let mut cam_pos = anchor + (to / full) * cam.arm_dist;

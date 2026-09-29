@@ -29,23 +29,21 @@ pub(super) fn pool_color(name: &str) -> Color {
 pub(super) fn write_loadout_texts(sel: &ArsenalSelection, wh: &mut WhTextQ, bp: &mut BpTextQ, cap: &mut CapTextQ) {
     for (status, mut text) in wh.iter_mut() {
         let on = carried_index(sel, status.0).is_some();
-        text.sections[0].value = if on { "已携带 ✓".to_string() } else { String::new() };
+        text.0 = if on { "已携带 ✓".to_string() } else { String::new() };
     }
-    for (slot, mut text) in bp.iter_mut() {
+    for (slot, mut text, mut text_color) in bp.iter_mut() {
         match sel.0.get(slot.0) {
             Some(name) => {
-                text.sections[0].value = name.clone();
-                text.sections[0].style.color = pool_color(name);
+                text.0 = name.clone();
+                text_color.0 = pool_color(name);
             }
             None => {
-                text.sections[0].value = "空".to_string();
-                text.sections[0].style.color = Color::srgb(0.85, 0.85, 0.85);
+                text.0 = "空".to_string();
+                text_color.0 = Color::srgb(0.85, 0.85, 0.85);
             }
         }
     }
     if let Ok(mut cap) = cap.get_single_mut() {
-        if !cap.sections.is_empty() {
-            cap.sections[0].value = format!("{} / {}", sel.0.len(), LOADOUT_CAPACITY);
-        }
+        cap.0 = format!("{} / {}", sel.0.len(), LOADOUT_CAPACITY);
     }
 }

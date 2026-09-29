@@ -181,8 +181,10 @@ pub fn apply_entities(
 /// 缺 `GlobalTransform` 便不在递归起点里，子级的 `GlobalTransform` 永远停在
 /// `identity` —— 所有服务端实体（含本人角色、靶机）都被画在**世界原点**且缩放松失，
 /// 玩家在出生点自然"看不见自己、也看不见靶机"（此前被误判为 AOI 遮蔽）。
-/// 故此处用 `SpatialBundle` 一次性补齐 Transform / GlobalTransform /
-/// Visibility / InheritedVisibility / ViewVisibility。
+/// bevy 0.15 起 `SpatialBundle` 已移除，改为 `Transform` + `Visibility`：
+/// `Transform` 以 `#[require(GlobalTransform)]` 自动补齐全局变换，
+/// `Visibility` 以 `#[require(InheritedVisibility, ViewVisibility)]` 自动补齐可见性链，
+/// 五件套依旧齐全。
 #[allow(clippy::too_many_arguments)]
 fn spawn_body(
     commands: &mut Commands,
@@ -201,11 +203,9 @@ fn spawn_body(
             let mut root = commands.spawn((
                 RenderedEntity { id: entry.entity_id },
                 VoxelRendered,
-                SpatialBundle {
-                    transform: Transform::from_translation(Vec3::new(entry.x, entry.y, entry.z))
-                        .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
-                    ..default()
-                },
+                Transform::from_translation(Vec3::new(entry.x, entry.y, entry.z))
+                    .with_rotation(Quat::from_rotation_y(std::f32::consts::PI)),
+                Visibility::default(),
             ));
             spawn_voxel_body(&mut root, cube, materials, voxel_mats, spec);
             return;
@@ -224,10 +224,8 @@ fn spawn_body(
 
     let mut root = commands.spawn((
         RenderedEntity { id: entry.entity_id },
-        SpatialBundle {
-            transform: Transform::from_translation(Vec3::new(entry.x, entry.y, entry.z)),
-            ..default()
-        },
+        Transform::from_translation(Vec3::new(entry.x, entry.y, entry.z)),
+        Visibility::default(),
     ));
 
     root.with_children(|p| {
@@ -235,8 +233,8 @@ fn spawn_body(
             // 物体类：单方块
             p.spawn((
                 PbrBundle {
-                    mesh: cube.handle.clone(),
-                    material: primary,
+                    mesh: Mesh3d(cube.handle.clone()),
+                    material: MeshMaterial3d(primary),
                     transform: Transform::from_scale(body.torso_scale),
                     ..default()
                 },
@@ -245,8 +243,8 @@ fn spawn_body(
             // 角色类：躯干 + 头（脚底对齐 y=0，躯干块中心抬至 y=0.75）
             p.spawn((
                 PbrBundle {
-                    mesh: cube.handle.clone(),
-                    material: primary,
+                    mesh: Mesh3d(cube.handle.clone()),
+                    material: MeshMaterial3d(primary),
                     transform: Transform::from_translation(Vec3::new(0.0, 0.75, 0.0))
                         .with_scale(body.torso_scale),
                     ..default()
@@ -254,8 +252,8 @@ fn spawn_body(
             ));
             p.spawn((
                 PbrBundle {
-                    mesh: cube.handle.clone(),
-                    material: accent,
+                    mesh: Mesh3d(cube.handle.clone()),
+                    material: MeshMaterial3d(accent),
                     transform: Transform::from_translation(Vec3::new(0.0, body.head_y, 0.0))
                         .with_scale(body.head_scale),
                     ..default()

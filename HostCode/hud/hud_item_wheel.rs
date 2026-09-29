@@ -112,7 +112,7 @@ pub fn spawn_item_wheel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     p.spawn((
         ItemWheelRoot,
         NodeBundle {
-            style: Style {
+            node: Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(0.0),
                 top: Val::Px(0.0),
@@ -129,8 +129,9 @@ pub fn spawn_item_wheel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         // 顶部键位提示（水平居中）。
         root.spawn((
             ItemWheelKeyText,
-            TextBundle {
-                style: Style {
+            (
+                flow::text("", flow::style(fonts, 18.0, theme::TEXT_WHITE)),
+                Node {
                     position_type: PositionType::Absolute,
                     left: Val::Percent(50.0),
                     top: Val::Px(88.0),
@@ -142,14 +143,12 @@ pub fn spawn_item_wheel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                     justify_content: JustifyContent::Center,
                     ..default()
                 },
-                text: Text::from_section("", flow::style(fonts, 18.0, theme::TEXT_WHITE)),
-                ..default()
-            },
+            ),
         ));
 
         // 中心卡片（屏幕正中，显示当前高亮物品名）。
         root.spawn(NodeBundle {
-            style: Style {
+            node: Node {
                 position_type: PositionType::Absolute,
                 left: Val::Percent(50.0),
                 top: Val::Percent(50.0),
@@ -172,7 +171,7 @@ pub fn spawn_item_wheel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         .with_children(|c| {
             c.spawn((
                 ItemWheelCenterText,
-                TextBundle::from_section("", flow::style(fonts, 17.0, theme::ACCENT_AMBER)),
+                flow::text("", flow::style(fonts, 17.0, theme::ACCENT_AMBER)),
             ));
         });
 
@@ -181,7 +180,7 @@ pub fn spawn_item_wheel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             root.spawn((
                 ItemWheelSector(i),
                 NodeBundle {
-                    style: Style {
+                    node: Node {
                         position_type: PositionType::Absolute,
                         left: Val::Percent(50.0),
                         top: Val::Percent(50.0),
@@ -201,7 +200,7 @@ pub fn spawn_item_wheel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             .with_children(|s| {
                 s.spawn((
                     ItemWheelSectorText(i),
-                    TextBundle::from_section("", flow::style(fonts, 14.0, theme::TEXT_WHITE)),
+                    flow::text("", flow::style(fonts, 14.0, theme::TEXT_WHITE)),
                 ));
             });
         }
@@ -333,7 +332,7 @@ pub fn item_wheel_input(
     let Some(key) = state.held_key else {
         return;
     };
-    state.held += time.delta_seconds();
+    state.held += time.delta_secs();
     let category = category_of(key);
 
     if state.open {
@@ -418,9 +417,9 @@ fn category_slots(
 pub fn update_item_wheel(
     state: Res<ItemWheelState>,
     mut root: Query<&mut Visibility, With<ItemWheelRoot>>,
-    mut sectors: Query<(&ItemWheelSector, &mut Style, &mut BackgroundColor, &mut BorderColor)>,
+    mut sectors: Query<(&ItemWheelSector, &mut Node, &mut BackgroundColor, &mut BorderColor)>,
     mut sec_text: Query<
-        (&ItemWheelSectorText, &mut Text),
+        (&ItemWheelSectorText, &mut Text, &mut TextColor),
         (Without<ItemWheelCenterText>, Without<ItemWheelKeyText>),
     >,
     mut center: Query<
@@ -469,10 +468,10 @@ pub fn update_item_wheel(
         });
     }
 
-    for (sector, mut text) in &mut sec_text {
-        text.sections[0].value = state.labels.get(sector.0).cloned().unwrap_or_default();
+    for (sector, mut text, mut tc) in &mut sec_text {
+        text.0 = state.labels.get(sector.0).cloned().unwrap_or_default();
         let selected = sector.0 == state.selected && !state.cancel;
-        text.sections[0].style.color = if selected {
+        tc.0 = if selected {
             theme::TEXT_WHITE
         } else {
             theme::TEXT_DIM
@@ -480,7 +479,7 @@ pub fn update_item_wheel(
     }
 
     if let Ok(mut t) = center.get_single_mut() {
-        t.sections[0].value = if state.cancel {
+        t.0 = if state.cancel {
             "松开取消".to_string()
         } else {
             state.labels.get(state.selected).cloned().unwrap_or_default()
@@ -493,7 +492,7 @@ pub fn update_item_wheel(
         } else {
             "4 战术类"
         };
-        t.sections[0].value = format!("{cat} · 滚轮/方向选择 · 松开使用");
+        t.0 = format!("{cat} · 滚轮/方向选择 · 松开使用");
     }
 }
 

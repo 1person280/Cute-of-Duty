@@ -31,7 +31,7 @@ pub fn drive_idle(
     if anim.length <= 0.0 {
         return;
     }
-    let t = time.elapsed_seconds() % anim.length;
+    let t = time.elapsed_secs() % anim.length;
     for (node, mut tf) in query.iter_mut() {
         let Some(track) = anim.tracks.iter().find(|tr| tr.bone == node.0) else {
             continue;

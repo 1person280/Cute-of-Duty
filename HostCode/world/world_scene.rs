@@ -119,8 +119,8 @@ fn spawn_floor(
             let is_dark = (x + z) % 2 == 0;
             commands
                 .spawn(PbrBundle {
-                    mesh: tile_mesh.clone(),
-                    material: if is_dark { ground_a.clone() } else { ground_b.clone() },
+                    mesh: Mesh3d(tile_mesh.clone()),
+                    material: MeshMaterial3d(if is_dark { ground_a.clone() } else { ground_b.clone() }),
                     transform: Transform::from_xyz(
                         x as f32 * tile,
                         -0.1,
@@ -224,8 +224,8 @@ fn spawn_prop(
         transform.rotation = Quat::from_axis_angle(Vec3::from(axis), angle);
     }
     commands.spawn(PbrBundle {
-        mesh,
-        material: mats.get(prop.material),
+        mesh: Mesh3d(mesh),
+        material: MeshMaterial3d(mats.get(prop.material)),
         transform,
         ..default()
     });
@@ -254,8 +254,8 @@ fn spawn_glow(
     });
     commands
         .spawn(PbrBundle {
-            mesh,
-            material: mat,
+            mesh: Mesh3d(mesh),
+            material: MeshMaterial3d(mat),
             transform: Transform::from_translation(Vec3::from(glow.pos)),
             ..default()
         })

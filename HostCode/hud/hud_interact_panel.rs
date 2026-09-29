@@ -27,9 +27,9 @@ fn track_height() -> f32 {
 pub fn sync_interact_panel(
     state: Res<InteractState>,
     mut root: Query<&mut Visibility, With<InteractPanel>>,
-    mut rows: Query<(&InteractRowSlot, &mut BackgroundColor, &mut BorderColor, &mut Style)>,
-    mut texts: Query<(&InteractRowText, &mut Text)>,
-    mut thumb: Query<&mut Style, (With<InteractScrollThumb>, Without<InteractRowSlot>)>,
+    mut rows: Query<(&InteractRowSlot, &mut BackgroundColor, &mut BorderColor, &mut Node)>,
+    mut texts: Query<(&InteractRowText, &mut Text, &mut TextColor)>,
+    mut thumb: Query<&mut Node, (With<InteractScrollThumb>, Without<InteractRowSlot>)>,
     mut hint: Query<&mut Text, (With<InteractHintText>, Without<InteractRowText>)>,
 ) {
     let n = state.entries.len();
@@ -54,17 +54,17 @@ pub fn sync_interact_panel(
         *border = BorderColor(if selected { theme::ACCENT_AMBER } else { theme::PANEL_BORDER });
     }
 
-    for (slot, mut text) in &mut texts {
+    for (slot, mut text, mut tc) in &mut texts {
         let idx = state.scroll_start + slot.0;
         match state.entries.get(idx) {
             Some(entry) => {
                 let selected = idx == state.selected;
-                text.sections[0].value =
+                text.0 =
                     format!("{}{}", if selected { "▶ " } else { "  " }, entry.label);
-                text.sections[0].style.color =
+                tc.0 =
                     if selected { theme::TEXT_WHITE } else { theme::TEXT_DIM };
             }
-            None => text.sections[0].value = String::new(),
+            None => text.0 = String::new(),
         }
     }
 
@@ -84,7 +84,7 @@ pub fn sync_interact_panel(
 
     if let Ok(mut text) = hint.get_single_mut() {
         let pages = n.div_ceil(INTERACT_VISIBLE_ROWS);
-        text.sections[0].value = if pages > 1 {
+        text.0 = if pages > 1 {
             let page = state.scroll_start / INTERACT_VISIBLE_ROWS + 1;
             format!("滚轮翻页（{page}/{pages}）· F 确认")
         } else {
@@ -117,7 +117,7 @@ pub fn sync_interact_menu(
     }
 
     if let Ok(mut t) = title.get_single_mut() {
-        t.sections[0].value = state.title.clone();
+        t.0 = state.title.clone();
     }
 
     let Ok(list_entity) = list.get_single() else {
@@ -130,7 +130,7 @@ pub fn sync_interact_menu(
         commands.entity(list_entity).with_children(|p| {
             p.spawn((
                 ButtonBundle {
-                    style: Style {
+                    node: Node {
                         padding: UiRect::new(
                             Val::Px(14.0),
                             Val::Px(14.0),
@@ -155,7 +155,7 @@ pub fn sync_interact_menu(
                 InteractOptionIndex(i),
             ))
             .with_children(|b| {
-                b.spawn(TextBundle::from_section(
+                b.spawn(flow::text(
                     format!("{}{}", if selected { "▶ " } else { "  " }, label),
                     flow::style(
                         &fonts,

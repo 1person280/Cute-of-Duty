@@ -70,7 +70,7 @@ const SKILL_CD_FILL: Color = Color::srgba(1.0, 0.72, 0.2, 0.55);
 /// 装配 vitals 面板（左下角：干员名 → HP 180×22 → 护甲 140×10 → Q/E 图标 → 道具槽）。
 pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     p.spawn(NodeBundle {
-        style: Style {
+        node: Node {
             position_type: PositionType::Absolute,
             left: Val::Px(16.0),
             bottom: Val::Px(16.0),
@@ -86,12 +86,12 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         // 干员名
         v.spawn((
             VitalsText::OperatorName,
-            TextBundle::from_section("干员 #0", flow::style(fonts, 20.0, theme::TEXT_WHITE)),
+            flow::text("干员 #0", flow::style(fonts, 20.0, theme::TEXT_WHITE)),
         ));
 
         // 血条 180×22 + 居中数值
         let mut hp = v.spawn(NodeBundle {
-            style: Style {
+            node: Node {
                 width: Val::Px(180.0),
                 height: Val::Px(22.0),
                 justify_content: JustifyContent::FlexStart,
@@ -104,7 +104,7 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             h.spawn((
                 VitalsBar::Health,
                 NodeBundle {
-                    style: Style {
+                    node: Node {
                         width: Val::Percent(100.0),
                         height: Val::Percent(100.0),
                         ..default()
@@ -115,7 +115,7 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             ));
             // 数值覆盖层（绝对定位铺满血条、内容居中）
             h.spawn(NodeBundle {
-                style: Style {
+                node: Node {
                     position_type: PositionType::Absolute,
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),
@@ -128,7 +128,7 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             .with_children(|c| {
                 c.spawn((
                     VitalsText::Hp,
-                    TextBundle::from_section(
+                    flow::text(
                         "HP 100 / 100",
                         flow::style(fonts, 13.0, theme::TEXT_WHITE),
                     ),
@@ -138,7 +138,7 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
 
         // 护甲条 140×10 + 数值
         v.spawn(NodeBundle {
-            style: Style {
+            node: Node {
                 width: Val::Px(140.0),
                 height: Val::Px(10.0),
                 justify_content: JustifyContent::FlexStart,
@@ -151,7 +151,7 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             a.spawn((
                 VitalsBar::Armor,
                 NodeBundle {
-                    style: Style {
+                    node: Node {
                         width: Val::Percent(0.0),
                         height: Val::Percent(100.0),
                         ..default()
@@ -163,12 +163,12 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         });
         v.spawn((
             VitalsText::Armor,
-            TextBundle::from_section("ARMOR 0 / 100", flow::style(fonts, 12.0, theme::TEXT_DIM)),
+            flow::text("ARMOR 0 / 100", flow::style(fonts, 12.0, theme::TEXT_DIM)),
         ));
 
         // 技能图标行：Q / E 两个 52×52 方块（冷却填充 + 读秒 + 底部键位标签）
         v.spawn(NodeBundle {
-            style: Style {
+            node: Node {
                 flex_direction: FlexDirection::Row,
                 column_gap: Val::Px(8.0),
                 ..default()
@@ -182,7 +182,7 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
 
         // 道具槽行：键位 3 / 4（物品名 + 计数来自权威快照的 4×3 背包格位）
         v.spawn(NodeBundle {
-            style: Style {
+            node: Node {
                 flex_direction: FlexDirection::Row,
                 column_gap: Val::Px(8.0),
                 ..default()
@@ -193,7 +193,7 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             for slot in [3u8, 4u8] {
                 row.spawn((
                     NodeBundle {
-                        style: Style {
+                        node: Node {
                             width: Val::Px(ITEM_W),
                             height: Val::Px(ITEM_H),
                             flex_direction: FlexDirection::Column,
@@ -208,13 +208,13 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                     },
                 ))
                 .with_children(|c| {
-                    c.spawn(TextBundle::from_section(
+                    c.spawn(flow::text(
                         format!("{slot}"),
                         flow::style(fonts, 11.0, theme::TEXT_DIM),
                     ));
                     c.spawn((
                         VitalsText::ItemSlot(slot),
-                        TextBundle::from_section("—", flow::style(fonts, 13.0, theme::TEXT_DIM)),
+                        flow::text("—", flow::style(fonts, 13.0, theme::TEXT_DIM)),
                     ));
                 });
             }
@@ -231,7 +231,7 @@ fn spawn_skill_icon(
     text: VitalsText,
 ) {
     row.spawn(NodeBundle {
-        style: Style {
+        node: Node {
             width: Val::Px(SKILL_ICON),
             height: Val::Px(SKILL_ICON),
             border: UiRect::all(Val::Px(1.0)),
@@ -247,7 +247,7 @@ fn spawn_skill_icon(
         icon.spawn((
             bar,
             NodeBundle {
-                style: Style {
+                node: Node {
                     position_type: PositionType::Absolute,
                     left: Val::Px(0.0),
                     bottom: Val::Px(0.0),
@@ -261,7 +261,7 @@ fn spawn_skill_icon(
         ));
         // 中央读数（钟面）
         icon.spawn(NodeBundle {
-            style: Style {
+            node: Node {
                 position_type: PositionType::Absolute,
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
@@ -275,9 +275,9 @@ fn spawn_skill_icon(
         .with_children(|c| {
             c.spawn((
                 text,
-                TextBundle::from_section("就绪", flow::style(fonts, 13.0, theme::TEXT_WHITE)),
+                flow::text("就绪", flow::style(fonts, 13.0, theme::TEXT_WHITE)),
             ));
-            c.spawn(TextBundle::from_section(
+            c.spawn(flow::text(
                 key,
                 flow::style(fonts, 11.0, theme::ACCENT_AMBER),
             ));
@@ -289,7 +289,7 @@ fn spawn_skill_icon(
 pub fn update_vitals_bars(
     snap: Res<SnapshotBuffer>,
     player: Res<LocalPlayer>,
-    mut bars: Query<(&VitalsBar, &mut Style)>,
+    mut bars: Query<(&VitalsBar, &mut Node)>,
 ) {
     let snap_entry = snap.current.iter().find(|e| e.entity_id == player.entity_id);
     let (hp_f, armor_f, cd_q, cd_e, op) = match snap_entry {
@@ -318,7 +318,7 @@ pub fn update_vitals_bars(
 pub fn update_vitals_text(
     snap: Res<SnapshotBuffer>,
     player: Res<LocalPlayer>,
-    mut texts: Query<(&VitalsText, &mut Text)>,
+    mut texts: Query<(&VitalsText, &mut Text, &mut TextColor)>,
 ) {
     let snap_entry = snap.current.iter().find(|e| e.entity_id == player.entity_id);
     let (hp, armor, cd_q, cd_e, op) = match snap_entry {
@@ -329,23 +329,23 @@ pub fn update_vitals_text(
     let backpack = snap_entry.and_then(|e| e.backpack.as_deref());
     let om = meta(op);
 
-    for (kind, mut text) in &mut texts {
+    for (kind, mut text, mut tc) in &mut texts {
         match *kind {
             VitalsText::OperatorName => {
-                text.sections[0].value = om.name.to_string();
-                text.sections[0].style.color = om.color;
+                text.0 = om.name.to_string();
+                tc.0 = om.color;
             }
             VitalsText::Hp => {
-                text.sections[0].value = format!("HP {:.0} / {:.0}", hp.max(0.0), MAX_HP);
+                text.0 = format!("HP {:.0} / {:.0}", hp.max(0.0), MAX_HP);
             }
             VitalsText::Armor => {
-                text.sections[0].value = format!("ARMOR {:.0} / {:.0}", armor.max(0.0), MAX_ARMOR);
+                text.0 = format!("ARMOR {:.0} / {:.0}", armor.max(0.0), MAX_ARMOR);
             }
             VitalsText::SkillQ => {
-                text.sections[0].value = cd_readout(cd_q, om.skill_q);
+                text.0 = cd_readout(cd_q, om.skill_q);
             }
             VitalsText::SkillE => {
-                text.sections[0].value = cd_readout(cd_e, om.skill_e);
+                text.0 = cd_readout(cd_e, om.skill_e);
             }
             VitalsText::ItemSlot(slot) => {
                 let category = if slot == 3 {
@@ -354,11 +354,11 @@ pub fn update_vitals_text(
                     ItemCategory::Tactical
                 };
                 let (name, n) = category_readout(backpack, category);
-                text.sections[0].value = match name {
+                text.0 = match name {
                     Some(name) if n > 0 => format!("{name} ×{n}"),
                     _ => "—".to_string(),
                 };
-                text.sections[0].style.color = if n == 0 {
+                tc.0 = if n == 0 {
                     theme::TEXT_DIM
                 } else {
                     text_color_for(slot)

@@ -52,7 +52,7 @@ const AMMO_ALERT: Color = Color::srgb(0.95, 0.25, 0.20);
 /// 装配右下武器/弹药面板 + 顶部公告流。
 pub fn spawn_skills(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     p.spawn(NodeBundle {
-        style: Style {
+        node: Node {
             position_type: PositionType::Absolute,
             right: Val::Px(16.0),
             bottom: Val::Px(16.0),
@@ -67,7 +67,7 @@ pub fn spawn_skills(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     .with_children(|s| {
         // 武器槽行：[1] 主武器名 / [2] 副武器占位
         s.spawn(NodeBundle {
-            style: Style {
+            node: Node {
                 flex_direction: FlexDirection::Row,
                 column_gap: Val::Px(6.0),
                 ..default()
@@ -81,7 +81,7 @@ pub fn spawn_skills(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
 
         // 大字弹药行：`当前` (24px) + ` / 容量` (13px，基线对齐更稳)
         s.spawn(NodeBundle {
-            style: Style {
+            node: Node {
                 flex_direction: FlexDirection::Row,
                 align_items: AlignItems::FlexEnd,
                 column_gap: Val::Px(4.0),
@@ -92,54 +92,53 @@ pub fn spawn_skills(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         .with_children(|row| {
             row.spawn((
                 RightText::AmmoMain,
-                TextBundle::from_section("--", flow::style(fonts, 34.0, theme::TEXT_WHITE)),
+                flow::text("--", flow::style(fonts, 34.0, theme::TEXT_WHITE)),
             ));
             row.spawn((
                 RightText::AmmoMax,
-                TextBundle::from_section("/ --", flow::style(fonts, 16.0, theme::TEXT_DIM)),
+                flow::text("/ --", flow::style(fonts, 16.0, theme::TEXT_DIM)),
             ));
         });
 
         // 备用弹药池
         s.spawn((
             RightText::AmmoPool,
-            TextBundle::from_section("备用 --", flow::style(fonts, 13.0, theme::TEXT_DIM)),
+            flow::text("备用 --", flow::style(fonts, 13.0, theme::TEXT_DIM)),
         ));
 
         // 换弹提示（未换弹时留空，避免面板抖动）
         s.spawn((
             RightText::Reload,
-            TextBundle::from_section("", flow::style(fonts, 14.0, theme::ACCENT_AMBER)),
+            flow::text("", flow::style(fonts, 14.0, theme::ACCENT_AMBER)),
         ));
 
         // 元素附着状态
         s.spawn((
             RightText::Element,
-            TextBundle::from_section("元素 · 无", flow::style(fonts, 13.0, theme::TEXT_DIM)),
+            flow::text("元素 · 无", flow::style(fonts, 13.0, theme::TEXT_DIM)),
         ));
     });
 
     // 顶部公告流：右上为击杀数、左上为小地图，故移至左中上（避开两者）。
     p.spawn((
         FeedText,
-        TextBundle {
-            style: Style {
+        (
+            flow::text("", flow::style(fonts, 16.0, theme::TEXT_DIM)),
+            Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(24.0),
                 top: Val::Px(230.0),
                 max_width: Val::Px(420.0),
                 ..default()
             },
-            text: Text::from_section("", flow::style(fonts, 16.0, theme::TEXT_DIM)),
-            ..default()
-        },
+        ),
     ));
 }
 
 /// 单个武器槽：方形键位徽标 + 槽内武器名。
 fn spawn_weapon_slot(row: &mut ChildBuilder<'_>, fonts: &CjkFont, slot: u8, name: &str) {
     row.spawn(NodeBundle {
-        style: Style {
+        node: Node {
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             column_gap: Val::Px(4.0),
@@ -152,13 +151,13 @@ fn spawn_weapon_slot(row: &mut ChildBuilder<'_>, fonts: &CjkFont, slot: u8, name
         ..default()
     })
     .with_children(|b| {
-        b.spawn(TextBundle::from_section(
+        b.spawn(flow::text(
             format!("{slot}"),
             flow::style(fonts, 12.0, theme::ACCENT_AMBER),
         ));
         b.spawn((
             RightText::WeaponSlot(slot),
-            TextBundle::from_section(name, flow::style(fonts, 15.0, theme::TEXT_DIM)),
+            flow::text(name, flow::style(fonts, 15.0, theme::TEXT_DIM)),
         ));
     });
 }
@@ -171,7 +170,7 @@ pub fn update_skills(
     snap: Res<SnapshotBuffer>,
     player: Res<LocalPlayer>,
     time: Res<Time>,
-    mut texts: Query<(&RightText, &mut Text)>,
+    mut texts: Query<(&RightText, &mut Text, &mut TextColor)>,
 ) {
     let snapshot = snap.current.iter().find(|e| e.entity_id == player.entity_id);
     let (ammo, ammo_max, ammo_reserve, reload, weapons, active_slot, elem_state) = match snapshot {
@@ -187,10 +186,10 @@ pub fn update_skills(
         None => (-1, -1, -1, 0.0, None, 0, None),
     };
     // 闪烁相位：3Hz 方波（亮 1/6s、暗 1/6s 交替）。
-    let blink_on = ((time.elapsed_seconds() * BLINK_HZ * 2.0) as u32) % 2 == 0;
+    let blink_on = ((time.elapsed_secs() * BLINK_HZ * 2.0) as u32) % 2 == 0;
     let low_ammo = ammo > 0 && ammo <= LOW_AMMO && reload <= 0.0;
 
-    for (kind, mut text) in &mut texts {
+    for (kind, mut text, mut tc) in &mut texts {
         match *kind {
             // 双武器槽：按服务端下发的武器元素取名/配色，当前手持槽高亮（元素亮色），
             // 另一槽压暗——直观体现"同一时间只有一把可用"。
@@ -208,12 +207,12 @@ pub fn update_skills(
                     }
                     None => ("—".to_string(), theme::TEXT_DIM),
                 };
-                text.sections[0].value = value;
-                text.sections[0].style.color = color;
+                text.0 = value;
+                tc.0 = color;
             }
             RightText::AmmoMain => {
-                text.sections[0].value = if ammo < 0 { "--".to_string() } else { format!("{ammo}") };
-                text.sections[0].style.color = if low_ammo && blink_on {
+                text.0 = if ammo < 0 { "--".to_string() } else { format!("{ammo}") };
+                tc.0 = if low_ammo && blink_on {
                     AMMO_ALERT
                 } else if low_ammo {
                     theme::KILL_AMBER
@@ -222,25 +221,25 @@ pub fn update_skills(
                 };
             }
             RightText::AmmoMax => {
-                text.sections[0].value =
+                text.0 =
                     if ammo_max < 0 { "/ --".to_string() } else { format!("/ {ammo_max}") };
             }
             RightText::AmmoPool => {
-                text.sections[0].value =
+                text.0 =
                     if ammo_reserve < 0 { "备用 --".to_string() } else { format!("备用 {ammo_reserve}") };
             }
             RightText::Reload => {
-                text.sections[0].value = if reload > 0.0 {
+                text.0 = if reload > 0.0 {
                     format!("RELOADING {reload:.1}s")
                 } else {
                     String::new()
                 };
-                text.sections[0].style.color = theme::ACCENT_AMBER;
+                tc.0 = theme::ACCENT_AMBER;
             }
             RightText::Element => {
                 let (value, color) = element_readout(elem_state.as_ref());
-                text.sections[0].value = value;
-                text.sections[0].style.color = color;
+                text.0 = value;
+                tc.0 = color;
             }
         }
     }
@@ -289,5 +288,5 @@ pub fn update_feed(
         .cloned()
         .collect::<Vec<_>>()
         .join("\n");
-    text.sections[0].value = msg;
+    text.0 = msg;
 }

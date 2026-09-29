@@ -1,4 +1,4 @@
-﻿//! 主菜单行为层：输入分发、按钮动作、模式/分类选择与样式刷新。
+//! 主菜单行为层：输入分发、按钮动作、模式/分类选择与样式刷新。
 //!
 //! 设计动机（Why）：把主菜单 UI 树的交互与样式从 `menu_main` 的构建中分离，保持每个
 //! 模块职责单一。进场（`开始游戏`）只把选中的「训练场」吸收为 `StartTraining` 上行、
@@ -145,7 +145,7 @@ pub fn main_menu_interaction(
                 return;
             }
             if let Ok(mut text) = status_texts.get_mut(ui.status_text) {
-                text.sections[0].value = format!("「{}」尚未开放，敬请期待", spec.name);
+                text.0 = format!("「{}」尚未开放，敬请期待", spec.name);
             }
         } else if gear.is_some() {
             if let Ok(mut vis) = visibility.get_mut(ui.settings_overlay) {
@@ -185,7 +185,7 @@ pub fn main_menu_interaction(
     }
     if adjusted {
         for (value, mut text) in value_texts.iter_mut() {
-            text.sections[0].value = setting_label(&settings, value.0);
+            text.0 = setting_label(&settings, value.0);
         }
     }
 }
@@ -211,7 +211,7 @@ pub fn main_menu_style(
     category: Res<SelectedCategory>,
     panel_vis: Query<&Visibility, (With<ModePanelRoot>, Without<ModeRow>)>,
     gear_hover: Query<&Interaction, (With<GearButton>, Changed<Interaction>)>,
-    mut gear_icon: Query<&mut UiImage, With<GearIcon>>,
+    mut gear_icon: Query<&mut ImageNode, With<GearIcon>>,
     mut hover_buttons: MenuHoverQuery,
     row_changed: Query<&Interaction, (With<ModeRow>, Changed<Interaction>)>,
     category_changed: Query<&Interaction, (With<CategoryButton>, Changed<Interaction>)>,
@@ -302,7 +302,7 @@ pub fn main_menu_style(
 
     if selected.is_changed() {
         if let Ok(mut text) = status_texts.get_mut(ui.status_text) {
-            text.sections[0].value = format!("当前模式：{}", game_mode_spec(selected.0).name);
+            text.0 = format!("当前模式：{}", game_mode_spec(selected.0).name);
         }
     }
 }

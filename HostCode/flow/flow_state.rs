@@ -122,13 +122,43 @@ pub fn setup_global(mut commands: Commands, mut fonts: ResMut<Assets<Font>>) {
     commands.insert_resource(crate::net::latency::PanelSpawned(false));
 }
 
-/// 构建 `TextStyle`（字体未就绪则退默认句柄，bevy 告警并回退默认字体）。
+/// 本地文本样式描述（bevy 0.15 适配层）。
+///
+/// Why：0.15 删除了引擎的 `TextBundle` / `TextStyle`，文本实体改为 `Text` +
+/// `TextFont` + `TextColor` 三组件组合。为让既有调用点从
+/// `TextBundle::from_section(txt, style(..))` 平移到新 API 而又不改写参数结构，
+/// 本结构承载与旧 `TextStyle` 等价的「字体句柄 / 字号 / 颜色」三要素；仅由本模块
+/// 的 `style()` 构造、`text()` 消费（字段私有）。
+pub struct TextStyle {
+    font: Handle<Font>,
+    font_size: f32,
+    color: Color,
+}
+
+/// 构建本地文本样式（字体未就绪则退默认句柄，bevy 告警并回退默认字体）。
 pub fn style(fonts: &CjkFont, size: f32, color: Color) -> TextStyle {
     TextStyle {
         font: fonts.0.clone().unwrap_or_default(),
         font_size: size,
         color,
     }
+}
+
+/// 生成 0.15 文本实体组合（`Text` + `TextFont` + `TextColor`）。
+///
+/// Why：`Text` 自带 `#[require(Node, TextLayout, TextFont, TextColor, ..)]`，返回元组
+/// 即可直接 `spawn` / `with_children`，替代已不可构造的 `TextBundle::from_section`；
+/// 调用点因此只需把 `TextBundle::from_section` 改名为 `flow::text`，参数保持不变。
+pub fn text(contents: impl Into<String>, style: TextStyle) -> impl Bundle {
+    (
+        Text::new(contents),
+        TextFont {
+            font: style.font,
+            font_size: style.font_size,
+            ..default()
+        },
+        TextColor(style.color),
+    )
 }
 
 /// 路由下行控制消息：握手 → 记握延迟并进入主菜单；Rtt → 刷新面板延迟；
@@ -188,7 +218,7 @@ pub fn route_control_messages(
 
     // 2) 加载兜底：超时未握手也放行进主菜单。
     if *state.get() == AppState::Loading {
-        *load_timer += time.delta_seconds();
+        *load_timer += time.delta_secs();
         if *load_timer > LOADING_TIMEOUT_SECS {
             *load_timer = 0.0;
             next_state.set(AppState::MainMenu);

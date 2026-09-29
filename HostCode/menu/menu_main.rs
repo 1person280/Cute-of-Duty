@@ -110,7 +110,7 @@ pub fn spawn_menu(
     let root = commands
         .spawn((
             NodeBundle {
-                style: Style {
+                node: Node {
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),
                     ..default()
@@ -124,21 +124,21 @@ pub fn spawn_menu(
 
     commands.entity(root).with_children(|root| {
         // 左上角角标
-        root.spawn(TextBundle::from_section(
+        root.spawn(flow::text(
             "PRE-ALPHA v0.3.0",
             flow::style(&fonts, 14.0, Color::srgb(0.42, 0.48, 0.56)),
         ))
-        .insert(Style {
+        .insert(Node {
             position_type: PositionType::Absolute,
             top: Val::Px(18.0),
             left: Val::Px(24.0),
             ..default()
         });
-        root.spawn(TextBundle::from_section(
+        root.spawn(flow::text(
             "CUTE OF DUTY 1: SIMPLE",
             flow::style(&fonts, 14.0, Color::srgb(0.42, 0.48, 0.56)),
         ))
-        .insert(Style {
+        .insert(Node {
             position_type: PositionType::Absolute,
             top: Val::Px(40.0),
             left: Val::Px(24.0),
@@ -147,7 +147,7 @@ pub fn spawn_menu(
 
         // 左侧 40% 标题区（模式面板展开时标题仍完整可见）
         root.spawn(NodeBundle {
-            style: Style {
+            node: Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(0.0),
                 top: Val::Px(0.0),
@@ -162,33 +162,33 @@ pub fn spawn_menu(
             ..default()
         })
         .with_children(|left| {
-            left.spawn(TextBundle::from_section(
+            left.spawn(flow::text(
                 "CUTE OF DUTY",
                 flow::style(&fonts, 64.0, Color::srgb(0.92, 0.95, 1.0)),
             ));
-            left.spawn(TextBundle::from_section(
+            left.spawn(flow::text(
                 "SIMPLE · 像素战术撤离",
                 flow::style(&fonts, 18.0, menu_accent()),
             ));
-            left.spawn(TextBundle::from_section(
+            left.spawn(flow::text(
                 "点右下角「切换模式」选择作战模式",
                 flow::style(&fonts, 14.0, Color::srgb(0.42, 0.48, 0.56)),
             ));
         });
 
         // 底部左下：操作提示 + 退出
-        root.spawn(TextBundle::from_section(
+        root.spawn(flow::text(
             "WASD 移动 · 左键射击 · 右键越肩瞄准 · R 换弹\nTab/Esc 背包 · Q/E 干员技能 · F 互动（拾取/站点）",
             flow::style(&fonts, 13.0, Color::srgb(0.42, 0.48, 0.56)),
         ))
-        .insert(Style {
+        .insert(Node {
             position_type: PositionType::Absolute,
             bottom: Val::Px(80.0),
             left: Val::Px(24.0),
             ..default()
         });
         root.spawn(NodeBundle {
-            style: Style {
+            node: Node {
                 position_type: PositionType::Absolute,
                 left: Val::Px(24.0),
                 bottom: Val::Px(24.0),
@@ -202,7 +202,7 @@ pub fn spawn_menu(
 
         // 右下角：当前模式状态行 + 切换模式/开始游戏/仓库
         root.spawn(NodeBundle {
-            style: Style {
+            node: Node {
                 position_type: PositionType::Absolute,
                 right: Val::Px(24.0),
                 bottom: Val::Px(24.0),
@@ -211,13 +211,13 @@ pub fn spawn_menu(
                 row_gap: Val::Px(10.0),
                 ..default()
             },
-            z_index: ZIndex::Global(10),
+            z_index: ZIndex(10),
             ..default()
         })
         .with_children(|col| {
             status_text = col
                 .spawn((
-                    TextBundle::from_section(
+                    flow::text(
                         format!("当前模式：{}", game_mode_spec(selected.0).name),
                         flow::style(&fonts, 15.0, menu_accent()),
                     ),
@@ -225,7 +225,7 @@ pub fn spawn_menu(
                 ))
                 .id();
             col.spawn(NodeBundle {
-                style: Style {
+                node: Node {
                     flex_direction: FlexDirection::Row,
                     column_gap: Val::Px(12.0),
                     ..default()
@@ -242,7 +242,7 @@ pub fn spawn_menu(
         // 右上角齿轮：打开设置浮层
         root.spawn((
             NodeBundle {
-                style: Style {
+                node: Node {
                     position_type: PositionType::Absolute,
                     top: Val::Px(16.0),
                     right: Val::Px(24.0),
@@ -256,7 +256,7 @@ pub fn spawn_menu(
                 background_color: base_bg,
                 border_color: base_border,
                 border_radius: BorderRadius::all(Val::Px(6.0)),
-                z_index: ZIndex::Global(10),
+                z_index: ZIndex(10),
                 ..default()
             },
             Interaction::default(),
@@ -266,10 +266,10 @@ pub fn spawn_menu(
         .with_children(|btn| {
             btn.spawn((
                 NodeBundle {
-                    style: Style { width: Val::Px(26.0), height: Val::Px(26.0), ..default() },
+                    node: Node { width: Val::Px(26.0), height: Val::Px(26.0), ..default() },
                     ..default()
                 },
-                UiImage::new(gear_texture.clone()),
+                ImageNode::new(gear_texture.clone()),
                 GearIcon,
             ));
         });
@@ -278,7 +278,7 @@ pub fn spawn_menu(
         mode_panel = root
             .spawn((
                 NodeBundle {
-                    style: Style {
+                    node: Node {
                         position_type: PositionType::Absolute,
                         right: Val::Px(0.0),
                         top: Val::Px(0.0),
@@ -303,17 +303,17 @@ pub fn spawn_menu(
                 ModePanelRoot,
             ))
             .with_children(|panel| {
-                panel.spawn(TextBundle::from_section(
+                panel.spawn(flow::text(
                     "选 择 作 战 模 式",
                     flow::style(&fonts, 30.0, Color::srgb(0.92, 0.95, 1.0)),
                 ));
-                panel.spawn(TextBundle::from_section(
+                panel.spawn(flow::text(
                     "按分类筛选 · 选中后点右下角「开始游戏」",
                     flow::style(&fonts, 14.0, Color::srgb(0.55, 0.62, 0.72)),
                 ));
                 panel
                     .spawn(NodeBundle {
-                        style: Style {
+                        node: Node {
                             flex_direction: FlexDirection::Row,
                             column_gap: Val::Px(28.0),
                             flex_grow: 1.0,
@@ -324,7 +324,7 @@ pub fn spawn_menu(
                     .with_children(|body| {
                         // 分类列
                         body.spawn(NodeBundle {
-                            style: Style {
+                            node: Node {
                                 flex_direction: FlexDirection::Column,
                                 row_gap: Val::Px(10.0),
                                 width: Val::Px(150.0),
@@ -333,14 +333,14 @@ pub fn spawn_menu(
                             ..default()
                         })
                         .with_children(|cats| {
-                            cats.spawn(TextBundle::from_section(
+                            cats.spawn(flow::text(
                                 "分 类",
                                 flow::style(&fonts, 14.0, Color::srgb(0.55, 0.62, 0.72)),
                             ));
                             for (index, name) in mode_panel::MODE_CATEGORIES.iter().enumerate() {
                                 cats.spawn((
                                     NodeBundle {
-                                        style: Style {
+                                        node: Node {
                                             width: Val::Percent(100.0),
                                             height: Val::Px(44.0),
                                             justify_content: JustifyContent::Center,
@@ -357,7 +357,7 @@ pub fn spawn_menu(
                                     CategoryButton(index),
                                 ))
                                 .with_children(|b| {
-                                    b.spawn(TextBundle::from_section(
+                                    b.spawn(flow::text(
                                         *name,
                                         flow::style(&fonts, 17.0, Color::srgb(0.85, 0.89, 0.95)),
                                     ));
@@ -366,7 +366,7 @@ pub fn spawn_menu(
                         });
                         // 模式列
                         body.spawn(NodeBundle {
-                            style: Style {
+                            node: Node {
                                 flex_direction: FlexDirection::Column,
                                 row_gap: Val::Px(12.0),
                                 flex_grow: 1.0,
@@ -375,7 +375,7 @@ pub fn spawn_menu(
                             ..default()
                         })
                         .with_children(|modes| {
-                            modes.spawn(TextBundle::from_section(
+                            modes.spawn(flow::text(
                                 "游 戏 模 式",
                                 flow::style(&fonts, 14.0, Color::srgb(0.55, 0.62, 0.72)),
                             ));
@@ -388,7 +388,7 @@ pub fn spawn_menu(
                                 modes
                                     .spawn((
                                         NodeBundle {
-                                            style: Style {
+                                            node: Node {
                                                 height: Val::Px(68.0),
                                                 justify_content: JustifyContent::SpaceBetween,
                                                 align_items: AlignItems::Center,
@@ -411,7 +411,7 @@ pub fn spawn_menu(
                                     ))
                                     .with_children(|row| {
                                         row.spawn(NodeBundle {
-                                            style: Style {
+                                            node: Node {
                                                 flex_direction: FlexDirection::Column,
                                                 row_gap: Val::Px(3.0),
                                                 ..default()
@@ -419,16 +419,16 @@ pub fn spawn_menu(
                                             ..default()
                                         })
                                         .with_children(|l| {
-                                            l.spawn(TextBundle::from_section(
+                                            l.spawn(flow::text(
                                                 spec.name,
                                                 flow::style(&fonts, 21.0, name_color),
                                             ));
-                                            l.spawn(TextBundle::from_section(
+                                            l.spawn(flow::text(
                                                 spec.desc,
                                                 flow::style(&fonts, 13.0, desc_color),
                                             ));
                                         });
-                                        row.spawn(TextBundle::from_section(
+                                        row.spawn(flow::text(
                                             tag,
                                             flow::style(&fonts, 15.0, tag_color),
                                         ));
@@ -444,7 +444,7 @@ pub fn spawn_menu(
         // 压暗层必须自己占一层（ZIndex 15/20，盖过 z10 的主操作区）。
         settings_backdrop = root
             .spawn(NodeBundle {
-                style: Style {
+                node: Node {
                     position_type: PositionType::Absolute,
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),
@@ -452,13 +452,13 @@ pub fn spawn_menu(
                 },
                 background_color: BackgroundColor(Color::srgba(0.0, 0.0, 0.02, 0.60)),
                 visibility: Visibility::Hidden,
-                z_index: ZIndex::Global(15),
+                z_index: ZIndex(15),
                 ..default()
             })
             .id();
         settings_overlay = root
             .spawn(NodeBundle {
-                style: Style {
+                node: Node {
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),
                     flex_direction: FlexDirection::Column,
@@ -468,23 +468,23 @@ pub fn spawn_menu(
                     ..default()
                 },
                 visibility: Visibility::Hidden,
-                z_index: ZIndex::Global(20),
+                z_index: ZIndex(20),
                 ..default()
             })
             .with_children(|overlay| {
-                overlay.spawn(TextBundle::from_section(
+                overlay.spawn(flow::text(
                     "游 戏 设 置",
                     flow::style(&fonts, 36.0, Color::srgb(0.92, 0.95, 1.0)),
                 ));
                 overlay.spawn(NodeBundle {
-                    style: Style { height: Val::Px(8.0), ..default() },
+                    node: Node { height: Val::Px(8.0), ..default() },
                     ..default()
                 });
                 game_settings::spawn_setting_row(overlay, &fonts, &settings, SettingKind::Sensitivity, "鼠标灵敏度");
                 game_settings::spawn_setting_row(overlay, &fonts, &settings, SettingKind::Fov, "视野 (FOV)");
                 game_settings::spawn_setting_row(overlay, &fonts, &settings, SettingKind::Ambient, "环境亮度");
                 overlay.spawn(NodeBundle {
-                    style: Style { height: Val::Px(10.0), ..default() },
+                    node: Node { height: Val::Px(10.0), ..default() },
                     ..default()
                 });
                 game_settings::spawn_credits_panel(overlay, &fonts);
@@ -520,7 +520,7 @@ pub fn spawn_action_button(
     parent
         .spawn((
             NodeBundle {
-                style: Style {
+                node: Node {
                     width: Val::Px(width),
                     height: Val::Px(height),
                     justify_content: JustifyContent::Center,
@@ -537,7 +537,7 @@ pub fn spawn_action_button(
             MenuButton,
         ))
         .with_children(|btn| {
-            btn.spawn(TextBundle::from_section(
+            btn.spawn(flow::text(
                 label,
                 flow::style(fonts, font_size, Color::srgb(0.92, 0.95, 1.0)),
             ));

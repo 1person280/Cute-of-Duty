@@ -31,7 +31,7 @@ fn set_ghost(
             }
         }
     }
-    if let Ok(mut text) = ghost_text.get_single_mut() {
+    if let Ok((mut text, mut text_color)) = ghost_text.get_single_mut() {
         let (name, color) = match source {
             ArsenalDragSource::Warehouse(i) => (MVP_ITEMS[*i].to_string(), ITEM_COLORS[*i]),
             ArsenalDragSource::Carried(i) => match sel.0.get(*i) {
@@ -39,8 +39,8 @@ fn set_ghost(
                 None => return,
             },
         };
-        text.sections[0].value = name;
-        text.sections[0].style.color = color;
+        text.0 = name;
+        text_color.0 = color;
     }
 }
 
