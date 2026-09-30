@@ -323,7 +323,7 @@ TCP 的可靠传输更好保障**元素状态、技能效果、背包交互**等
 - **架构与契约**
   - [模块边界总览](docs/architecture/module-boundaries.md) / [ADR 0001–0007](docs/adr/)
   - [线格式契约 protocol.yaml](docs/contracts/protocol.yaml) / [Web 服务契约 web.yaml](docs/contracts/web.yaml) / [BarekHistory 变更台账](docs/barek-history.md)（冻结区已并入其中：改了但未验证的改动直接写入 BarekHistory 条目并标注「待实机验证」）
-- **AI 协作工作流**：`.agents/skills/`（[改动前拷问](.agents/skills/plan-interrogation/) / [游戏美术创作](.agents/skills/) / [地图建模验收](.agents/skills/) / [合规交付](.agents/skills/compliant-delivery/)）
+- **AI 协作工作流**：`.agents/skills/`（[改动前拷问](.agents/skills/plan-interrogation/) / [游戏美术创作](.agents/skills/game-art-creation/) / [地图建模验收](.agents/skills/map-acceptance/) / [合规交付](.agents/skills/compliant-delivery/)）
 
 ---
 
