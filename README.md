@@ -210,7 +210,7 @@ Cargo Workspace（虚拟 manifest）下平级三个 crate：
 | `ServerCode/config/` | **配置表（含加载器，与核心代码物理相邻）** | `element_reactions.yaml`：**单一事实来源**——默认值由 `include_str!` 编译期嵌入，运行时同路径文件作为设计师热改覆盖 |
 | `ServerCode/model/` | 模型文件（易变化资源） | 体素几何/动画 JSON；握手后经 `ModelCatalog` 下发客户端渲染本人模型 |
 | `tools/` | 开发辅助 | `cargo-wrap`（编译封装，产物不入库）+ PowerShell 辅助脚本 |
-| `.agents/skills/` | AI 协作工作流文档 | 美术创作 / 地图验收 / 改动前拷问等技能说明 |
+| `.agents/skills/` | AI 协作工作流文档 | 改动前拷问 / 美术创作 / 地图验收 / 合规交付 四份技能说明 |
 | `.github/workflows/rust.yml` | CI | push/PR 到 `main` 自动跑 `cargo build` + `cargo test` |
 
 **配置加载语义（`element_reactions.yaml`）**：**权威默认** = 编译期 `include_str!` 嵌入的同目录 YAML；
@@ -323,7 +323,7 @@ TCP 的可靠传输更好保障**元素状态、技能效果、背包交互**等
 - **架构与契约**
   - [模块边界总览](docs/architecture/module-boundaries.md) / [ADR 0001–0007](docs/adr/)
   - [线格式契约 protocol.yaml](docs/contracts/protocol.yaml) / [Web 服务契约 web.yaml](docs/contracts/web.yaml) / [BarekHistory 变更台账](docs/barek-history.md)（冻结区已并入其中：改了但未验证的改动直接写入 BarekHistory 条目并标注「待实机验证」）
-- **AI 协作工作流**：`.agents/skills/`（[游戏美术创作](.agents/skills/) / [地图建模验收](.agents/skills/) / [改动前拷问](.agents/skills/plan-interrogation/)）
+- **AI 协作工作流**：`.agents/skills/`（[改动前拷问](.agents/skills/plan-interrogation/) / [游戏美术创作](.agents/skills/) / [地图建模验收](.agents/skills/) / [合规交付](.agents/skills/compliant-delivery/)）
 
 ---
 
