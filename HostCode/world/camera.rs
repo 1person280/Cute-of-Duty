@@ -1,4 +1,4 @@
-﻿//! 第三人称越肩镜头 + 鼠标自由视角
+//! 第三人称越肩镜头 + 鼠标自由视角
 ///
 /// 设计动机（Why）：0.6 早期版本朝向由 WASD 位移方向推导，既没有鼠标自由视角、
 /// 也无法把瞄准朝向报给服务端（弹道与移动轴系都因此失真）。本模块改为**鼠标驱动**：
@@ -86,16 +86,15 @@ const MAX_FRAME_DELTA: f32 = 200.0;
 
 /// 生成越肩摄像机（初始面向 -Z 北侧；握手前停在原点后方，仍在场内）。
 ///
-/// bevy 0.14 用 `Camera3dBundle` 承载相机（渲染图/投影/可见性一并装配）。
+/// bevy 0.15 直接 spawn `Camera3d` + `Transform`（渲染图/投影/可见性由
+/// required components 一并补齐）。
 pub fn spawn_camera(commands: &mut Commands) {
     let look = Vec3::new(0.0, PIVOT_Y, 0.0);
     commands.spawn((
         ChaseCamera { aim_blend: 0.0, arm_dist: CAMERA_DIST },
-        Camera3dBundle {
-            transform: Transform::from_translation(look + Vec3::new(0.0, 0.0, CAMERA_DIST))
-                .looking_at(look, Vec3::Y),
-            ..default()
-        },
+        Camera3d::default(),
+        Transform::from_translation(look + Vec3::new(0.0, 0.0, CAMERA_DIST))
+            .looking_at(look, Vec3::Y),
     ));
 }
 

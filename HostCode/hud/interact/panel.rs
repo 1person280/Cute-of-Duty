@@ -129,29 +129,27 @@ pub fn sync_interact_menu(
         let label = opt.label.clone();
         commands.entity(list_entity).with_children(|p| {
             p.spawn((
-                ButtonBundle {
-                    node: Node {
-                        padding: UiRect::new(
-                            Val::Px(14.0),
-                            Val::Px(14.0),
-                            Val::Px(8.0),
-                            Val::Px(8.0),
-                        ),
-                        border: UiRect::all(Val::Px(1.0)),
-                        ..default()
-                    },
-                    background_color: if selected {
-                        theme::ROW_HOVER.into()
-                    } else {
-                        theme::PANEL_BG.into()
-                    },
-                    border_color: BorderColor(if selected {
-                        theme::ACCENT_AMBER
-                    } else {
-                        theme::PANEL_BORDER
-                    }),
+                Button,
+                Node {
+                    padding: UiRect::new(
+                        Val::Px(14.0),
+                        Val::Px(14.0),
+                        Val::Px(8.0),
+                        Val::Px(8.0),
+                    ),
+                    border: UiRect::all(Val::Px(1.0)),
                     ..default()
                 },
+                BackgroundColor(if selected {
+                    theme::ROW_HOVER
+                } else {
+                    theme::PANEL_BG
+                }),
+                BorderColor(if selected {
+                    theme::ACCENT_AMBER
+                } else {
+                    theme::PANEL_BORDER
+                }),
                 InteractOptionIndex(i),
             ))
             .with_children(|b| {

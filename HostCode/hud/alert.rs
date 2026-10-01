@@ -36,21 +36,18 @@ pub fn spawn_alert_overlay(p: &mut ChildBuilder<'_>) {
     for (width, weight) in LAYERS {
         p.spawn((
             HudEdgeGlow { weight },
-            NodeBundle {
-                node: Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(0.0),
-                    top: Val::Px(0.0),
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(100.0),
-                    border: UiRect::all(Val::Px(width)),
-                    ..default()
-                },
-                background_color: Color::NONE.into(),
-                border_color: BorderColor(Color::NONE),
-                visibility: Visibility::Hidden,
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(0.0),
+                top: Val::Px(0.0),
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                border: UiRect::all(Val::Px(width)),
                 ..default()
             },
+            BackgroundColor(Color::NONE),
+            BorderColor(Color::NONE),
+            Visibility::Hidden,
         ));
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "cute_of_duty_host"
-version = "0.12.3"
+version = "0.12.4"
 edition = "2021"
 license = "GPL-3.0-with-linking-exception"
 authors = ["B站@3493264141322312", "Kimi AI Collaborator"]
@@ -25,8 +25,9 @@ tokio = { version = "1.35", features = ["rt-multi-thread", "time", "macros", "ne
 #   - `Window.cursor` → `Window.cursor_options`、`UiImage` → `ImageNode`、
 #     `Time::delta_seconds/elapsed_seconds` → `delta_secs/elapsed_secs`、
 #     `Gizmos::sphere` 去旋转参数
-# 已弃用但仍可用的 bundle（`NodeBundle`/`PbrBundle`/`Camera3dBundle`/
-# `DirectionalLightBundle`/`PointLightBundle`）留待 0.16 再迁。
+# 已于 0.12.4 迁移完毕：`NodeBundle`/`PbrBundle`/`Camera3dBundle`/`DirectionalLightBundle`/
+# `PointLightBundle`/`ButtonBundle` 六类弃用 Bundle（91 处构造点 / 17 文件）全部改为
+# required-components 新写法（直接 spawn 组件元组），构建期弃用告警 276 → 0。
 #
 # 注意：不启用 dynamic_linking（bevy_dylib.dll 动态装载）。实测本机 MinGW(GNU)
 # 工具链下 bevy_dylib 链接报 `export ordinal too large: 242786` —— Windows PE 导出

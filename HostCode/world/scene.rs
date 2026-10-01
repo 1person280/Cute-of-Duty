@@ -17,60 +17,58 @@ use cute_of_duty_contract::map::{
 
 /// 场景主光照（主平行光 + 补光 + 四角点光，参数对齐 0.3.2 `demo/world.rs`）。
 ///
-/// bevy 0.14：定向光用 `DirectionalLightBundle`，阴影开关是 `shadows_enabled`。
+/// bevy 0.15：光源直接 spawn `DirectionalLight`/`PointLight` + `Transform`
+/// （required components 自动补齐 `Cascades`/`Visibility` 等），阴影开关是 `shadows_enabled`。
 pub fn spawn_world(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
 ) {
     // 主平行光（0.3.2 数值：8000 lux，硬阴影）
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
+    commands.spawn((
+        DirectionalLight {
             illuminance: 8_000.0,
             shadows_enabled: true,
             shadow_depth_bias: 0.02,
             shadow_normal_bias: 0.6,
             ..default()
         },
-        transform: Transform::from_rotation(Quat::from_euler(
+        Transform::from_rotation(Quat::from_euler(
             EulerRot::XYZ,
             -0.8,
             0.5,
             0.0,
         )),
-        ..default()
-    });
+    ));
 
     // 补光（无阴影，压低阴影死黑，保持旧版露天观感）
-    commands.spawn(DirectionalLightBundle {
-        directional_light: DirectionalLight {
+    commands.spawn((
+        DirectionalLight {
             illuminance: 1_500.0,
             shadows_enabled: false,
             ..default()
         },
-        transform: Transform::from_rotation(Quat::from_euler(
+        Transform::from_rotation(Quat::from_euler(
             EulerRot::XYZ,
             -0.3,
             -1.5,
             0.0,
         )),
-        ..default()
-    });
+    ));
 
     // 角部点光：随活动地图（1×1km 草坪场）的四角布置（0.3.2 数值 80000/60m）。
     let corner = map::lawn::HALF;
     for pos in [(corner, 2.5, corner), (-corner, 2.5, corner), (corner, 2.5, -corner), (-corner, 2.5, -corner)] {
-        commands.spawn(PointLightBundle {
-            point_light: PointLight {
+        commands.spawn((
+            PointLight {
                 intensity: 80_000.0,
                 color: Color::srgb(0.9, 0.85, 0.75),
                 range: 60.0,
                 shadows_enabled: false,
                 ..default()
             },
-            transform: Transform::from_xyz(pos.0, pos.1, pos.2),
-            ..default()
-        });
+            Transform::from_xyz(pos.0, pos.1, pos.2),
+        ));
     }
 
     // 完整草坪训练场（静态部分：地板 + props + glows）
@@ -118,16 +116,15 @@ fn spawn_floor(
         for z in -n..=n {
             let is_dark = (x + z) % 2 == 0;
             commands
-                .spawn(PbrBundle {
-                    mesh: Mesh3d(tile_mesh.clone()),
-                    material: MeshMaterial3d(if is_dark { ground_a.clone() } else { ground_b.clone() }),
-                    transform: Transform::from_xyz(
+                .spawn((
+                    Mesh3d(tile_mesh.clone()),
+                    MeshMaterial3d(if is_dark { ground_a.clone() } else { ground_b.clone() }),
+                    Transform::from_xyz(
                         x as f32 * tile,
                         -0.1,
                         z as f32 * tile,
                     ),
-                    ..default()
-                })
+                ))
                 .insert(NotShadowCaster);
         }
     }
@@ -223,12 +220,11 @@ fn spawn_prop(
     if let Some((axis, angle)) = prop.rot {
         transform.rotation = Quat::from_axis_angle(Vec3::from(axis), angle);
     }
-    commands.spawn(PbrBundle {
-        mesh: Mesh3d(mesh),
-        material: MeshMaterial3d(mats.get(prop.material)),
+    commands.spawn((
+        Mesh3d(mesh),
+        MeshMaterial3d(mats.get(prop.material)),
         transform,
-        ..default()
-    });
+    ));
 }
 
 /// 渲染单个发光件：霓虹灯带 / 信标 / 出生光垫（自发光材质）。
@@ -253,12 +249,11 @@ fn spawn_glow(
         ..default()
     });
     commands
-        .spawn(PbrBundle {
-            mesh: Mesh3d(mesh),
-            material: MeshMaterial3d(mat),
-            transform: Transform::from_translation(Vec3::from(glow.pos)),
-            ..default()
-        })
+        .spawn((
+            Mesh3d(mesh),
+            MeshMaterial3d(mat),
+            Transform::from_translation(Vec3::from(glow.pos)),
+        ))
         .insert(NotShadowCaster);
 }
 

@@ -33,13 +33,10 @@ pub fn spawn_hud(mut commands: Commands, fonts: Res<CjkFont>, kills: Res<KillCou
         .spawn((
             HudRoot,
             StateScoped(AppState::InGame),
-            NodeBundle {
-                node: Node {
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(100.0),
-                    position_type: PositionType::Absolute,
-                    ..default()
-                },
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                position_type: PositionType::Absolute,
                 ..default()
             },
         ))
@@ -71,13 +68,10 @@ pub fn spawn_hud(mut commands: Commands, fonts: Res<CjkFont>, kills: Res<KillCou
 fn spawn_extract_label(p: &mut ChildBuilder, fonts: &CjkFont) {
     p.spawn((
         ExtractLabel,
-        NodeBundle {
-            node: Node {
-                position_type: PositionType::Absolute,
-                top: Val::Px(48.0),
-                left: Val::Percent(50.0),
-                ..default()
-            },
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Px(48.0),
+            left: Val::Percent(50.0),
             ..default()
         },
     ))
@@ -91,17 +85,14 @@ fn spawn_extract_label(p: &mut ChildBuilder, fonts: &CjkFont) {
     // 入区后的居中大字提示：默认隐藏，`update_extract` 按入区状态闪烁显示。
     p.spawn((
         ExtractPrompt,
-        NodeBundle {
-            node: Node {
-                position_type: PositionType::Absolute,
-                top: Val::Percent(60.0),
-                width: Val::Percent(100.0),
-                justify_content: JustifyContent::Center,
-                ..default()
-            },
-            visibility: Visibility::Hidden,
+        Node {
+            position_type: PositionType::Absolute,
+            top: Val::Percent(60.0),
+            width: Val::Percent(100.0),
+            justify_content: JustifyContent::Center,
             ..default()
         },
+        Visibility::Hidden,
     ))
     .with_children(|prompt| {
         prompt.spawn(flow::text(

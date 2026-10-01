@@ -44,20 +44,17 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
         .spawn((
             ArsenalRoot,
             StateScoped(AppState::MainMenu),
-            NodeBundle {
-                visibility: Visibility::Hidden,
-                node: Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(OVERLAY_OFFSET),
-                    top: Val::Px(OVERLAY_OFFSET),
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(12.0),
-                    padding: UiRect::all(Val::Px(18.0)),
-                    ..default()
-                },
-                background_color: theme::PANEL_BG.into(),
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(OVERLAY_OFFSET),
+                top: Val::Px(OVERLAY_OFFSET),
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(12.0),
+                padding: UiRect::all(Val::Px(18.0)),
                 ..default()
             },
+            BackgroundColor(theme::PANEL_BG),
+            Visibility::Hidden,
         ))
         .with_children(|o| {
             o.spawn(flow::text(
@@ -69,13 +66,10 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                 flow::style(&fonts, 15.0, theme::TEXT_DIM),
             ));
 
-            o.spawn(NodeBundle {
-                node: Node {
-                    flex_direction: FlexDirection::Row,
-                    column_gap: Val::Px(28.0),
-                    align_items: AlignItems::FlexStart,
-                    ..default()
-                },
+            o.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(28.0),
+                align_items: AlignItems::FlexStart,
                 ..default()
             })
             .with_children(|cols| {
@@ -83,13 +77,10 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                 cols.spawn((
                     WarehouseZone,
                     Interaction::default(),
-                    NodeBundle {
-                        node: Node {
-                            flex_direction: FlexDirection::Column,
-                            row_gap: Val::Px(8.0),
-                            align_items: AlignItems::Center,
-                            ..default()
-                        },
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(8.0),
+                        align_items: AlignItems::Center,
                         ..default()
                     },
                 ))
@@ -98,10 +89,7 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                         "仓库（物资池）",
                         flow::style(&fonts, 20.0, accent),
                     ));
-                    wa.spawn(NodeBundle {
-                        node: grid_style(),
-                        ..default()
-                    })
+                    wa.spawn(grid_style())
                     .with_children(|grid| {
                         // 物资池按 4×3 铺格：有物资的格可拖拽，其余为空格位（不响应拖拽）。
                         for i in 0..ARSENAL_SLOTS {
@@ -110,11 +98,8 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                                     grid.spawn((
                                         ArsenalRow { index: i },
                                         Interaction::default(),
-                                        NodeBundle {
-                                            node: cell_style(),
-                                            background_color: Color::srgb(0.20, 0.22, 0.25).into(),
-                                            ..default()
-                                        },
+                                        cell_style(),
+                                        BackgroundColor(Color::srgb(0.20, 0.22, 0.25)),
                                     ))
                                     .with_children(|r| {
                                         r.spawn(flow::text(
@@ -131,11 +116,10 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                                     });
                                 }
                                 None => {
-                                    grid.spawn(NodeBundle {
-                                        node: cell_style(),
-                                        background_color: Color::srgb(0.13, 0.14, 0.17).into(),
-                                        ..default()
-                                    });
+                                    grid.spawn((
+                                        cell_style(),
+                                        BackgroundColor(Color::srgb(0.13, 0.14, 0.17)),
+                                    ));
                                 }
                             }
                         }
@@ -146,13 +130,10 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                 cols.spawn((
                     BackpackZone,
                     Interaction::default(),
-                    NodeBundle {
-                        node: Node {
-                            flex_direction: FlexDirection::Column,
-                            row_gap: Val::Px(8.0),
-                            align_items: AlignItems::Center,
-                            ..default()
-                        },
+                    Node {
+                        flex_direction: FlexDirection::Column,
+                        row_gap: Val::Px(8.0),
+                        align_items: AlignItems::Center,
                         ..default()
                     },
                 ))
@@ -168,20 +149,14 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                             flow::style(&fonts, 16.0, theme::TEXT_DIM),
                         ),
                     ));
-                    bk.spawn(NodeBundle {
-                        node: grid_style(),
-                        ..default()
-                    })
+                    bk.spawn(grid_style())
                     .with_children(|grid| {
                         for s in 0..ARSENAL_SLOTS {
                             grid.spawn((
                                 BackpackRow { index: s },
                                 Interaction::default(),
-                                NodeBundle {
-                                    node: cell_style(),
-                                    background_color: Color::srgb(0.20, 0.22, 0.25).into(),
-                                    ..default()
-                                },
+                                cell_style(),
+                                BackgroundColor(Color::srgb(0.20, 0.22, 0.25)),
                             ))
                             .with_children(|slot| {
                                 slot.spawn((
@@ -198,29 +173,23 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
             });
 
             // 底部操作行：返回 / 开始游戏。
-            o.spawn(NodeBundle {
-                node: Node {
-                    flex_direction: FlexDirection::Row,
-                    column_gap: Val::Px(12.0),
-                    ..default()
-                },
+            o.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(12.0),
                 ..default()
             })
             .with_children(|row| {
                 row.spawn((
                     BackButton,
                     Interaction::default(),
-                    NodeBundle {
-                        node: Node {
-                            width: Val::Px(120.0),
-                            height: Val::Px(44.0),
-                            align_items: AlignItems::Center,
-                            justify_content: JustifyContent::Center,
-                            ..default()
-                        },
-                        background_color: Color::srgb(0.22, 0.22, 0.24).into(),
+                    Node {
+                        width: Val::Px(120.0),
+                        height: Val::Px(44.0),
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
                         ..default()
                     },
+                    BackgroundColor(Color::srgb(0.22, 0.22, 0.24)),
                 ))
                 .with_children(|b| {
                     b.spawn(flow::text(
@@ -231,17 +200,14 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                 row.spawn((
                     JinButton,
                     Interaction::default(),
-                    NodeBundle {
-                        node: Node {
-                            width: Val::Px(376.0),
-                            height: Val::Px(44.0),
-                            align_items: AlignItems::Center,
-                            justify_content: JustifyContent::Center,
-                            ..default()
-                        },
-                        background_color: Color::srgb(0.30, 0.42, 0.28).into(),
+                    Node {
+                        width: Val::Px(376.0),
+                        height: Val::Px(44.0),
+                        align_items: AlignItems::Center,
+                        justify_content: JustifyContent::Center,
                         ..default()
                     },
+                    BackgroundColor(Color::srgb(0.30, 0.42, 0.28)),
                 ))
                 .with_children(|b| {
                     b.spawn(flow::text(
@@ -257,18 +223,15 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
         .spawn((
             LoadoutGhost,
             StateScoped(AppState::MainMenu),
-            NodeBundle {
-                visibility: Visibility::Hidden,
-                node: Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(0.0),
-                    top: Val::Px(0.0),
-                    padding: UiRect::px(10.0, 10.0, 4.0, 4.0),
-                    ..default()
-                },
-                background_color: Color::srgb(0.12, 0.13, 0.16).into(),
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(0.0),
+                top: Val::Px(0.0),
+                padding: UiRect::px(10.0, 10.0, 4.0, 4.0),
                 ..default()
             },
+            BackgroundColor(Color::srgb(0.12, 0.13, 0.16)),
+            Visibility::Hidden,
         ))
         .with_children(|g| {
             g.spawn((

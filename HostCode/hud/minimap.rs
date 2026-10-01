@@ -1,4 +1,4 @@
-﻿//! HUD 左上角小地图 + 罗盘：以玩家为中心的局部放大图（半径≈[`MINIMAP_RANGE`] 米）
+//! HUD 左上角小地图 + 罗盘：以玩家为中心的局部放大图（半径≈[`MINIMAP_RANGE`] 米）
 //!
 //! 设计动机：小地图是**纯表现层**——静态层直接读服务端 `map::lawn::layout()` 的纯数据
 //! （不触碰任何模拟逻辑），动态层读权威 `EntitySnapshot`（位置/模型身份是服务端裁决值）。
@@ -283,7 +283,7 @@ pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             ));
         }
         // 动态点容器：每帧被 `update_minimap` 清空重建
-        map.spawn((MinimapDots, NodeBundle::default()));
+        map.spawn((MinimapDots, Node::default()));
         // 玩家：白色定位点 + 朝向菱形（恒居中，后生成者在上层）
         map.spawn((
             MinimapPlayerDot,

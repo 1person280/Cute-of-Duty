@@ -1,4 +1,4 @@
-﻿//! HUD 消耗品径向轮盘：**长按 3/4 呼出、滚轮/鼠标方向选格、松开速用；短按直接速用首件**
+//! HUD 消耗品径向轮盘：**长按 3/4 呼出、滚轮/鼠标方向选格、松开速用；短按直接速用首件**
 //!
 //! 设计动机（Why）：3/4 号槽不再是"固定的医疗包/手雷"两个硬编码位，而是**按类别索引进
 //! 背包**——服务端权威的 4×3 背包里凡是恢复类（[`ItemCategory::Consumable`]）即可用 3 调用，
@@ -112,19 +112,16 @@ pub struct ItemWheelKeyText;
 pub fn spawn_item_wheel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     p.spawn((
         ItemWheelRoot,
-        NodeBundle {
-            node: Node {
-                position_type: PositionType::Absolute,
-                left: Val::Px(0.0),
-                top: Val::Px(0.0),
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                ..default()
-            },
-            background_color: Color::srgba(0.02, 0.03, 0.05, 0.35).into(),
-            visibility: Visibility::Hidden,
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(0.0),
+            top: Val::Px(0.0),
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
             ..default()
         },
+        BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.35)),
+        Visibility::Hidden,
     ))
     .with_children(|root| {
         // 顶部键位提示（水平居中）。
@@ -148,8 +145,8 @@ pub fn spawn_item_wheel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         ));
 
         // 中心卡片（屏幕正中，显示当前高亮物品名）。
-        root.spawn(NodeBundle {
-            node: Node {
+        root.spawn((
+            Node {
                 position_type: PositionType::Absolute,
                 left: Val::Percent(50.0),
                 top: Val::Percent(50.0),
@@ -165,10 +162,9 @@ pub fn spawn_item_wheel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                 border: UiRect::all(Val::Px(1.0)),
                 ..default()
             },
-            background_color: theme::PANEL_BG.into(),
-            border_color: BorderColor(theme::ACCENT_AMBER),
-            ..default()
-        })
+            BackgroundColor(theme::PANEL_BG),
+            BorderColor(theme::ACCENT_AMBER),
+        ))
         .with_children(|c| {
             c.spawn((
                 ItemWheelCenterText,
@@ -180,23 +176,20 @@ pub fn spawn_item_wheel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         for i in 0..MAX_SECTORS {
             root.spawn((
                 ItemWheelSector(i),
-                NodeBundle {
-                    node: Node {
-                        position_type: PositionType::Absolute,
-                        left: Val::Percent(50.0),
-                        top: Val::Percent(50.0),
-                        width: Val::Px(SECTOR_W),
-                        height: Val::Px(SECTOR_H),
-                        justify_content: JustifyContent::Center,
-                        align_items: AlignItems::Center,
-                        border: UiRect::all(Val::Px(1.0)),
-                        display: Display::None,
-                        ..default()
-                    },
-                    background_color: Color::srgba(0.10, 0.12, 0.16, 0.9).into(),
-                    border_color: BorderColor(theme::PANEL_BORDER),
+                Node {
+                    position_type: PositionType::Absolute,
+                    left: Val::Percent(50.0),
+                    top: Val::Percent(50.0),
+                    width: Val::Px(SECTOR_W),
+                    height: Val::Px(SECTOR_H),
+                    justify_content: JustifyContent::Center,
+                    align_items: AlignItems::Center,
+                    border: UiRect::all(Val::Px(1.0)),
+                    display: Display::None,
                     ..default()
                 },
+                BackgroundColor(Color::srgba(0.10, 0.12, 0.16, 0.9)),
+                BorderColor(theme::PANEL_BORDER),
             ))
             .with_children(|s| {
                 s.spawn((

@@ -69,8 +69,8 @@ const SKILL_CD_FILL: Color = Color::srgba(1.0, 0.72, 0.2, 0.55);
 
 /// 装配 vitals 面板（左下角：干员名 → HP 180×22 → 护甲 140×10 → Q/E 图标 → 道具槽）。
 pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
-    p.spawn(NodeBundle {
-        node: Node {
+    p.spawn((
+        Node {
             position_type: PositionType::Absolute,
             left: Val::Px(16.0),
             bottom: Val::Px(16.0),
@@ -79,9 +79,8 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             padding: UiRect::all(Val::Px(10.0)),
             ..default()
         },
-        background_color: theme::PANEL_BG.into(),
-        ..default()
-    })
+        BackgroundColor(theme::PANEL_BG),
+    ))
     .with_children(|v| {
         // 干员名
         v.spawn((
@@ -90,39 +89,32 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         ));
 
         // 血条 180×22 + 居中数值
-        let mut hp = v.spawn(NodeBundle {
-            node: Node {
+        let mut hp = v.spawn((
+            Node {
                 width: Val::Px(180.0),
                 height: Val::Px(22.0),
                 justify_content: JustifyContent::FlexStart,
                 ..default()
             },
-            background_color: Color::srgb(0.15, 0.13, 0.13).into(),
-            ..default()
-        });
+            BackgroundColor(Color::srgb(0.15, 0.13, 0.13)),
+        ));
         hp.with_children(|h| {
             h.spawn((
                 VitalsBar::Health,
-                NodeBundle {
-                    node: Node {
-                        width: Val::Percent(100.0),
-                        height: Val::Percent(100.0),
-                        ..default()
-                    },
-                    background_color: HP_RED.into(),
-                    ..default()
-                },
-            ));
-            // 数值覆盖层（绝对定位铺满血条、内容居中）
-            h.spawn(NodeBundle {
-                node: Node {
-                    position_type: PositionType::Absolute,
+                Node {
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
                     ..default()
                 },
+                BackgroundColor(HP_RED),
+            ));
+            // 数值覆盖层（绝对定位铺满血条、内容居中）
+            h.spawn(Node {
+                position_type: PositionType::Absolute,
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
                 ..default()
             })
             .with_children(|c| {
@@ -137,28 +129,24 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         });
 
         // 护甲条 140×10 + 数值
-        v.spawn(NodeBundle {
-            node: Node {
+        v.spawn((
+            Node {
                 width: Val::Px(140.0),
                 height: Val::Px(10.0),
                 justify_content: JustifyContent::FlexStart,
                 ..default()
             },
-            background_color: Color::srgb(0.10, 0.13, 0.17).into(),
-            ..default()
-        })
+            BackgroundColor(Color::srgb(0.10, 0.13, 0.17)),
+        ))
         .with_children(|a| {
             a.spawn((
                 VitalsBar::Armor,
-                NodeBundle {
-                    node: Node {
-                        width: Val::Percent(0.0),
-                        height: Val::Percent(100.0),
-                        ..default()
-                    },
-                    background_color: ARMOR_BLUE.into(),
+                Node {
+                    width: Val::Percent(0.0),
+                    height: Val::Percent(100.0),
                     ..default()
                 },
+                BackgroundColor(ARMOR_BLUE),
             ));
         });
         v.spawn((
@@ -167,12 +155,9 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         ));
 
         // 技能图标行：Q / E 两个 52×52 方块（冷却填充 + 读秒 + 底部键位标签）
-        v.spawn(NodeBundle {
-            node: Node {
-                flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(8.0),
-                ..default()
-            },
+        v.spawn(Node {
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(8.0),
             ..default()
         })
         .with_children(|row| {
@@ -181,31 +166,25 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         });
 
         // 道具槽行：键位 3 / 4（物品名 + 计数来自权威快照的 4×3 背包格位）
-        v.spawn(NodeBundle {
-            node: Node {
-                flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(8.0),
-                ..default()
-            },
+        v.spawn(Node {
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(8.0),
             ..default()
         })
         .with_children(|row| {
             for slot in [3u8, 4u8] {
                 row.spawn((
-                    NodeBundle {
-                        node: Node {
-                            width: Val::Px(ITEM_W),
-                            height: Val::Px(ITEM_H),
-                            flex_direction: FlexDirection::Column,
-                            justify_content: JustifyContent::Center,
-                            align_items: AlignItems::Center,
-                            border: UiRect::all(Val::Px(1.0)),
-                            ..default()
-                        },
-                        background_color: Color::srgba(0.14, 0.16, 0.20, 0.9).into(),
-                        border_color: BorderColor(theme::PANEL_BORDER),
+                    Node {
+                        width: Val::Px(ITEM_W),
+                        height: Val::Px(ITEM_H),
+                        flex_direction: FlexDirection::Column,
+                        justify_content: JustifyContent::Center,
+                        align_items: AlignItems::Center,
+                        border: UiRect::all(Val::Px(1.0)),
                         ..default()
                     },
+                    BackgroundColor(Color::srgba(0.14, 0.16, 0.20, 0.9)),
+                    BorderColor(theme::PANEL_BORDER),
                 ))
                 .with_children(|c| {
                     c.spawn(flow::text(
@@ -230,46 +209,39 @@ fn spawn_skill_icon(
     bar: VitalsBar,
     text: VitalsText,
 ) {
-    row.spawn(NodeBundle {
-        node: Node {
+    row.spawn((
+        Node {
             width: Val::Px(SKILL_ICON),
             height: Val::Px(SKILL_ICON),
             border: UiRect::all(Val::Px(1.0)),
             overflow: Overflow::clip(),
             ..default()
         },
-        background_color: Color::srgba(0.10, 0.12, 0.16, 0.9).into(),
-        border_color: BorderColor(theme::PANEL_BORDER),
-        ..default()
-    })
+        BackgroundColor(Color::srgba(0.10, 0.12, 0.16, 0.9)),
+        BorderColor(theme::PANEL_BORDER),
+    ))
     .with_children(|icon| {
         // 冷却填充：贴底、高度随剩余冷却比例
         icon.spawn((
             bar,
-            NodeBundle {
-                node: Node {
-                    position_type: PositionType::Absolute,
-                    left: Val::Px(0.0),
-                    bottom: Val::Px(0.0),
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(0.0),
-                    ..default()
-                },
-                background_color: SKILL_CD_FILL.into(),
+            Node {
+                position_type: PositionType::Absolute,
+                left: Val::Px(0.0),
+                bottom: Val::Px(0.0),
+                width: Val::Percent(100.0),
+                height: Val::Percent(0.0),
                 ..default()
             },
+            BackgroundColor(SKILL_CD_FILL),
         ));
         // 中央读数（钟面）
-        icon.spawn(NodeBundle {
-            node: Node {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                flex_direction: FlexDirection::Column,
-                ..default()
-            },
+        icon.spawn(Node {
+            position_type: PositionType::Absolute,
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            flex_direction: FlexDirection::Column,
             ..default()
         })
         .with_children(|c| {

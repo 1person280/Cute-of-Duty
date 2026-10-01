@@ -199,12 +199,11 @@ fn build_bone(
                 let center = px_center(c.origin, c.size, s) - pivot;
                 let size = px_size(c.size, s);
                 let material = cache.handle(materials, cube_color(c, &bone.name));
-                p.spawn(PbrBundle {
-                    mesh: Mesh3d(mesh.clone()),
-                    material: MeshMaterial3d(material),
-                    transform: Transform::from_translation(center).with_scale(size),
-                    ..default()
-                });
+                p.spawn((
+                    Mesh3d(mesh.clone()),
+                    MeshMaterial3d(material),
+                    Transform::from_translation(center).with_scale(size),
+                ));
             }
             for child in bones
                 .iter()

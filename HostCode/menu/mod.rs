@@ -143,15 +143,12 @@ pub fn spawn_menu(
 
     let root = commands
         .spawn((
-            NodeBundle {
-                node: Node {
-                    width: Val::Percent(100.0),
-                    height: Val::Percent(100.0),
-                    ..default()
-                },
-                background_color: BackgroundColor(theme::BG_DEEP),
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
                 ..default()
             },
+            BackgroundColor(theme::BG_DEEP),
             StateScoped(AppState::MainMenu),
         ))
         .id();
@@ -180,19 +177,16 @@ pub fn spawn_menu(
         });
 
         // 左侧 40% 标题区（模式面板展开时标题仍完整可见）
-        root.spawn(NodeBundle {
-            node: Node {
-                position_type: PositionType::Absolute,
-                left: Val::Px(0.0),
-                top: Val::Px(0.0),
-                width: Val::Percent(40.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                row_gap: Val::Px(14.0),
-                ..default()
-            },
+        root.spawn(Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(0.0),
+            top: Val::Px(0.0),
+            width: Val::Percent(40.0),
+            height: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(14.0),
             ..default()
         })
         .with_children(|left| {
@@ -221,13 +215,10 @@ pub fn spawn_menu(
             left: Val::Px(24.0),
             ..default()
         });
-        root.spawn(NodeBundle {
-            node: Node {
-                position_type: PositionType::Absolute,
-                left: Val::Px(24.0),
-                bottom: Val::Px(24.0),
-                ..default()
-            },
+        root.spawn(Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(24.0),
+            bottom: Val::Px(24.0),
             ..default()
         })
         .with_children(|wrap| {
@@ -235,8 +226,8 @@ pub fn spawn_menu(
         });
 
         // 右下角：当前模式状态行 + 切换模式/开始游戏/仓库
-        root.spawn(NodeBundle {
-            node: Node {
+        root.spawn((
+            Node {
                 position_type: PositionType::Absolute,
                 right: Val::Px(24.0),
                 bottom: Val::Px(24.0),
@@ -245,9 +236,8 @@ pub fn spawn_menu(
                 row_gap: Val::Px(10.0),
                 ..default()
             },
-            z_index: ZIndex(10),
-            ..default()
-        })
+            ZIndex(10),
+        ))
         .with_children(|col| {
             status_text = col
                 .spawn((
@@ -258,12 +248,9 @@ pub fn spawn_menu(
                     StatusText,
                 ))
                 .id();
-            col.spawn(NodeBundle {
-                node: Node {
-                    flex_direction: FlexDirection::Row,
-                    column_gap: Val::Px(12.0),
-                    ..default()
-                },
+            col.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(12.0),
                 ..default()
             })
             .with_children(|row| {
@@ -275,34 +262,28 @@ pub fn spawn_menu(
 
         // 右上角齿轮：打开设置浮层
         root.spawn((
-            NodeBundle {
-                node: Node {
-                    position_type: PositionType::Absolute,
-                    top: Val::Px(16.0),
-                    right: Val::Px(24.0),
-                    width: Val::Px(46.0),
-                    height: Val::Px(46.0),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    border: UiRect::all(Val::Px(2.0)),
-                    ..default()
-                },
-                background_color: base_bg,
-                border_color: base_border,
-                border_radius: BorderRadius::all(Val::Px(6.0)),
-                z_index: ZIndex(10),
+            Node {
+                position_type: PositionType::Absolute,
+                top: Val::Px(16.0),
+                right: Val::Px(24.0),
+                width: Val::Px(46.0),
+                height: Val::Px(46.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(2.0)),
                 ..default()
             },
+            base_bg,
+            base_border,
+            BorderRadius::all(Val::Px(6.0)),
+            ZIndex(10),
             Interaction::default(),
             MenuButton,
             GearButton,
         ))
         .with_children(|btn| {
             btn.spawn((
-                NodeBundle {
-                    node: Node { width: Val::Px(26.0), height: Val::Px(26.0), ..default() },
-                    ..default()
-                },
+                Node { width: Val::Px(26.0), height: Val::Px(26.0), ..default() },
                 ImageNode::new(gear_texture.clone()),
                 GearIcon,
             ));
@@ -311,29 +292,26 @@ pub fn spawn_menu(
         // 右侧 60% 模式面板：「切换模式」呼出/收起
         mode_panel = root
             .spawn((
-                NodeBundle {
-                    node: Node {
-                        position_type: PositionType::Absolute,
-                        right: Val::Px(0.0),
-                        top: Val::Px(0.0),
-                        width: Val::Percent(60.0),
-                        height: Val::Percent(100.0),
-                        flex_direction: FlexDirection::Column,
-                        padding: UiRect {
-                            left: Val::Px(44.0),
-                            right: Val::Px(44.0),
-                            top: Val::Px(32.0),
-                            bottom: Val::Px(110.0),
-                        },
-                        border: UiRect { left: Val::Px(2.0), ..default() },
-                        row_gap: Val::Px(14.0),
-                        ..default()
+                Node {
+                    position_type: PositionType::Absolute,
+                    right: Val::Px(0.0),
+                    top: Val::Px(0.0),
+                    width: Val::Percent(60.0),
+                    height: Val::Percent(100.0),
+                    flex_direction: FlexDirection::Column,
+                    padding: UiRect {
+                        left: Val::Px(44.0),
+                        right: Val::Px(44.0),
+                        top: Val::Px(32.0),
+                        bottom: Val::Px(110.0),
                     },
-                    background_color: BackgroundColor(Color::srgba(0.05, 0.07, 0.11, 0.985)),
-                    border_color: BorderColor(menu_accent()),
-                    visibility: Visibility::Hidden,
+                    border: UiRect { left: Val::Px(2.0), ..default() },
+                    row_gap: Val::Px(14.0),
                     ..default()
                 },
+                BackgroundColor(Color::srgba(0.05, 0.07, 0.11, 0.985)),
+                BorderColor(menu_accent()),
+                Visibility::Hidden,
                 ModePanelRoot,
             ))
             .with_children(|panel| {
@@ -346,24 +324,18 @@ pub fn spawn_menu(
                     flow::style(&fonts, 14.0, Color::srgb(0.55, 0.62, 0.72)),
                 ));
                 panel
-                    .spawn(NodeBundle {
-                        node: Node {
-                            flex_direction: FlexDirection::Row,
-                            column_gap: Val::Px(28.0),
-                            flex_grow: 1.0,
-                            ..default()
-                        },
+                    .spawn(Node {
+                        flex_direction: FlexDirection::Row,
+                        column_gap: Val::Px(28.0),
+                        flex_grow: 1.0,
                         ..default()
                     })
                     .with_children(|body| {
                         // 分类列
-                        body.spawn(NodeBundle {
-                            node: Node {
-                                flex_direction: FlexDirection::Column,
-                                row_gap: Val::Px(10.0),
-                                width: Val::Px(150.0),
-                                ..default()
-                            },
+                        body.spawn(Node {
+                            flex_direction: FlexDirection::Column,
+                            row_gap: Val::Px(10.0),
+                            width: Val::Px(150.0),
                             ..default()
                         })
                         .with_children(|cats| {
@@ -373,20 +345,17 @@ pub fn spawn_menu(
                             ));
                             for (index, name) in mode_panel::MODE_CATEGORIES.iter().enumerate() {
                                 cats.spawn((
-                                    NodeBundle {
-                                        node: Node {
-                                            width: Val::Percent(100.0),
-                                            height: Val::Px(44.0),
-                                            justify_content: JustifyContent::Center,
-                                            align_items: AlignItems::Center,
-                                            border: UiRect::all(Val::Px(2.0)),
-                                            ..default()
-                                        },
-                                        background_color: base_bg,
-                                        border_color: base_border,
-                                        border_radius: BorderRadius::all(Val::Px(4.0)),
+                                    Node {
+                                        width: Val::Percent(100.0),
+                                        height: Val::Px(44.0),
+                                        justify_content: JustifyContent::Center,
+                                        align_items: AlignItems::Center,
+                                        border: UiRect::all(Val::Px(2.0)),
                                         ..default()
                                     },
+                                    base_bg,
+                                    base_border,
+                                    BorderRadius::all(Val::Px(4.0)),
                                     Interaction::default(),
                                     CategoryButton(index),
                                 ))
@@ -399,13 +368,10 @@ pub fn spawn_menu(
                             }
                         });
                         // 模式列
-                        body.spawn(NodeBundle {
-                            node: Node {
-                                flex_direction: FlexDirection::Column,
-                                row_gap: Val::Px(12.0),
-                                flex_grow: 1.0,
-                                ..default()
-                            },
+                        body.spawn(Node {
+                            flex_direction: FlexDirection::Column,
+                            row_gap: Val::Px(12.0),
+                            flex_grow: 1.0,
                             ..default()
                         })
                         .with_children(|modes| {
@@ -421,35 +387,29 @@ pub fn spawn_menu(
                                 };
                                 modes
                                     .spawn((
-                                        NodeBundle {
-                                            node: Node {
-                                                height: Val::Px(68.0),
-                                                justify_content: JustifyContent::SpaceBetween,
-                                                align_items: AlignItems::Center,
-                                                padding: UiRect {
-                                                    left: Val::Px(22.0),
-                                                    right: Val::Px(22.0),
-                                                    top: Val::Px(0.0),
-                                                    bottom: Val::Px(0.0),
-                                                },
-                                                border: UiRect::all(Val::Px(2.0)),
-                                                ..default()
+                                        Node {
+                                            height: Val::Px(68.0),
+                                            justify_content: JustifyContent::SpaceBetween,
+                                            align_items: AlignItems::Center,
+                                            padding: UiRect {
+                                                left: Val::Px(22.0),
+                                                right: Val::Px(22.0),
+                                                top: Val::Px(0.0),
+                                                bottom: Val::Px(0.0),
                                             },
-                                            background_color: base_bg,
-                                            border_color: base_border,
-                                            border_radius: BorderRadius::all(Val::Px(4.0)),
+                                            border: UiRect::all(Val::Px(2.0)),
                                             ..default()
                                         },
+                                        base_bg,
+                                        base_border,
+                                        BorderRadius::all(Val::Px(4.0)),
                                         Interaction::default(),
                                         ModeRow(spec.id),
                                     ))
                                     .with_children(|row| {
-                                        row.spawn(NodeBundle {
-                                            node: Node {
-                                                flex_direction: FlexDirection::Column,
-                                                row_gap: Val::Px(3.0),
-                                                ..default()
-                                            },
+                                        row.spawn(Node {
+                                            flex_direction: FlexDirection::Column,
+                                            row_gap: Val::Px(3.0),
                                             ..default()
                                         })
                                         .with_children(|l| {
@@ -477,22 +437,21 @@ pub fn spawn_menu(
         // 0.14 里带 Global Z 的父节点下 absolute 背景子节点与兄弟子树的遮挡关系不可靠，
         // 压暗层必须自己占一层（ZIndex 15/20，盖过 z10 的主操作区）。
         settings_backdrop = root
-            .spawn(NodeBundle {
-                node: Node {
+            .spawn((
+                Node {
                     position_type: PositionType::Absolute,
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),
                     ..default()
                 },
-                background_color: BackgroundColor(Color::srgba(0.0, 0.0, 0.02, 0.60)),
-                visibility: Visibility::Hidden,
-                z_index: ZIndex(15),
-                ..default()
-            })
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.02, 0.60)),
+                Visibility::Hidden,
+                ZIndex(15),
+            ))
             .id();
         settings_overlay = root
-            .spawn(NodeBundle {
-                node: Node {
+            .spawn((
+                Node {
                     width: Val::Percent(100.0),
                     height: Val::Percent(100.0),
                     flex_direction: FlexDirection::Column,
@@ -501,26 +460,19 @@ pub fn spawn_menu(
                     row_gap: Val::Px(14.0),
                     ..default()
                 },
-                visibility: Visibility::Hidden,
-                z_index: ZIndex(20),
-                ..default()
-            })
+                Visibility::Hidden,
+                ZIndex(20),
+            ))
             .with_children(|overlay| {
                 overlay.spawn(flow::text(
                     "游 戏 设 置",
                     flow::style(&fonts, 36.0, Color::srgb(0.92, 0.95, 1.0)),
                 ));
-                overlay.spawn(NodeBundle {
-                    node: Node { height: Val::Px(8.0), ..default() },
-                    ..default()
-                });
+                overlay.spawn(Node { height: Val::Px(8.0), ..default() });
                 settings::spawn_setting_row(overlay, &fonts, &settings, SettingKind::Sensitivity, "鼠标灵敏度");
                 settings::spawn_setting_row(overlay, &fonts, &settings, SettingKind::Fov, "视野 (FOV)");
                 settings::spawn_setting_row(overlay, &fonts, &settings, SettingKind::Ambient, "环境亮度");
-                overlay.spawn(NodeBundle {
-                    node: Node { height: Val::Px(10.0), ..default() },
-                    ..default()
-                });
+                overlay.spawn(Node { height: Val::Px(10.0), ..default() });
                 settings::spawn_credits_panel(overlay, &fonts);
                 close_btn = spawn_action_button(overlay, &fonts, "返 回", 200.0, 48.0, 20.0);
             })
@@ -553,20 +505,17 @@ pub fn spawn_action_button(
     let (bg, border) = menu_button_palette(false);
     parent
         .spawn((
-            NodeBundle {
-                node: Node {
-                    width: Val::Px(width),
-                    height: Val::Px(height),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    border: UiRect::all(Val::Px(2.0)),
-                    ..default()
-                },
-                background_color: bg,
-                border_color: border,
-                border_radius: BorderRadius::all(Val::Px(4.0)),
+            Node {
+                width: Val::Px(width),
+                height: Val::Px(height),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(2.0)),
                 ..default()
             },
+            bg,
+            border,
+            BorderRadius::all(Val::Px(4.0)),
             Interaction::default(),
             MenuButton,
         ))

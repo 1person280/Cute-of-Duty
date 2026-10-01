@@ -125,20 +125,17 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     // ---- 就近列表：小面板贴在准星右下侧，**不铺满全屏、不加整屏遮罩**（避免常显时糊住画面） ----
     p.spawn((
         InteractPanel,
-        NodeBundle {
-            node: Node {
-                position_type: PositionType::Absolute,
-                left: Val::Percent(55.0),
-                top: Val::Percent(40.0),
-                flex_direction: FlexDirection::Column,
-                row_gap: Val::Px(INTERACT_ROW_GAP),
-                padding: UiRect::all(Val::Px(10.0)),
-                ..default()
-            },
-            background_color: Color::srgba(0.04, 0.06, 0.09, 0.72).into(),
-            visibility: Visibility::Hidden,
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Percent(55.0),
+            top: Val::Percent(40.0),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(INTERACT_ROW_GAP),
+            padding: UiRect::all(Val::Px(10.0)),
             ..default()
         },
+        BackgroundColor(Color::srgba(0.04, 0.06, 0.09, 0.72)),
+        Visibility::Hidden,
     ))
     .with_children(|panel| {
         panel.spawn(flow::text(
@@ -147,42 +144,33 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         ));
         // 行区（左） + 滚动条（右）并排
         panel
-            .spawn(NodeBundle {
-                node: Node {
-                    flex_direction: FlexDirection::Row,
-                    column_gap: Val::Px(6.0),
-                    align_items: AlignItems::FlexStart,
-                    ..default()
-                },
+            .spawn(Node {
+                flex_direction: FlexDirection::Row,
+                column_gap: Val::Px(6.0),
+                align_items: AlignItems::FlexStart,
                 ..default()
             })
             .with_children(|body| {
-                body.spawn(NodeBundle {
-                    node: Node {
-                        flex_direction: FlexDirection::Column,
-                        row_gap: Val::Px(INTERACT_ROW_GAP),
-                        min_width: Val::Px(260.0),
-                        ..default()
-                    },
+                body.spawn(Node {
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(INTERACT_ROW_GAP),
+                    min_width: Val::Px(260.0),
                     ..default()
                 })
                 .with_children(|list| {
                     for j in 0..INTERACT_VISIBLE_ROWS {
                         list.spawn((
                             InteractRowSlot(j),
-                            NodeBundle {
-                                node: Node {
-                                    padding: UiRect::axes(Val::Px(10.0), Val::Px(3.0)),
-                                    height: Val::Px(INTERACT_ROW_H),
-                                    align_items: AlignItems::Center,
-                                    justify_content: JustifyContent::Center,
-                                    border: UiRect::all(Val::Px(1.0)),
-                                    ..default()
-                                },
-                                background_color: theme::PANEL_BG.into(),
-                                border_color: BorderColor(theme::PANEL_BORDER),
+                            Node {
+                                padding: UiRect::axes(Val::Px(10.0), Val::Px(3.0)),
+                                height: Val::Px(INTERACT_ROW_H),
+                                align_items: AlignItems::Center,
+                                justify_content: JustifyContent::Center,
+                                border: UiRect::all(Val::Px(1.0)),
                                 ..default()
                             },
+                            BackgroundColor(theme::PANEL_BG),
+                            BorderColor(theme::PANEL_BORDER),
                         ))
                         .with_children(|row| {
                             row.spawn((
@@ -198,31 +186,27 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
                 // 滚动条：定高轨道 + 按比例定位的滑块
                 let track_h = INTERACT_VISIBLE_ROWS as f32 * (INTERACT_ROW_H + INTERACT_ROW_GAP)
                     - INTERACT_ROW_GAP;
-                body.spawn(NodeBundle {
-                    node: Node {
+                body.spawn((
+                    Node {
                         width: Val::Px(4.0),
                         height: Val::Px(track_h),
                         overflow: Overflow::clip(),
                         ..default()
                     },
-                    background_color: Color::srgba(1.0, 1.0, 1.0, 0.10).into(),
-                    ..default()
-                })
+                    BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.10)),
+                ))
                 .with_children(|track| {
                     track.spawn((
                         InteractScrollThumb,
-                        NodeBundle {
-                            node: Node {
-                                position_type: PositionType::Absolute,
-                                left: Val::Px(0.0),
-                                top: Val::Px(0.0),
-                                width: Val::Px(4.0),
-                                height: Val::Px(track_h),
-                                ..default()
-                            },
-                            background_color: theme::ACCENT_AMBER.into(),
+                        Node {
+                            position_type: PositionType::Absolute,
+                            left: Val::Px(0.0),
+                            top: Val::Px(0.0),
+                            width: Val::Px(4.0),
+                            height: Val::Px(track_h),
                             ..default()
                         },
+                        BackgroundColor(theme::ACCENT_AMBER),
                     ));
                 });
             });
@@ -238,23 +222,20 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
     // ---- 站点二级选项面板：整屏半透明遮罩 + 居中面板（标题 / 选项列表 / 操作提示） ----
     p.spawn((
         InteractMenuRoot,
-        NodeBundle {
-            node: Node {
-                position_type: PositionType::Absolute,
-                left: Val::Px(0.0),
-                top: Val::Px(0.0),
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                row_gap: Val::Px(10.0),
-                ..default()
-            },
-            background_color: Color::srgba(0.02, 0.03, 0.05, 0.55).into(),
-            visibility: Visibility::Hidden,
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Px(0.0),
+            top: Val::Px(0.0),
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            row_gap: Val::Px(10.0),
             ..default()
         },
+        BackgroundColor(Color::srgba(0.02, 0.03, 0.05, 0.55)),
+        Visibility::Hidden,
     ))
     .with_children(|root| {
         root.spawn((
@@ -263,13 +244,10 @@ pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         ));
         root.spawn((
             InteractMenuList,
-            NodeBundle {
-                node: Node {
-                    flex_direction: FlexDirection::Column,
-                    row_gap: Val::Px(8.0),
-                    min_width: Val::Px(260.0),
-                    ..default()
-                },
+            Node {
+                flex_direction: FlexDirection::Column,
+                row_gap: Val::Px(8.0),
+                min_width: Val::Px(260.0),
                 ..default()
             },
         ));

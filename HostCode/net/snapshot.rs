@@ -232,32 +232,23 @@ fn spawn_body(
         if body.head_scale == Vec3::ZERO {
             // 物体类：单方块
             p.spawn((
-                PbrBundle {
-                    mesh: Mesh3d(cube.handle.clone()),
-                    material: MeshMaterial3d(primary),
-                    transform: Transform::from_scale(body.torso_scale),
-                    ..default()
-                },
+                Mesh3d(cube.handle.clone()),
+                MeshMaterial3d(primary),
+                Transform::from_scale(body.torso_scale),
             ));
         } else {
             // 角色类：躯干 + 头（脚底对齐 y=0，躯干块中心抬至 y=0.75）
             p.spawn((
-                PbrBundle {
-                    mesh: Mesh3d(cube.handle.clone()),
-                    material: MeshMaterial3d(primary),
-                    transform: Transform::from_translation(Vec3::new(0.0, 0.75, 0.0))
-                        .with_scale(body.torso_scale),
-                    ..default()
-                },
+                Mesh3d(cube.handle.clone()),
+                MeshMaterial3d(primary),
+                Transform::from_translation(Vec3::new(0.0, 0.75, 0.0))
+                    .with_scale(body.torso_scale),
             ));
             p.spawn((
-                PbrBundle {
-                    mesh: Mesh3d(cube.handle.clone()),
-                    material: MeshMaterial3d(accent),
-                    transform: Transform::from_translation(Vec3::new(0.0, body.head_y, 0.0))
-                        .with_scale(body.head_scale),
-                    ..default()
-                },
+                Mesh3d(cube.handle.clone()),
+                MeshMaterial3d(accent),
+                Transform::from_translation(Vec3::new(0.0, body.head_y, 0.0))
+                    .with_scale(body.head_scale),
             ));
         }
     });

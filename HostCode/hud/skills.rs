@@ -1,4 +1,4 @@
-﻿//! HUD 右下：武器槽 [1]/[2] + 大字弹药 + 备用弹池 + 换弹提示 + 元素状态；以及顶部公告流
+//! HUD 右下：武器槽 [1]/[2] + 大字弹药 + 备用弹池 + 换弹提示 + 元素状态；以及顶部公告流
 //!
 //! 设计动机：右下面板对齐旧版"武器槽 → 大字弹药 → 状态行"的三段结构（[1]/[2] 槽位、
 //! `当前 / 容量` 大字、`RELOADING` 提示），但配色/字号仍走本项目的 `theme` 过程化风格。
@@ -51,8 +51,8 @@ const AMMO_ALERT: Color = Color::srgb(0.95, 0.25, 0.20);
 
 /// 装配右下武器/弹药面板 + 顶部公告流。
 pub fn spawn_skills(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
-    p.spawn(NodeBundle {
-        node: Node {
+    p.spawn((
+        Node {
             position_type: PositionType::Absolute,
             right: Val::Px(16.0),
             bottom: Val::Px(16.0),
@@ -61,17 +61,13 @@ pub fn spawn_skills(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
             padding: UiRect::all(Val::Px(10.0)),
             ..default()
         },
-        background_color: theme::PANEL_BG.into(),
-        ..default()
-    })
+        BackgroundColor(theme::PANEL_BG),
+    ))
     .with_children(|s| {
         // 武器槽行：[1] 主武器名 / [2] 副武器占位
-        s.spawn(NodeBundle {
-            node: Node {
-                flex_direction: FlexDirection::Row,
-                column_gap: Val::Px(6.0),
-                ..default()
-            },
+        s.spawn(Node {
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(6.0),
             ..default()
         })
         .with_children(|row| {
@@ -80,13 +76,10 @@ pub fn spawn_skills(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
         });
 
         // 大字弹药行：`当前` (24px) + ` / 容量` (13px，基线对齐更稳)
-        s.spawn(NodeBundle {
-            node: Node {
-                flex_direction: FlexDirection::Row,
-                align_items: AlignItems::FlexEnd,
-                column_gap: Val::Px(4.0),
-                ..default()
-            },
+        s.spawn(Node {
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::FlexEnd,
+            column_gap: Val::Px(4.0),
             ..default()
         })
         .with_children(|row| {
@@ -137,8 +130,8 @@ pub fn spawn_skills(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
 
 /// 单个武器槽：方形键位徽标 + 槽内武器名。
 fn spawn_weapon_slot(row: &mut ChildBuilder<'_>, fonts: &CjkFont, slot: u8, name: &str) {
-    row.spawn(NodeBundle {
-        node: Node {
+    row.spawn((
+        Node {
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             column_gap: Val::Px(4.0),
@@ -146,10 +139,9 @@ fn spawn_weapon_slot(row: &mut ChildBuilder<'_>, fonts: &CjkFont, slot: u8, name
             border: UiRect::all(Val::Px(1.0)),
             ..default()
         },
-        background_color: Color::srgba(0.14, 0.16, 0.20, 0.9).into(),
-        border_color: BorderColor(theme::PANEL_BORDER),
-        ..default()
-    })
+        BackgroundColor(Color::srgba(0.14, 0.16, 0.20, 0.9)),
+        BorderColor(theme::PANEL_BORDER),
+    ))
     .with_children(|b| {
         b.spawn(flow::text(
             format!("{slot}"),

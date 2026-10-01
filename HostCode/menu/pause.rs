@@ -110,41 +110,34 @@ pub fn spawn_pause_ui(commands: &mut Commands, fonts: &CjkFont, settings: &GameS
     let mut settings_panel = Entity::PLACEHOLDER;
 
     let root = commands
-        .spawn(NodeBundle {
-            node: Node {
-                position_type: PositionType::Absolute,
-                width: Val::Percent(100.0),
-                height: Val::Percent(100.0),
-                flex_direction: FlexDirection::Column,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                ..default()
-            },
+        .spawn(Node {
+            position_type: PositionType::Absolute,
+            width: Val::Percent(100.0),
+            height: Val::Percent(100.0),
+            flex_direction: FlexDirection::Column,
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
             ..default()
         })
         .id();
 
     commands.entity(root).with_children(|root_node| {
         // 全屏压暗层：独立绝对定位节点（与 HUD 边缘光同款写法，可靠渲染）。
-        root_node.spawn(NodeBundle {
-            node: Node {
+        root_node.spawn((
+            Node {
                 position_type: PositionType::Absolute,
                 width: Val::Percent(100.0),
                 height: Val::Percent(100.0),
                 ..default()
             },
-            background_color: BackgroundColor(Color::srgba(0.0, 0.0, 0.02, 0.55)),
-            ..default()
-        });
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.02, 0.55)),
+        ));
 
         main_panel = root_node
-            .spawn(NodeBundle {
-                node: Node {
-                    flex_direction: FlexDirection::Column,
-                    align_items: AlignItems::Center,
-                    row_gap: Val::Px(14.0),
-                    ..default()
-                },
+            .spawn(Node {
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::Center,
+                row_gap: Val::Px(14.0),
                 ..default()
             })
             .with_children(|panel| {
@@ -156,10 +149,7 @@ pub fn spawn_pause_ui(commands: &mut Commands, fonts: &CjkFont, settings: &GameS
                     "按 / 或 ~ 键继续游戏",
                     flow::style(fonts, 14.0, Color::srgb(0.55, 0.62, 0.72)),
                 ));
-                panel.spawn(NodeBundle {
-                    node: Node { height: Val::Px(18.0), ..default() },
-                    ..default()
-                });
+                panel.spawn(Node { height: Val::Px(18.0), ..default() });
                 resume_btn = spawn_action_button(panel, fonts, "返 回 游 戏", 360.0, 52.0, 22.0);
                 settings_btn = spawn_action_button(panel, fonts, "游 戏 设 置", 360.0, 52.0, 22.0);
                 return_btn = spawn_action_button(panel, fonts, "返 回 主 界 面", 360.0, 52.0, 22.0);
@@ -167,32 +157,25 @@ pub fn spawn_pause_ui(commands: &mut Commands, fonts: &CjkFont, settings: &GameS
             .id();
 
         settings_panel = root_node
-            .spawn(NodeBundle {
-                node: Node {
+            .spawn((
+                Node {
                     flex_direction: FlexDirection::Column,
                     align_items: AlignItems::Center,
                     row_gap: Val::Px(14.0),
                     ..default()
                 },
-                visibility: Visibility::Hidden,
-                ..default()
-            })
+                Visibility::Hidden,
+            ))
             .with_children(|panel| {
                 panel.spawn(flow::text(
                     "游 戏 设 置",
                     flow::style(fonts, 40.0, Color::srgb(0.92, 0.95, 1.0)),
                 ));
-                panel.spawn(NodeBundle {
-                    node: Node { height: Val::Px(10.0), ..default() },
-                    ..default()
-                });
+                panel.spawn(Node { height: Val::Px(10.0), ..default() });
                 spawn_setting_row(panel, fonts, settings, SettingKind::Sensitivity, "鼠标灵敏度");
                 spawn_setting_row(panel, fonts, settings, SettingKind::Fov, "视野 (FOV)");
                 spawn_setting_row(panel, fonts, settings, SettingKind::Ambient, "环境亮度");
-                panel.spawn(NodeBundle {
-                    node: Node { height: Val::Px(12.0), ..default() },
-                    ..default()
-                });
+                panel.spawn(Node { height: Val::Px(12.0), ..default() });
                 spawn_credits_panel(panel, fonts);
                 back_btn = spawn_action_button(panel, fonts, "返 回", 360.0, 46.0, 20.0);
             })

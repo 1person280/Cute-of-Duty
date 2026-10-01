@@ -43,15 +43,12 @@ pub fn update_crosshair(rig: Res<AimRig>, mut bars: Query<&mut BackgroundColor, 
 pub fn spawn_crosshair(p: &mut ChildBuilder<'_>) {
     p.spawn((
         CrosshairRoot,
-        NodeBundle {
-            node: Node {
-                position_type: PositionType::Absolute,
-                left: Val::Percent(50.0),
-                top: Val::Percent(50.0),
-                width: Val::Px(0.0),
-                height: Val::Px(0.0),
-                ..default()
-            },
+        Node {
+            position_type: PositionType::Absolute,
+            left: Val::Percent(50.0),
+            top: Val::Percent(50.0),
+            width: Val::Px(0.0),
+            height: Val::Px(0.0),
             ..default()
         },
     ))
@@ -76,9 +73,9 @@ pub fn spawn_crosshair(p: &mut ChildBuilder<'_>) {
 }
 
 /// 一条白色直壁（绝对定位，left/top 为相对中心锚点的像素偏移）。
-fn bar(left: Val, top: Val, w: f32, h: f32) -> NodeBundle {
-    NodeBundle {
-        node: Node {
+fn bar(left: Val, top: Val, w: f32, h: f32) -> impl Bundle {
+    (
+        Node {
             position_type: PositionType::Absolute,
             left,
             top,
@@ -86,7 +83,6 @@ fn bar(left: Val, top: Val, w: f32, h: f32) -> NodeBundle {
             height: Val::Px(h),
             ..default()
         },
-        background_color: Color::WHITE.into(),
-        ..default()
-    }
+        BackgroundColor(Color::WHITE),
+    )
 }

@@ -35,8 +35,8 @@ pub fn spawn_setting_row(
     label: &str,
 ) {
     parent
-        .spawn(NodeBundle {
-            node: Node {
+        .spawn((
+            Node {
                 width: Val::Px(460.0),
                 height: Val::Px(46.0),
                 flex_direction: FlexDirection::Row,
@@ -46,23 +46,19 @@ pub fn spawn_setting_row(
                 border: UiRect::all(Val::Px(2.0)),
                 ..default()
             },
-            background_color: BackgroundColor(Color::srgba(0.10, 0.14, 0.20, 0.95)),
-            border_color: BorderColor(Color::srgb(0.22, 0.28, 0.36)),
-            border_radius: BorderRadius::all(Val::Px(4.0)),
-            ..default()
-        })
+            BackgroundColor(Color::srgba(0.10, 0.14, 0.20, 0.95)),
+            BorderColor(Color::srgb(0.22, 0.28, 0.36)),
+            BorderRadius::all(Val::Px(4.0)),
+        ))
         .with_children(|row| {
             row.spawn(flow::text(
                 label,
                 flow::style(fonts, 19.0, Color::srgb(0.85, 0.89, 0.95)),
             ));
-            row.spawn(NodeBundle {
-                node: Node {
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    column_gap: Val::Px(8.0),
-                    ..default()
-                },
+            row.spawn(Node {
+                flex_direction: FlexDirection::Row,
+                align_items: AlignItems::Center,
+                column_gap: Val::Px(8.0),
                 ..default()
             })
             .with_children(|ctrl| {
@@ -89,20 +85,17 @@ pub fn spawn_step_button(
 ) {
     parent
         .spawn((
-            NodeBundle {
-                node: Node {
-                    width: Val::Px(40.0),
-                    height: Val::Px(34.0),
-                    justify_content: JustifyContent::Center,
-                    align_items: AlignItems::Center,
-                    border: UiRect::all(Val::Px(2.0)),
-                    ..default()
-                },
-                background_color: BackgroundColor(Color::srgba(0.14, 0.20, 0.28, 0.98)),
-                border_color: BorderColor(menu_accent()),
-                border_radius: BorderRadius::all(Val::Px(4.0)),
+            Node {
+                width: Val::Px(40.0),
+                height: Val::Px(34.0),
+                justify_content: JustifyContent::Center,
+                align_items: AlignItems::Center,
+                border: UiRect::all(Val::Px(2.0)),
                 ..default()
             },
+            BackgroundColor(Color::srgba(0.14, 0.20, 0.28, 0.98)),
+            BorderColor(menu_accent()),
+            BorderRadius::all(Val::Px(4.0)),
             Interaction::default(),
             MenuButton,
             SettingAdjust { kind, delta },
@@ -134,8 +127,8 @@ pub fn spawn_credits_panel(parent: &mut ChildBuilder, fonts: &CjkFont) {
     ];
 
     parent
-        .spawn(NodeBundle {
-            node: Node {
+        .spawn((
+            Node {
                 width: Val::Px(760.0),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::Center,
@@ -144,11 +137,10 @@ pub fn spawn_credits_panel(parent: &mut ChildBuilder, fonts: &CjkFont) {
                 border: UiRect::all(Val::Px(2.0)),
                 ..default()
             },
-            background_color: BackgroundColor(Color::srgba(0.06, 0.09, 0.13, 0.92)),
-            border_color: BorderColor(Color::srgb(0.22, 0.28, 0.36)),
-            border_radius: BorderRadius::all(Val::Px(4.0)),
-            ..default()
-        })
+            BackgroundColor(Color::srgba(0.06, 0.09, 0.13, 0.92)),
+            BorderColor(Color::srgb(0.22, 0.28, 0.36)),
+            BorderRadius::all(Val::Px(4.0)),
+        ))
         .with_children(|panel| {
             panel.spawn(flow::text(
                 "开 源 代 码 鸣 谢",
@@ -158,20 +150,14 @@ pub fn spawn_credits_panel(parent: &mut ChildBuilder, fonts: &CjkFont) {
                 "本项目代码以 GPL-3.0 with linking exception 开源、美术资产以 CC BY-NC-SA 4.0 授权，站在下列开源库的肩膀上",
                 flow::style(fonts, 12.0, Color::srgb(0.55, 0.62, 0.72)),
             ));
-            panel.spawn(NodeBundle {
-                node: Node { height: Val::Px(4.0), ..default() },
-                ..default()
-            });
+            panel.spawn(Node { height: Val::Px(4.0), ..default() });
             for (name, desc) in CREDITS {
                 panel
-                    .spawn(NodeBundle {
-                        node: Node {
-                            width: Val::Percent(100.0),
-                            flex_direction: FlexDirection::Row,
-                            justify_content: JustifyContent::SpaceBetween,
-                            column_gap: Val::Px(16.0),
-                            ..default()
-                        },
+                    .spawn(Node {
+                        width: Val::Percent(100.0),
+                        flex_direction: FlexDirection::Row,
+                        justify_content: JustifyContent::SpaceBetween,
+                        column_gap: Val::Px(16.0),
                         ..default()
                     })
                     .with_children(|row| {

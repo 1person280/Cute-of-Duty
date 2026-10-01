@@ -24,6 +24,36 @@
 
 ---
 
+## [0.12.4] · 2026-10-01 · 客户端弃用 Bundle 迁移（required components）
+
+- **变更类型**：Refactor（**不触碰线格式**；仅客户端 UI/渲染的实体组装写法，无行为语义变化）
+- **影响模块**：`HostCode`（`world`、`hud`、`menu`、`net/snapshot` 共 **17 文件 / 91 处**）、三端 `Cargo.toml`（版本号对齐）、`HostCode/Cargo.toml`（迁移注释）、`README.md`
+- **兼容性**：**兼容**（`z+1`）
+  - 线格式 / `ServerMessage` / `ClientMessage` **字节级不变**，`docs/contracts/protocol.yaml` 的 `wire_version` **仍为 `12`**；双端 `0.12.4` 与 `0.12.3`/`0.12.2` **仍互通**。
+  - 改动纯属**客户端源码编译面**：把 Bevy 0.15 中**已弃用但仍可编译**的 6 类 Bundle 迁到 required-components 新写法，不涉及任何对外契约。
+  - **行为等价性依据**：`Node` 的 `#[require]` 集与 `NodeBundle` 全字段同集，故 `BackgroundColor`/`BorderColor`/`BorderRadius`/`ZIndex`/`Visibility` 由 required components 自动补齐、不会丢；`Camera3d` require `Projection`（FOV 写入路径不受影响）；`DirectionalLight`/`PointLight` 自动补 `Cascades`/`Visibility`。
+  - **未删未改**：既有显式 `Interaction::default()` 全部保留（`Node` 不含它）；`Button` 处不重复补 `Interaction`（自动补齐）；`ZIndex(10/15/20)`、`Visibility::Hidden` 等数值**零改动**。
+- **迁移指南**：不适用（`z+1`，非协议不兼容）。仅对**后续在本仓新增客户端 UI/渲染代码**者提示：
+  - 一律**直接 spawn 组件元组**，勿再用 `NodeBundle`/`PbrBundle`/`Camera3dBundle`/`DirectionalLightBundle`/`PointLightBundle`/`ButtonBundle`（0.16 将删除）。
+  - 颜色**必须**写成 `BackgroundColor(<颜色表达式>)` / `BorderColor(<颜色表达式>)`；**不能**写 `Color::X.into()`——在裸元组里 `.into()` 的目标类型无法推断，会编译失败。
+  - 按钮用 `Button`（其 required components 自动补 `Node`/`FocusPolicy(Block)`/`Interaction`），**不要**再手写 `Interaction`。
+  - 若某变量本已是组件（如 `let (base_bg, base_border) = menu_button_palette(..)` 返回 `(BackgroundColor, BorderColor)`），直接放入元组即可，**勿再包一层** `BackgroundColor(..)`（会得到 `expected Color, found BackgroundColor`）。
+- **已知问题（**待修复**·发布本测试版时仍未修复，非"已完成"）**：
+  - ①**仓库（携带物资）浮层点击无反应**：2026-10-01 实机录屏确认 —— 鼠标悬停「仓库 · 携带物资」按钮**有**高亮反馈，点击后**浮层不出现**（84–89s 逐帧 30 张，主菜单纹丝不动）。
+    - 已排除：本次迁移的 `arsenal/layout.rs`（13 处）为机械脱壳、无字段丢失；`Node` 的 `#[require]` 实查 bevy 0.15.3 源码**含 `ZIndex`**（不存在"丢 ZIndex"）。
+    - 插桩实测（临时 `eprintln!`，已撤除）：`ensure_overlay` 每帧 `fonts_ready=true existing_roots=1` —— 浮层根节点**唯一且已建**，`get_single_mut()` 不会失败，问题不在浮层创建。
+    - **根因未定位**：`main_menu_loadout` → `arsenal_interaction` 开关链路未取到运行时断点证据（本机合成鼠标输入无法触达 Bevy UI 拾取，未能复现点击）。**未修复**。
+  - ②**主菜单版本号陈旧**：主菜单左上角显示 `PRE-ALPHA v0.3.0`（[`HostCode/menu/mod.rs`](../HostCode/menu/mod.rs) 写死的字符串），与本版 `0.12.4` 不一致。**未修复**。
+- **验证**：
+  - `cargo check --workspace`（**本机无 `cargo-wrap`**，经 owner 确认以裸 `cargo` 替代）→ 弃用告警 **276 → 0**，退出码 `0`，无 error / 无 warning。
+  - 全仓 `NodeBundle|PbrBundle|Camera3dBundle|DirectionalLightBundle|PointLightBundle|ButtonBundle` **零命中**。
+  - `cargo test -p cute_of_duty_server` → **119 passed / 0 failed**（与 0.12.3 基线一致，服务端零回归）。
+  - 最大 `.rs` 文件仍 **< 600 行**（`HostCode/menu/mod.rs` 580 → 500）。
+  - **待实机验证**：菜单 z 层级（10/15/20）压暗、仓库拖拽 hover 换色、血/甲/冷却条随快照变化、FOV 设置生效、准星、光照与体素模型渲染。
+- **关联**：[`HostCode/Cargo.toml`](../HostCode/Cargo.toml)、[README 版本历史](../README.md)（无 ADR：未触碰模块边界 / 公共 Trait / 线格式）
+
+---
+
 ## [0.12.3] · 2026-09-29 · 服务端内置原生 Web 服务（HTTP/HTTPS 门户 + 运维 API + WebSocket 桥）
 
 - **变更类型**：Additive（**不触碰线格式**；新增 ServerCode 内置 Web 服务与传输无关核心）
