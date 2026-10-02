@@ -24,11 +24,12 @@
 
 ---
 
-## [未发布] · 2026-10-02 · 单人维护期 L2 评审门槛过渡条款（文档先行，未改代码）
+## [未发布] · 2026-10-02 · 单人维护期 L2 评审豁免 + README 免责声明冻结条款（文档先行，未改代码）
 
 - **变更类型**：Refactor（仅规范 / 文档，**未改任何代码**；不触碰线格式，版本号不动）
-- **影响模块**：规范层——`CONTRIBUTING.md`（第八节成熟度分级表下方注记 + 第九节 9.2 范围表指引）、
-  `.agents/skills/compliant-delivery/SKILL.md`（2.3 评审门槛 + TL;DR）、`docs/barek-history.md`（本条）
+- **影响模块**：规范层 + 仓库门面——`CONTRIBUTING.md`（第八节成熟度分级表下方注记 + 第九节 9.2 范围表指引）、
+  `.agents/skills/compliant-delivery/SKILL.md`（2.3 评审门槛 + 3.5 发布红线 + TL;DR）、
+  `README.md`（顶部新增免责声明）、`docs/barek-history.md`（本条）
 - **兼容性**：**兼容** —— 不触碰线格式 / 配置语义 / 公共 Trait；`wire_version` 仍为 **13**，
   双端 `0.13.0` 的互通关系不变（非 `z` / 非 `y` 位变更：纯文档）。
 - **迁移指南**：不适用（非协议不兼容）。
@@ -42,7 +43,12 @@
     `compliant-delivery` 技能 2.3 与 TL;DR 同步。
   - **动机（Why）**：0.13.0 发布时该门槛在单一登记贡献者下客观无法满足，只能每次发布口头标注偏离；
     把规则写成**带失效条件的过渡条款**，比反复解释更可追溯，也不会让门槛形同虚设（它明确了"何时必须恢复"）。
-- **验证**：纯文档变更，不涉 `.rs` / 线格式 / 契约语义，故未跑编译；`git status` 仅含上述 3 个文档文件。
+  - 新增「**README 顶部免责声明不得移除**」硬规约：README 顶部（badge 区下方）必须保留**免责声明** ——
+    声明本项目为**个人非商业同人 / 学习项目**、与《Call of Duty》系列及其权利方（Activision）**无任何关联**、
+    代码 / 资产许可与「不提供担保」。**在本项目成为热门项目之前，任何提交 / 发布都不得删除、缩短或弱化该声明**，
+    每次 release 前逐字校验。落地：`README.md` 顶部新增该声明 + 维护者 HTML 注释（`<!-- 维护者注意：… -->`）；
+    `compliant-delivery` 技能 **3.5 发布红线**与 **TL;DR** 各加一条。
+- **验证**：纯文档变更，不涉 `.rs` / 线格式 / 契约语义，故未跑编译；`git status` 仅含上述 4 个文档文件。
 - **关联**：[CONTRIBUTING.md](../CONTRIBUTING.md)、[cla-signatures.md](cla-signatures.md)、
   [.agents/skills/compliant-delivery/SKILL.md](../.agents/skills/compliant-delivery/SKILL.md)。
 

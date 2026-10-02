@@ -209,6 +209,7 @@ Remove-Item $stage -Recurse -Force; Remove-Item $zip -Force   # 省磁盘：GitH
 - tag 名严格为 `x.y.z`（如 `0.10.0`），**无 v 前缀**（历史曾误写 `v0.6-SnapShot-1`，大小写错乱，**不要复现**）。
 - **不得启用已冻结的历史 WIP 号**（如 `0.7-Snapshot-7` / `0.8.0-Snapshot-8` 那批未发布快照）。
 - **许可随版本发布**：代码 `LICENSE`（GPLv3 + Linking Exception，覆盖 `HostCode/`·`ServerCode/`·`ContractCode/`·`tools/`）+ 资产 `LICENSE-ASSETS`（CC BY-NC-SA 4.0）+ `CLA.md` 必须齐全。
+- **README 顶部免责声明不得移除（成为热门项目之前）**：README 顶部（badge 区下方）必须保留**免责声明**——声明本项目为**个人非商业同人 / 学习项目**、与《Call of Duty》系列及其权利方（Activision）**无任何关联**、代码 / 资产许可与「不提供担保」。**在本项目成为热门项目之前，任何提交 / 发布都不得删除、缩短或弱化该声明**；每次 release 前须逐字校验其仍在位（对应用维护者注释：`<!-- 维护者注意：… -->`）。
 - **禁无版本分发**：任何 release 都必须对应明确 tag 与提交，客户端与服务端版本漂移须给兼容声明。
 
 ---
@@ -236,4 +237,5 @@ Remove-Item $stage -Recurse -Force; Remove-Item $zip -Force   # 省磁盘：GitH
 - 推送：分支语义化，`main` 不 force-push、不重写历史；L2 先开 Issue + ≥2 reviewer（单人维护期按 2.3 过渡条款豁免，但须在记录中声明）。
 - 发布：统一版本号 `x.y.z`（`x` 内核 · `y` 协议 · `z` 细节，各按判据 +1），**无 v 前缀**；**版本信息必须 4 个汉字**（Release 标题 `x.y.z：<4字简述>`，如 `0.11.0：通信优化`）；五件套（README 版本表 / BarekHistory / tag / GitHub Release / 双端 exe 二进制 zip）一次对齐；**每次 release 必带简短代码更改 + 扁平化更新**；**上版「未做 / 下一版本目标 / 本轮冻结」三份清单未了结者必须逐条结转（标注来源版本，不得静默丢失 / 不得"与上版一致"整段省略），且「未做」须按来源版本分组、一条一行**；冻结项不写"已完成"。
 - 打包：只打 `--release` 双端 exe；zip 含 exe + `menu/` + 三份许可 + 使用说明；命名 `CuteOfDuty-<版本号>-win64.zip`；补发用 `gh release upload --clobber`，上传后删本地 zip；说明须写明资源绝对路径限制。
+- 免责声明：README 顶部免责声明仍在位（**项目成为热门项目之前不得移除 / 缩短 / 弱化**）。
 - 编译一律 `cargo-wrap`；发布构建一律 `--release`。
