@@ -99,6 +99,7 @@ git push -u origin <branch>          # origin = https://github.com/1person280/Cu
 
 - **L2 模块**（`net` 线格式 / 契约层 `ContractCode` / 公共 Trait）或**新增顶层模块 / 提取独立 crate** → **先开 Issue 对齐**。
 - L2 变更须 **≥2 名 reviewer + maintainer 参与**；破坏性变更先写**迁移指南 + ADR**，再动代码。
+- **单人维护期过渡条款**：仓库仅 **1 名登记贡献者**（见 [cla-signatures.md](../../../docs/cla-signatures.md)）期间，L2 变更**豁免**「≥2 名 reviewer」，由 maintainer **自审**，但必须**同时**满足：① BarekHistory 条目含**迁移指南**；② 契约 YAML 同步；③ 五道红线全绿且附**可核对凭据**；④ 该次提交 / 发布记录中**声明为豁免**。出现**第 2 名登记贡献者**后本条款**自动失效**（届时须回溯复核豁免期内的 L2 变更）。同条款亦见 [CONTRIBUTING 第八节](../../../CONTRIBUTING.md)。
 - PR 描述必附：改了哪个模块 / 为什么 / **依赖图**（证明无环）/ **验证命令 + 结果**；手工验收写清 **步骤 + 预期 + 实际**，未实测标注"未验证"。
 - 绕过 [BarekHistory](../../../docs/barek-history.md) 中标注「待实机验证」的冻结项 → 直接关闭。
 
@@ -232,7 +233,7 @@ Remove-Item $stage -Recurse -Force; Remove-Item $zip -Force   # 省磁盘：GitH
 
 - 提交前：CLA 已签？`user.name/email` 对？五道红线过了？`git status` 无该入库之外的杂物？
 - 提交信息：`<type>(<scope>): 为什么`，一次一件事，重构≠功能。
-- 推送：分支语义化，`main` 不 force-push、不重写历史；L2 先开 Issue + ≥2 reviewer。
+- 推送：分支语义化，`main` 不 force-push、不重写历史；L2 先开 Issue + ≥2 reviewer（单人维护期按 2.3 过渡条款豁免，但须在记录中声明）。
 - 发布：统一版本号 `x.y.z`（`x` 内核 · `y` 协议 · `z` 细节，各按判据 +1），**无 v 前缀**；**版本信息必须 4 个汉字**（Release 标题 `x.y.z：<4字简述>`，如 `0.11.0：通信优化`）；五件套（README 版本表 / BarekHistory / tag / GitHub Release / 双端 exe 二进制 zip）一次对齐；**每次 release 必带简短代码更改 + 扁平化更新**；**上版「未做 / 下一版本目标 / 本轮冻结」三份清单未了结者必须逐条结转（标注来源版本，不得静默丢失 / 不得"与上版一致"整段省略），且「未做」须按来源版本分组、一条一行**；冻结项不写"已完成"。
 - 打包：只打 `--release` 双端 exe；zip 含 exe + `menu/` + 三份许可 + 使用说明；命名 `CuteOfDuty-<版本号>-win64.zip`；补发用 `gh release upload --clobber`，上传后删本地 zip；说明须写明资源绝对路径限制。
 - 编译一律 `cargo-wrap`；发布构建一律 `--release`。

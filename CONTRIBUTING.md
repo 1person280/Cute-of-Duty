@@ -171,6 +171,7 @@ cargo-wrap build --release --workspace       # 客户端表现改动（debug 产
 
 > **`module.md` 过渡纪律**：仓库现有 `module.md` 数量 = **0**。未补期间，任何触碰某模块的 PR 必须**同时**补上该模块的 `module.md`，否则不予合入（"碰到就补，不碰不堵"）；补全清单见 [module-boundaries 第七节](docs/architecture/module-boundaries.md)。
 > **L2 集合**以 module-boundaries 成熟度列中标记 L2 的模块为准（禁用"等"字兜底）；标 `待定` 的模块（当前 `interact`）在定级前按 L2 流程处理。
+> **单人维护期过渡条款**：仓库当前仅 **1 名登记贡献者**（见 [CLA 签署台账](docs/cla-signatures.md)）——该期间 L2 变更**豁免**上表「≥2 名 reviewer」，由 maintainer **自审**，但必须**同时**满足：① BarekHistory 条目含**迁移指南**；② `docs/contracts/*.yaml` 同步；③ 五道红线全绿且附**可核对凭据**；④ 该次提交/发布记录中**声明为豁免**。出现**第 2 名登记贡献者**后本条款**自动失效**，恢复「≥2 名 reviewer」门槛（届时须回溯复核豁免期内的 L2 变更）。
 
 ---
 
@@ -186,7 +187,7 @@ cargo-wrap build --release --workspace       # 客户端表现改动（debug 产
 |---|---|---|
 | 缺陷修复、文档补全、测试补充 | ✅ 直接提 PR | — |
 | L0 / L1 模块内的重构与功能 | ✅ 提 PR | 需附依赖图与验证方式 |
-| **L2 模块（`net` 线格式 / `ContractCode` / 公共 Trait）** | ⚠️ **先开 Issue 对齐** | 必须附迁移指南，≥2 reviewer |
+| **L2 模块（`net` 线格式 / `ContractCode` / 公共 Trait）** | ⚠️ **先开 Issue 对齐** | 必须附迁移指南，≥2 reviewer（单人维护期见第八节过渡条款） |
 | 新增顶层模块 / 提取独立 crate | ⚠️ **先开 Issue 对齐** | 必须先在 `module-boundaries.md` 定边界 |
 | 绕过 `barek-history.md` 中标注「待实机验证」的冻结项 | ❌ 直接关闭 | — |
 

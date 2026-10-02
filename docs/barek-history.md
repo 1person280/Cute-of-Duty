@@ -24,6 +24,30 @@
 
 ---
 
+## [未发布] · 2026-10-02 · 单人维护期 L2 评审门槛过渡条款（文档先行，未改代码）
+
+- **变更类型**：Refactor（仅规范 / 文档，**未改任何代码**；不触碰线格式，版本号不动）
+- **影响模块**：规范层——`CONTRIBUTING.md`（第八节成熟度分级表下方注记 + 第九节 9.2 范围表指引）、
+  `.agents/skills/compliant-delivery/SKILL.md`（2.3 评审门槛 + TL;DR）、`docs/barek-history.md`（本条）
+- **兼容性**：**兼容** —— 不触碰线格式 / 配置语义 / 公共 Trait；`wire_version` 仍为 **13**，
+  双端 `0.13.0` 的互通关系不变（非 `z` / 非 `y` 位变更：纯文档）。
+- **迁移指南**：不适用（非协议不兼容）。
+- **内容**：
+  - 新增「**单人维护期过渡条款**」：仓库**仅 1 名登记贡献者**期间，L2 变更**豁免**「≥2 名 reviewer」，
+    由 maintainer **自审**，但必须**同时**满足四条 —— ① BarekHistory 条目含**迁移指南**；
+    ② `docs/contracts/*.yaml` 同步；③ 五道红线全绿且附**可核对凭据**；④ 该次提交 / 发布记录中**声明为豁免**。
+  - **自动失效条件**：出现**第 2 名登记贡献者**（见 [`docs/cla-signatures.md`](cla-signatures.md)）后本条款
+    **自动失效**，恢复「≥2 名 reviewer」门槛，届时须**回溯复核豁免期内的 L2 变更**。
+  - **落地位置**：[CONTRIBUTING 第八节](../CONTRIBUTING.md)（权威条款）、第九节 9.2 范围表加指引；
+    `compliant-delivery` 技能 2.3 与 TL;DR 同步。
+  - **动机（Why）**：0.13.0 发布时该门槛在单一登记贡献者下客观无法满足，只能每次发布口头标注偏离；
+    把规则写成**带失效条件的过渡条款**，比反复解释更可追溯，也不会让门槛形同虚设（它明确了"何时必须恢复"）。
+- **验证**：纯文档变更，不涉 `.rs` / 线格式 / 契约语义，故未跑编译；`git status` 仅含上述 3 个文档文件。
+- **关联**：[CONTRIBUTING.md](../CONTRIBUTING.md)、[cla-signatures.md](cla-signatures.md)、
+  [.agents/skills/compliant-delivery/SKILL.md](../.agents/skills/compliant-delivery/SKILL.md)。
+
+---
+
 ## [0.13.0] · 2026-10-02 · 物库修复（选装生效 + 服务端预设目录）（**协议不兼容**）
 
 - **变更类型**：Fix + Additive（**新增下行消息 `ServerMessage::PresetCatalog`，线格式不兼容**）
