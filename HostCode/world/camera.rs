@@ -20,10 +20,10 @@
 use bevy::input::mouse::MouseMotion;
 use bevy::prelude::*;
 
-use cute_of_duty_contract::map;
+use cute_of_duty_contract::map::MapLayout;
 
 use crate::flow::flow_state::{AimRig, LocalPlayer};
-use crate::flow::GameSettings;
+use crate::flow::{GameSettings, WorldCatalog};
 use crate::net::snapshot::SnapshotBuffer;
 
 /// 第三人称越肩镜头标记（每帧由 `follow_system` 重写世界变换；`game_settings` 据此改 FOV）。
@@ -69,10 +69,14 @@ const ORBIT_PITCH_MAX: f32 = 0.55;
 const MIN_CAM_Y: f32 = 0.35;
 /// 撞墙时臂长的下限（米）：镜头最多缩到锚点背后 0.7m，避免穿进角色体内或贴脸糊屏。
 const MIN_ARM_DIST: f32 = 0.7;
-/// 镜头与墙面的安全间隙（米）：命中点再往回收一点，杜绝近裁面切进墙里。
-const WALL_MARGIN: f32 = 0.25;
-/// 离墙后臂长回伸速度（米/秒）：缓伸而非瞬回，避免镜头"弹开"造成的眩晕。
-const ARM_RECOVER_SPEED: f32 = 6.0;
+/// 镜头与墙面的安全间隙（米）：命中点再往回收一点，并吸收收缩平滑的滞后
+/// （25/s 收缩在 60fps 下约一帧 0.1m、玩家 6m/s 后退约 0.24m），杜绝近裁面切进墙里。
+const WALL_MARGIN: f32 = 0.30;
+/// 贴墙收缩速率（1/秒，指数平滑）。取高值：威胁侧要快，但仍非瞬跳——
+/// 时间常数 τ = 1/25 ≈ 40ms，视觉上是"顺"而不是"啪"。
+const CAM_ARM_SHRINK_RATE: f32 = 25.0;
+/// 离墙回伸速率（1/秒，指数平滑）。取低值：从容归位，避免镜头"弹开"造成的眩晕。
+const CAM_ARM_GROW_RATE: f32 = 10.0;
 
 /// 鼠标灵敏度（弧度/像素），再乘设置里的灵敏度；数值沿 0.3.2 手感。
 const MOUSE_SENS_X: f32 = 0.0024;
@@ -149,6 +153,7 @@ pub fn follow_system(
     player: Res<LocalPlayer>,
     rig: Res<AimRig>,
     time: Res<Time>,
+    catalog: Res<WorldCatalog>,
     mut colliders: Local<Option<Vec<(Vec3, Vec3)>>>,
 ) {
     let center = if player.entity_id != 0 {
@@ -190,20 +195,22 @@ pub fn follow_system(
         let ideal = anchor + right * shoulder - dir * dist;
 
         // SpringArm 避障：沿"锚点 → 理想机位"做射线-AABB 扫掠，命中实体墙（solid prop）则收缩臂长。
-        // 收缩瞬间生效（防穿模），离墙按 `ARM_RECOVER_SPEED` 缓伸（防弹跳）。
+        // 收缩/回伸均走非对称指数平滑（见 `approach_arm`），不再瞬时跳变。
         let to = ideal - anchor;
         let full = to.length();
         if full > 1e-4 {
-            let colliders = colliders.get_or_insert_with(build_colliders);
-            let target_arm = match sweep_nearest(anchor, to / full, full, colliders) {
-                Some(t) => (t - WALL_MARGIN).clamp(MIN_ARM_DIST, full),
-                None => full,
-            };
-            cam.arm_dist = if target_arm < cam.arm_dist {
-                target_arm
-            } else {
-                (cam.arm_dist + ARM_RECOVER_SPEED * time.delta_secs()).min(target_arm)
-            };
+            // 目录未到达时无法建碰撞盒（相机此时也尚未生成，正常不会走到），跳过避障。
+            if let Some(layout) = catalog.layout.as_ref() {
+                let colliders = colliders.get_or_insert_with(|| build_colliders(layout));
+                // 安全臂长：命中实体墙则收至「命中点 − 安全间隙」，否则保持全臂长。
+                let safe = match sweep_nearest(anchor, to / full, full, colliders) {
+                    Some(t) => (t - WALL_MARGIN).clamp(MIN_ARM_DIST, full),
+                    None => full,
+                };
+                // 非对称指数平滑（收缩快 / 回伸慢、帧率无关），取代原先
+                // "收缩瞬时跳变 + 回伸线性匀速"的硬切换，消除扫过掩体边缘时的瞬跳。
+                cam.arm_dist = approach_arm(cam.arm_dist, safe, time.delta_secs());
+            }
         }
         let mut cam_pos = anchor + (to / full) * cam.arm_dist;
         if cam_pos.y < MIN_CAM_Y {
@@ -217,10 +224,10 @@ pub fn follow_system(
 
 /// 收集地图静态 solid 物体的 AABB（世界坐标 min/max），供 SpringArm 扫掠使用。
 ///
-/// 设计动机（Why）：镜头避障属**表现层**，不需要进服务端模拟；直接读 `map::lawn` 的
-/// 纯数据（与服务端共享同一份地图定义，不触碰任何模拟逻辑），缓存一次即可。
-fn build_colliders() -> Vec<(Vec3, Vec3)> {
-    map::lawn::layout()
+/// 设计动机（Why）：镜头避障属**表现层**，不需要进服务端模拟；直接读服务端下发的
+/// 地图布局纯数据（与服务端同一事实来源，不触碰任何模拟逻辑），缓存一次即可。
+fn build_colliders(layout: &MapLayout) -> Vec<(Vec3, Vec3)> {
+    layout
         .props
         .iter()
         .filter(|p| p.solid)
@@ -231,6 +238,21 @@ fn build_colliders() -> Vec<(Vec3, Vec3)> {
             (c - half, c + half)
         })
         .collect()
+}
+
+/// 把当前臂长朝安全臂长做**非对称、帧率无关的指数平滑**：收缩用高率、回伸用低率。
+///
+/// 设计动机（Why）：原实现收缩侧为瞬时赋值、回伸侧为线性匀速——视角扫过掩体边缘时
+/// 臂长会"啪"地跳变。指数平滑 `α = 1 - exp(-k·dt)` 使**相同总时长在不同帧率下收敛一致**，
+/// 且收缩率高于回伸率：威胁侧仍足够快，却不产生瞬跳。防穿模由调用处的 `WALL_MARGIN` 兜底。
+fn approach_arm(current: f32, target: f32, dt: f32) -> f32 {
+    let rate = if target < current {
+        CAM_ARM_SHRINK_RATE
+    } else {
+        CAM_ARM_GROW_RATE
+    };
+    let alpha = 1.0 - (-rate * dt).exp();
+    current + (target - current) * alpha
 }
 
 /// 射线-AABB 最近命中距离（slab 法）；`dir` 须为单位向量，返回 `[0, max_t]` 内的最小 `t`。
@@ -271,4 +293,43 @@ fn sweep_nearest(origin: Vec3, dir: Vec3, max_t: f32, colliders: &[(Vec3, Vec3)]
         }
     }
     nearest
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// 帧率无关：相同总时长、不同步长，臂长收敛结果应一致（指数平滑的核心性质，
+    /// 也是本实现相对旧线性匀速回伸的关键收益）。
+    #[test]
+    fn approach_arm_is_frame_rate_independent() {
+        // 同一总时长 0.05s：60fps 走 3 步 × 1/60s，120fps 走 6 步 × 1/120s。
+        let mut a = CAMERA_DIST;
+        for _ in 0..3 {
+            a = approach_arm(a, MIN_ARM_DIST, 1.0 / 60.0);
+        }
+        let mut b = CAMERA_DIST;
+        for _ in 0..6 {
+            b = approach_arm(b, MIN_ARM_DIST, 1.0 / 120.0);
+        }
+        assert!((a - b).abs() < 1e-4, "不同帧率收敛应一致: {a} vs {b}");
+    }
+
+    /// 不超调：任何步长下臂长都落在 [target, current] 区间内（收缩不越过下限、回伸不越过上限）。
+    #[test]
+    fn approach_arm_never_overshoots() {
+        // 夸张 dt：α 近似 1，结果应贴住目标但不越界。
+        let shrink = approach_arm(CAMERA_DIST, MIN_ARM_DIST, 10.0);
+        assert!(
+            (MIN_ARM_DIST..=CAMERA_DIST).contains(&shrink),
+            "收缩越过目标区间: {shrink}"
+        );
+        let grow = approach_arm(MIN_ARM_DIST, CAMERA_DIST, 10.0);
+        assert!(
+            (MIN_ARM_DIST..=CAMERA_DIST).contains(&grow),
+            "回伸越过目标区间: {grow}"
+        );
+        // dt = 0 不改变现状。
+        assert_eq!(approach_arm(3.3, MIN_ARM_DIST, 0.0), 3.3);
+    }
 }
