@@ -63,7 +63,7 @@ function bindPacket(name) {
   const buf = new Uint8Array(256);
   const dv = new DataView(buf.buffer);
   dv.setUint32(0, 0x434F4431, true);    // MAGIC "COD1"（小端）
-  dv.setUint16(4, 12, true);            // WIRE_VERSION
+  dv.setUint16(4, 13, true);            // WIRE_VERSION
   buf[6] = 0;                           // PacketKind::Bind
   buf[7] = 0;                           // continuation = false
   buf[8] = 0;                           // unit_count = 0

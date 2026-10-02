@@ -8,7 +8,7 @@ use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use cute_of_duty_contract::net::protocol::ClientMessage;
 
-use crate::flow::flow_state::AppState;
+use crate::flow::flow_state::{AppState, LoadoutPresets};
 use crate::net::network::NetOut;
 
 use super::refresh::{carried_index, pool_color, write_loadout_texts};
@@ -178,15 +178,18 @@ pub fn arsenal_drag_system(
     }
 }
 
-/// 浮层交互：显隐跟随、返回、确认进场（上报选装 + 请求进场）。拖拽由 `arsenal_drag_system` 负责。
+/// 浮层交互：显隐跟随、预设一键填充、返回、确认进场（上报选装 + 请求进场）。
+/// 拖拽由 `arsenal_drag_system` 负责。
 pub fn arsenal_interaction(
     out: Res<NetOut>,
     mut next_state: ResMut<NextState<AppState>>,
     mut vis: ResMut<ArsenalVisible>,
-    selection: Res<ArsenalSelection>,
+    mut selection: ResMut<ArsenalSelection>,
+    presets: Res<LoadoutPresets>,
     mut root_q: Query<&mut Visibility, With<ArsenalRoot>>,
     confirm: Query<&Interaction, (With<JinButton>, Changed<Interaction>)>,
     back: Query<&Interaction, (With<BackButton>, Changed<Interaction>)>,
+    preset_btns: Query<(&PresetButton, &Interaction), Changed<Interaction>>,
 ) {
     if let Ok(mut visibility) = root_q.get_single_mut() {
         *visibility = if vis.0 {
@@ -198,6 +201,15 @@ pub fn arsenal_interaction(
     for interaction in &back {
         if *interaction == Interaction::Pressed {
             vis.0 = false;
+        }
+    }
+    for (btn, interaction) in &preset_btns {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        if let Some(p) = presets.presets.get(btn.index) {
+            // 以预设内容**完全覆盖**携带清单（预设内容归服务端权威，客户端只照抄名字）。
+            selection.0 = p.items.clone();
         }
     }
     for interaction in &confirm {

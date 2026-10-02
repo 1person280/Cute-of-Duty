@@ -43,6 +43,8 @@ pub fn run(addr: &str) {
         .init_resource::<crate::world::VoxelMaterials>()
         // 服务端下发的体素模型/动画目录视图（由远程对象池增量解码灌入，见 sync_catalog_from_pool）。
         .init_resource::<crate::flow::ModelCatalog>()
+        // 服务端下发的选装预设目录（握手后经控制通道一次性灌入，见 flow::route_control_messages）。
+        .init_resource::<crate::flow::LoadoutPresets>()
         // 中文字体句柄默认缺失（Default=None）但资源恒存在，避免任何 UI 系统
         // 在字体注入前的首帧对 `Res<CjkFont>` 取值 panic。
         .init_resource::<crate::flow::CjkFont>()

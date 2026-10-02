@@ -156,7 +156,7 @@ pub fn spawn_menu(
     commands.entity(root).with_children(|root| {
         // 左上角角标
         root.spawn(flow::text(
-            "PRE-ALPHA v0.3.0",
+            format!("PRE-ALPHA v{}", env!("CARGO_PKG_VERSION")),
             flow::style(&fonts, 14.0, Color::srgb(0.42, 0.48, 0.56)),
         ))
         .insert(Node {

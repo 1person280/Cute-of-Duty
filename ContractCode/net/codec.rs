@@ -119,6 +119,10 @@ pub fn encode_server(msg: &ServerMessage) -> Result<WireMessage, String> {
         ServerMessage::ReturnToMenu => Ok(WireMessage::Command(vec![one(S_RETURN_TO_MENU)])),
         ServerMessage::Snapshot { .. } => Ok(WireMessage::Data(DataKind::Snapshot, to_json(msg)?)),
         ServerMessage::Event { .. } => Ok(WireMessage::Data(DataKind::Event, to_json(msg)?)),
+        // 预设目录含字符串、压不进定长单元，与其它变长控制消息同路（控制类数据流）。
+        ServerMessage::PresetCatalog { .. } => {
+            Ok(WireMessage::Data(DataKind::Control, to_json(msg)?))
+        }
         ServerMessage::ModelCatalog { .. } => {
             Err("模型目录应走资源通道（resource_stream），不应进控制通道".to_string())
         }
@@ -442,6 +446,28 @@ mod tests {
         let WireMessage::Data(kind, bytes) = encode_server(&snap).unwrap() else { panic!("快照应为数据流") };
         assert_eq!(kind, DataKind::Snapshot);
         assert_eq!(decode_server_data(kind, &bytes).unwrap(), snap);
+    }
+
+    /// 预设目录含字符串，走控制类数据流且 JSON 往返无损。
+    #[test]
+    fn preset_catalog_becomes_control_data() {
+        let msg = ServerMessage::PresetCatalog {
+            presets: vec![
+                crate::net::protocol::LoadoutPreset {
+                    name: "标准".into(),
+                    items: vec!["大型医疗包".into(), "烈焰手雷".into()],
+                },
+                crate::net::protocol::LoadoutPreset {
+                    name: "爆破".into(),
+                    items: vec!["破片手雷".into(), "步枪弹药".into()],
+                },
+            ],
+        };
+        let WireMessage::Data(kind, bytes) = encode_server(&msg).unwrap() else {
+            panic!("预设目录应降级为数据流");
+        };
+        assert_eq!(kind, DataKind::Control);
+        assert_eq!(decode_server_data(kind, &bytes).unwrap(), msg);
     }
 
     /// 对象池同步：键数跨单元（4 键 → 2 单元），成组解码后完全还原。

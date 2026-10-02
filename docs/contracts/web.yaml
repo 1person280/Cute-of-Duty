@@ -108,7 +108,7 @@ shapes:
 websocket:
   carrier: RFC6455 二进制帧             # 承载与原生 TCP **完全相同**的定长包
   wire:
-    unchanged: true                     # 不改线格式；wire_version 仍为 12（见 protocol.yaml）
+    unchanged: true                     # 换载体本身不改线格式（当前 wire_version 见 protocol.yaml；0.13.0 起为 13）
     frames:
       control: 256B                     # 主/控制通道包（32B 头 + 7×32B 单元）
       resource: 4096B                   # 资源通道包（32B 头 + 4064B 负载）

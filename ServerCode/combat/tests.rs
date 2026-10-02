@@ -484,3 +484,63 @@ fn reload_works_with_third_ammo_stack() {
     let reserve = e.get_component::<Backpack>().unwrap().ammo_total();
     assert_eq!(reserve, 128, "换弹应恰好从背包抽走补齐弹夹的 30 发（剩余 {reserve}）");
 }
+
+// ——— 选装清单进图（`apply_loadout`）：完全替换语义 ———
+
+/// 空清单 → 空背包：旧的 `Backpack::starting()` 固定配发必须被完全清掉。
+#[test]
+fn apply_loadout_empty_clears_backpack() {
+    let mut h = CombatHarness::new();
+    let pid = spawn_player(&mut h.world, Vec3::default(), 0);
+    let placed = apply_loadout(&mut h.world, pid, &[]);
+    assert_eq!(placed, 0, "空清单不应入格任何物品");
+    let e = h.world.get_entity(pid).unwrap();
+    let bp = e.get_component::<Backpack>().unwrap();
+    assert!(bp.slots.iter().all(|s| s.is_none()), "空清单应得空背包，旧配发不得残留");
+    assert_eq!(bp.ammo_total(), 0, "备用弹药应随旧配发一并清空");
+}
+
+/// 清单里的名字经**权威映射表**入格，并按类别落到不同格位。
+#[test]
+fn apply_loadout_places_known_items() {
+    let mut h = CombatHarness::new();
+    let pid = spawn_player(&mut h.world, Vec3::default(), 0);
+    let carried = vec!["大型医疗包".to_string(), "破片手雷".to_string()];
+    assert_eq!(apply_loadout(&mut h.world, pid, &carried), 2);
+    let e = h.world.get_entity(pid).unwrap();
+    let bp = e.get_component::<Backpack>().unwrap();
+    assert_eq!(bp.count_category(ItemCategory::Consumable), 1, "大型医疗包应入恢复类");
+    assert_eq!(bp.count_category(ItemCategory::Tactical), 1, "破片手雷应入战术类");
+}
+
+/// 未登记的名字忽略（客户端不可信），但不阻断其余合法物资入格。
+#[test]
+fn apply_loadout_ignores_unknown_names() {
+    let mut h = CombatHarness::new();
+    let pid = spawn_player(&mut h.world, Vec3::default(), 0);
+    let carried = vec!["核弹".to_string(), "医疗包".to_string(), "".to_string()];
+    assert_eq!(apply_loadout(&mut h.world, pid, &carried), 1, "非法名应被忽略");
+    let e = h.world.get_entity(pid).unwrap();
+    let bp = e.get_component::<Backpack>().unwrap();
+    assert_eq!(bp.count_category(ItemCategory::Consumable), 1);
+}
+
+/// 超出 4×3 格位的溢出部分丢弃：14 个**不同文案**的物资只能占 12 格。
+#[test]
+fn apply_loadout_drops_overflow() {
+    let mut h = CombatHarness::new();
+    let pid = spawn_player(&mut h.world, Vec3::default(), 0);
+    let carried: Vec<String> = [
+        "医疗包", "大型医疗包", "急救包", "护甲片", "护甲板", "重型护甲板", "额外弹药",
+        "步枪弹药", "烈焰手雷", "冰霜手雷", "雷电手雷", "毒素手雷", "破片手雷", "水压手雷",
+    ]
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
+    let placed = apply_loadout(&mut h.world, pid, &carried);
+    assert_eq!(placed, 12, "溢出应丢弃至恰好占满 12 格（实际入格 {placed}）");
+    let e = h.world.get_entity(pid).unwrap();
+    let bp = e.get_component::<Backpack>().unwrap();
+    assert_eq!(bp.slots.iter().filter(|s| s.is_some()).count(), 12);
+}
+

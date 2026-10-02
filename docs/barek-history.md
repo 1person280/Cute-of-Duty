@@ -24,6 +24,68 @@
 
 ---
 
+## [0.13.0] · 2026-10-02 · 物库修复（选装生效 + 服务端预设目录）（**协议不兼容**）
+
+- **变更类型**：Fix + Additive（**新增下行消息 `ServerMessage::PresetCatalog`，线格式不兼容**）
+- **影响模块**：
+  - `ContractCode`：`net/protocol.rs`（新增 `LoadoutPreset` 类型 + `ServerMessage::PresetCatalog`）、
+    `net/packet.rs`（`WIRE_VERSION` 12 → 13）、`net/codec.rs`（编码分支 + 往返测试）
+  - `ServerCode`：`items/catalog.rs`（新，物资名→权威物品映射）、`items/presets.rs`（新，3 套预设）、
+    `items/mod.rs`（子模块声明）、`combat/mod.rs`（新增 `apply_loadout`）、`combat/tests.rs`、
+    `net/stages.rs`（`Connect` 下发 + `StartTraining` 应用）、`net/web/portal.html`（绑定包版本 12 → 13）
+  - `HostCode`：`flow/state.rs`（新增 `LoadoutPresets` 资源 + 路由分支）、`flow/mod.rs`、`launcher/mod.rs`、
+    `menu/mod.rs`（版本号派生）、`menu/arsenal/{layout,interaction,state}.rs`（预设栏）
+  - 文档：`docs/contracts/protocol.yaml`（`wire_version` 12 → 13 + 新消息/类型 + 迁移指南）、`README.md`
+- **兼容性**：**不兼容**（`y+1`）
+  - `WIRE_VERSION` **12 → 13**；新增服务端下行变体 `ServerMessage::PresetCatalog`（经
+    `DataKind::Control` + JSON 承载）。老客户端 `serde_json` 无法反序列化该变体 → **双端必须同时升级到 `0.13.0`**。
+  - 包帧结构（256B/4096B 头布局、指令 opcode、`DataKind` 取值）**未改**；破坏点仅在新增消息变体。
+- **迁移指南**（`y+1` 必填）：
+  1. **服务端**：`ContractCode/net/packet.rs` 的 `WIRE_VERSION` 置 `13`；`codec::encode_server` 新增
+     `PresetCatalog → WireMessage::Data(DataKind::Control, to_json(msg))` 分支；`net/stages.rs` 的 `Connect`
+     分支在 `ModelCatalog` 之后追加一次
+     `rt.send_to(conn_id, ServerMessage::PresetCatalog { presets: crate::items::presets::all() })`；
+     `StartTraining` 分支改为取 `conn_loadout` 并调用 `combat::apply_loadout(sim.world_mut(), eid, &carried)`。
+  2. **客户端**：`ServerMessage` 新增分支 `PresetCatalog { presets }`（提示编译器给出非穷尽错误，逐个补全）；
+     把清单存进 `flow::LoadoutPresets` 资源（在 `launcher` 注册），仓库浮层据其渲染「预设」栏。
+  3. **浏览器骨架页**：`net/web/portal.html` 的绑定包 `setUint16(4, 13)`。
+  4. **前后对照**：老（无预设概念，仓库仅 7 项物资池手动拖拽；选装清单上报后服务端**只存不用**）→
+     新（仓库浮层含 3 套服务端预设，点击即覆盖携带清单；进场时服务端据清单**整包重建**背包）。
+- **内容**：
+  - **修「仓库带入的物资进不了对局」**：根因是服务端 `conn_loadout` **只存不消费**——`Connect` 时写入、
+    仅 `Disconnect` 时移除，从未用于重播种背包；玩家实体在 `Connect` 已按写死的 `Backpack::starting()`
+    出生，`StartTraining` 只播报提示。现由 `StartTraining` 取清单并调用新增的 `combat::apply_loadout`
+    **整包重建** 4×3 背包（**完全替换**语义：有记录用记录、无记录即空背包）。
+  - **新增选装预设**：服务端权威定义 3 套全局固定预设（`items/presets.rs`：标准 / 生存 / 爆破），
+    连接时经新消息一次性下发；仓库浮层新增「预设」栏，点击即以该预设内容覆盖携带清单。预设
+    **另开物品池**，可用仓库 7 项之外的物资（大型医疗包 / 急救包 / 护甲片 / 重型护甲板 / 步枪弹药 /
+    破片手雷 / 水压手雷）。
+  - **新增权威物资名映射** `items::catalog::item_from_name`：物资名 → `LootItem` 的**唯一**映射
+    （覆盖仓库 7 项 + 预设池）；未登记名字忽略并告警、超 12 格溢出丢弃并告警（客户端不可信，绝不凭空造物）。
+  - **修「仓库（携带物资）浮层点击无反应」**（0.12.4 挂账缺陷①）：根因是浮层 `ArsenalRoot` 由
+    `ensure_overlay` **独立 spawn 成无父节点的 UI 根**，与整屏不透明的主菜单根同级时，Bevy 0.15.3 的
+    `ui_stack_system` 对根节点按 `(GlobalZIndex, ZIndex)` 排序、两者同为 `(0,0)` 时**无稳定顺序**，
+    浮层可能被排到主菜单之后而被完全盖住（设置浮层不出问题正因它是主菜单的**子节点**）。
+    给 `ArsenalRoot` 挂 `GlobalZIndex(30)`、拖拽幽灵挂 `GlobalZIndex(40)` 后在根层级上稳定压过主菜单。
+  - **修「主菜单版本号陈旧」**（0.12.4 挂账缺陷②）：`HostCode/menu/mod.rs` 的硬编码 `"PRE-ALPHA v0.3.0"`
+    改为 `format!("PRE-ALPHA v{}", env!("CARGO_PKG_VERSION"))` 派生，此后随 `Cargo.toml` 自动同步。
+- **验证**：
+  - `cargo test -p cute_of_duty_contract` → **50 passed / 0 failed**（新增 `preset_catalog_becomes_control_data` 往返）
+  - `cargo test -p cute_of_duty_server` → **128 passed / 0 failed**（新增 `combat::tests::apply_loadout_*` 4 项、
+    `items::catalog::tests::*` 3 项、`items::presets::tests::*` 2 项）
+  - `cargo check --workspace` 退出码 **0**（本机**无 `cargo-wrap`**，经 owner 确认以裸 `cargo` 替代）
+  - **实机验证**（owner 复测 2026-10-02，`--release` 重建后录屏）：仓库浮层「预设」栏可点、点击后携带清单
+    被填充；进场后 4×3 背包与所选一致（含「空清单 = 空背包」与「未打开仓库 = 空背包」两种边界）。
+    **结论：无大问题**。
+- **顺带修「单文件超红线」**：`ServerCode/entity/mod.rs` 改动前既有 **604 行**（超「≤ 600 行」红线）；
+  把其 `impl Entity`（L107–L301，**195 行**）拆到同目录新文件 `entity/create.rs`（`mod.rs` 加 `mod create;`），
+  `mod.rs` **604 → 410 行**、`create.rs` **208 行**，二者均在红线内。纯结构搬移，**无行为变更**（`create` 为
+  `entity` 子模块，可访问父模块私有字段，固有 impl 跨模块合法）。
+- **关联**：`docs/contracts/protocol.yaml`、[README 版本历史](../README.md)。**无 ADR**：未触碰模块边界 / 公共 Trait，
+  仅新增一条下行消息（协议破坏点已在迁移指南与本契约 YAML 中记录）。
+
+---
+
 ## [0.12.4] · 2026-10-01 · 客户端弃用 Bundle 迁移（required components）
 
 - **变更类型**：Refactor（**不触碰线格式**；仅客户端 UI/渲染的实体组装写法，无行为语义变化）

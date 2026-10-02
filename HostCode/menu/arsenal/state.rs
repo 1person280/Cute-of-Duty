@@ -101,6 +101,11 @@ pub struct JinButton;
 /// 「返回」按钮：仅收起浮层。
 #[derive(Component)]
 pub struct BackButton;
+/// 「预设」按钮：点击以服务端下发的第 `index` 套预设覆盖携带清单。
+#[derive(Component)]
+pub struct PresetButton {
+    pub index: usize,
+}
 
 // ——— 定制查询类型（互斥；供拖拽系统与刷新函数共用）———
 /// 仓库行绿标文本（与其余 &mut Text 互斥）。

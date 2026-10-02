@@ -1,7 +1,7 @@
 # =============================================================================
 # Cute Of Duty · 线格式契约（machine-readable contract）
 # =============================================================================
-# 状态：草案 v0.12.3 —— 【尚不是权威源】
+# 状态：草案 v0.13.0 —— 【尚不是权威源】
 #   本文件目前是「手工整理的意图」，权威实现已随 0.12.2 契约拆分迁至 ContractCode/net/protocol.rs。
 #   权威源反转（YAML 为准、代码由 YAML 校验）是后续独立任务，见 docs/barek-history.md。
 #
@@ -17,28 +17,24 @@
 # =============================================================================
 
 contract: protocol
-version: 0.12.3
+version: 0.13.0
 status: draft
 owner_module: ContractCode/net
 authoritative_impl: ContractCode/net/protocol.rs
 compat:
-  previous: 0.11.0
+  previous: 0.12.4
   breaking: true
   migration_guide: |
-    统一 64KB 槽帧 → 小定长包 + 指令优先组包 + 双通道，**线格式不兼容**（老客户端与新服务端无法互通，反之亦然）。
-    逐步迁移：
-      1. 服务端写侧：控制连接用 `scheduler::SendScheduler`（指令优先，每包 ≤7 个 32B 单元）逐包组包，
-         资源连接用 `resource_stream::encode_resource`（每包 4096B）分片；均经 `codec::encode_server/encode_client`；
-      2. 服务端读侧：`session` 由"一帧一消息"改为"同端口首条 256B 绑定包分角色"，控制连接恒 256B、
-         资源连接恒 4096B，分别用 `codec::units_from_payload + decode_client_units` 与 `ResourceAssembler`；
-         **单监听端口**同时接受两类连接，绑定包 `sub_kind` = 角色（0=Control / 1=Resource），负载 = 玩家档案名；
-      3. 客户端：控制连接（256B）恒 `PacketReader::new(256)`，资源连接（4096B）恒 `PacketReader::new(4096)`；
-         两条线程**不合并数据包**、各按固定包长读写；建连时各发一条 256B 绑定包声明角色；
-      4. 客户端对象池：`HostCode/net/remote.rs` 16MB（250 在用 + 6 预取，各 64KB 固定地址槽）**语义不变**，
-         资源 4096B 分片拼接后落槽；`ModelCatalog` 仍由池增量解码而来；淘汰经主通道上行 `PoolSync`；
-      5. 前后对照：老（恒 64KB 帧，头含 flags/region/sub_kind）→ 新（主通道恒 256B = 32B 头 + 7×32B 单元；
-         资源通道恒 4096B = 32B 头 + 4064B 负载）。
-    老端处置：老客户端连新服务端将在首条绑定包即因类别/魔数不符而断开，需同步升级到 0.12.0。
+    新增下行变体 `ServerMessage::PresetCatalog`（服务端权威的选装预设目录），**线格式不兼容**：
+    `WIRE_VERSION` 12 → 13，老客户端连新服务端将在首条绑定包因版本号不符而断开。
+    迁移步骤：
+      1. 服务端：`ContractCode/net/packet.rs` 的 `WIRE_VERSION` 置 13；`codec::encode_server` 把
+         `PresetCatalog` 编为控制类数据流（`DataKind::Control` + JSON），与既有变长控制消息同路；
+         连接建立后一次性下发该消息（静态冷数据，不进每帧快照通道）。
+      2. 客户端：升级 `WIRE_VERSION` 至 13；新增 `ServerMessage::PresetCatalog` 分支，把预设目录
+         存入本地资源并在仓库浮层展示；未识别的老客户端无法解析该 JSON 变体，故必须同步升级。
+      3. 浏览器骨架页（`ServerCode/net/web/portal.html`）的绑定包版本号同步置 13。
+    老端处置：老客户端需同步升级到 0.13.0 才能与新服务端互通。
 
 # -----------------------------------------------------------------------------
 # 传输层：小定长包 + 指令优先组包 + 双通道（0.12.0 起取代统一 64KB 槽帧）
@@ -69,7 +65,7 @@ transport:
   header:
     bytes: 32
     magic: 0x434F4431            # "COD1"
-    wire_version: 12             # 与协议 y 位对齐（0.12 = 小定长包世代）
+    wire_version: 13             # 与协议 y 位对齐（0.13 = 小定长包世代 + 服务端预设目录）
     header_layout:               # (offset, width, little-endian)
       - { offset: 0,  width: 4, name: magic }
       - { offset: 4,  width: 2, name: version }
@@ -188,6 +184,12 @@ downlink:
       - name: Snapshot
       - name: Event
       - name: Pong
+      - name: PresetCatalog           # 0.13.0 新增
+        added_in: 0.13.0
+        doc: 连接时一次性下发选装预设目录，供仓库浮层一键选用；内容归服务端权威，客户端不内嵌预设数据。
+             静态冷数据，经控制类数据流（DataKind::Control + JSON）下发，不进每帧快照通道
+        fields:
+          - { name: presets, type: "Vec<LoadoutPreset>", required: true, doc: 预设清单（全局固定） }
       - name: ReturnToMenu
       - name: ModelCatalog          # 0.10.0 新增
         added_in: 0.10.0
@@ -206,6 +208,12 @@ types:
     fields:
       - { name: label, type: String,     doc: 展示名（唯一文案来源，UI 与补给选项共用） }
       - { name: kind,  type: PickupKind }
+  LoadoutPreset:                  # 0.13.0 新增
+    owner_module: ContractCode/net
+    doc: 一套选装预设：显示名 + 携带物资名清单（服务端权威下发，供仓库浮层一键选用）
+    fields:
+      - { name: name,  type: String,        doc: 预设显示名（如「标准」「生存」「爆破」） }
+      - { name: items, type: "Vec<String>", doc: 携带物资名清单，与 ClientMessage::Loadout 的 carried 同口径 }
   PickupKind:
     owner_module: ContractCode/items
     exposes:

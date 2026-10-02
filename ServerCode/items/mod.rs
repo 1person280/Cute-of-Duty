@@ -10,6 +10,9 @@
 
 use std::any::Any;
 
+pub mod catalog;
+pub mod presets;
+
 use crate::element::ElementType;
 use crate::entity::Component;
 use crate::map::PickupKind;

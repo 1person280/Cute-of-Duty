@@ -191,6 +191,18 @@ pub enum EventKind {
     Announce { text: String },
 }
 
+/// 一套选装预设：显示名 + 携带物资名清单（服务端权威下发，供仓库浮层一键选用）。
+///
+/// 设计动机（Why）：预设内容属"应该算什么"的服务端权威责任——客户端只展示与回传选中项，
+/// 不内嵌任何预设数据，避免双端漂移与本地篡改。
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LoadoutPreset {
+    /// 预设显示名（如「标准」「生存」「爆破」）。
+    pub name: String,
+    /// 预设携带的物资名清单（与 [`ClientMessage::Loadout`] 的 `carried` 同口径，按名解析为物品）。
+    pub items: Vec<String>,
+}
+
 /// 服务端→客户端下行消息。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ServerMessage {
@@ -211,6 +223,11 @@ pub enum ServerMessage {
     Event { kind: EventKind },
     /// 延迟探测回显（客户端据此计算到服务器往返延迟）
     Pong { seq: u64 },
+    /// 选装预设目录（0.13.0 新增）：连接时一次性下发，供仓库浮层一键选用。
+    ///
+    /// 设计动机（Why）：预设内容归服务端权威（单一事实来源），客户端不内嵌预设数据，
+    /// 只展示与回传选中项；静态冷数据、仅连接时发一次，不走每帧快照通道。
+    PresetCatalog { presets: Vec<LoadoutPreset> },
     /// 撤离成功：客户端据此从训练场回主界面
     ReturnToMenu,
 }

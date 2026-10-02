@@ -5,7 +5,7 @@
 
 use bevy::prelude::*;
 
-use crate::flow::flow_state::{self as flow, AppState, CjkFont};
+use crate::flow::flow_state::{self as flow, AppState, CjkFont, LoadoutPresets};
 use crate::shared::theme;
 
 use super::state::*;
@@ -34,8 +34,35 @@ fn cell_style() -> Node {
     }
 }
 
+/// 预设按钮：点击后以服务端下发目录的第 `index` 套预设覆盖携带清单（内容归服务端权威）。
+fn spawn_preset_button(parent: &mut ChildBuilder, fonts: &CjkFont, index: usize, label: &str) {
+    parent
+        .spawn((
+            PresetButton { index },
+            Interaction::default(),
+            Node {
+                padding: UiRect::px(14.0, 14.0, 6.0, 6.0),
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
+                border: UiRect::all(Val::Px(1.0)),
+                ..default()
+            },
+            BackgroundColor(Color::srgb(0.14, 0.18, 0.24)),
+            BorderColor(theme::ACCENT_CYAN),
+            BorderRadius::all(Val::Px(4.0)),
+        ))
+        .with_children(|b| {
+            b.spawn(flow::text(label.to_string(), flow::style(fonts, 18.0, Color::WHITE)));
+        });
+}
+
 /// 在 `MainMenu` 下确保浮层存在（含左右落区标记与拖拽幽灵，字体就绪后一次性建出）。
-pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query<(), With<ArsenalRoot>>) {
+pub fn ensure_overlay(
+    mut commands: Commands,
+    fonts: Res<CjkFont>,
+    presets: Res<LoadoutPresets>,
+    exists: Query<(), With<ArsenalRoot>>,
+) {
     if fonts.0.is_none() || !exists.is_empty() {
         return;
     }
@@ -55,6 +82,9 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
             },
             BackgroundColor(theme::PANEL_BG),
             Visibility::Hidden,
+            // 浮层是独立 UI 根：与主菜单根（整屏不透明）同级时，Bevy 的根节点排序不稳定，
+            // 可能被排到后面而被盖住。GlobalZIndex 专用于跨层级/跨根排序，确保浮层稳定在上。
+            GlobalZIndex(30),
         ))
         .with_children(|o| {
             o.spawn(flow::text(
@@ -65,6 +95,22 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
                 "拖拽仓库物资到右侧背包=携带 · 拖回左侧=不带 · Shift+左键 快捷移动",
                 flow::style(&fonts, 15.0, theme::TEXT_DIM),
             ));
+
+            // 预设栏：服务端权威下发的一键选装（点击即以该预设内容覆盖携带清单）。
+            if !presets.presets.is_empty() {
+                o.spawn(Node {
+                    flex_direction: FlexDirection::Row,
+                    column_gap: Val::Px(10.0),
+                    align_items: AlignItems::Center,
+                    ..default()
+                })
+                .with_children(|row| {
+                    row.spawn(flow::text("预设：", flow::style(&fonts, 18.0, theme::TEXT_DIM)));
+                    for (i, p) in presets.presets.iter().enumerate() {
+                        spawn_preset_button(row, &fonts, i, &p.name);
+                    }
+                });
+            }
 
             o.spawn(Node {
                 flex_direction: FlexDirection::Row,
@@ -232,6 +278,8 @@ pub fn ensure_overlay(mut commands: Commands, fonts: Res<CjkFont>, exists: Query
             },
             BackgroundColor(Color::srgb(0.12, 0.13, 0.16)),
             Visibility::Hidden,
+            // 幽灵是独立根，取比浮层更高的全局层级，保证始终压在浮层之上跟随光标。
+            GlobalZIndex(40),
         ))
         .with_children(|g| {
             g.spawn((

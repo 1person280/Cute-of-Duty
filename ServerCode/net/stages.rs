@@ -110,6 +110,11 @@ pub fn drain_commands(
                 }
                 conn_resident.insert(conn_id, resident);
                 rt.send_to(conn_id, ServerMessage::ModelCatalog { models, animations });
+                // 选装预设目录：服务端权威、静态冷数据，握手后一次性下发，供仓库浮层一键选用。
+                rt.send_to(
+                    conn_id,
+                    ServerMessage::PresetCatalog { presets: crate::items::presets::all() },
+                );
             }
             NetCommand::Input { conn_id, player } => {
                 // 连续量（移动/朝向）只记最新；边沿量（换弹/技能）在一个 Tick 内可能被更晚
@@ -155,13 +160,17 @@ pub fn drain_commands(
                 );
             }
             NetCommand::StartTraining { conn_id } => {
-                // 玩家实体在 Connect 已出生；这里仅需权威确认与状态播报。
-                info!("玩家 #conn {conn_id} 进入训练场");
+                // 进图背包 = 玩家选装清单（**完全替换**语义）：有记录用记录、无记录即空背包，
+                // 旧的开局固定配发不再作为进图来源。清单只在本局会话存放，跨局仍复用同一条。
+                let Some(&eid) = conn_entity.get(&conn_id) else { continue };
+                let carried = conn_loadout.get(&conn_id).cloned().unwrap_or_default();
+                let placed = combat::apply_loadout(sim.world_mut(), eid, &carried);
+                info!("玩家 #conn {conn_id} 进入训练场（携带 {placed} 件）");
                 rt.send_to(
                     conn_id,
                     ServerMessage::Event {
                         kind: EventKind::Announce {
-                            text: "已进入训练场 · 歼灭目标后到北端撤离".to_string(),
+                            text: format!("已进入训练场 · 携带 {placed} 件 · 歼灭目标后到北端撤离"),
                         },
                     },
                 );

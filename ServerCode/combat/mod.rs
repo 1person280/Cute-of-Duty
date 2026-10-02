@@ -237,6 +237,31 @@ pub fn spawn_player(world: &mut World, position: Vec3, operator_idx: usize) -> E
     world.spawn(entity)
 }
 
+/// 用选装清单重播种玩家背包（`StartTraining` 的权威落点）。
+///
+/// 设计动机（Why）：进图背包遵"完全替换"语义——玩家在仓库选了什么就带什么，旧的开局
+/// 固定配发不再作为进图来源。清单里每个名字经 [`crate::items::catalog::item_from_name`]
+/// 解析为权威物品：未登记的名字忽略（客户端不可信）、超出 4×3 格位的溢出丢弃，二者均
+/// 告警但不阻断进场。返回实际入格的件数（供调用方播报）。
+pub fn apply_loadout(world: &mut World, eid: EntityId, carried: &[String]) -> usize {
+    let Some(entity) = world.get_entity_mut(eid) else { return 0 };
+    let Some(bp) = entity.get_component_mut::<Backpack>() else { return 0 };
+    *bp = Backpack::new();
+    let mut placed = 0usize;
+    for name in carried {
+        let Some(item) = crate::items::catalog::item_from_name(name) else {
+            tracing::warn!("选装清单含未知物资「{name}」，已忽略");
+            continue;
+        };
+        if !bp.push(item) {
+            tracing::warn!("选装清单超出背包格位，「{name}」已丢弃");
+            continue;
+        }
+        placed += 1;
+    }
+    placed
+}
+
 /// 权威切换玩家手持武器槽：越界/同槽由 [`Combatant::switch_slot`] 忽略。
 ///
 /// 武器与干员解耦：切枪只改 `active_slot`，不影响 `operator_idx`（技能组保持不变）。

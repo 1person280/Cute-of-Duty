@@ -7,7 +7,7 @@
 
 use bevy::prelude::*;
 use cute_of_duty_contract::model::{VoxelAnimationSpec, VoxelModelSpec};
-use cute_of_duty_contract::net::protocol::{EventKind, ServerMessage};
+use cute_of_duty_contract::net::protocol::{EventKind, LoadoutPreset, ServerMessage};
 
 use crate::net::network::{ClientInbound, ControlBuffer};
 
@@ -52,6 +52,16 @@ pub struct ModelCatalog {
     pub models: Vec<VoxelModelSpec>,
     /// 体素动画 clip（骨名 → 旋转表达式）。
     pub animations: Vec<VoxelAnimationSpec>,
+}
+
+/// 服务端下发的选装预设目录（握手后一次性灌入的内存副本）。
+///
+/// 设计动机（Why）：预设内容归服务端权威（单一事实来源），客户端不内嵌任何预设数据；
+/// 本资源保存 `ServerMessage::PresetCatalog` 下发的清单，供仓库浮层展示与一键填充。
+#[derive(Resource, Default)]
+pub struct LoadoutPresets {
+    /// 预设清单（当前为服务端全局固定的 3 套）。
+    pub presets: Vec<LoadoutPreset>,
 }
 
 /// 本端视角姿态（鼠标自由视角的偏航/俯仰）。
@@ -176,6 +186,7 @@ pub fn route_control_messages(
     mut live: ResMut<LiveLatency>,
     mut announces: ResMut<Announcements>,
     mut kills: ResMut<KillCount>,
+    mut loadout_presets: ResMut<LoadoutPresets>,
     mut load_timer: Local<f32>,
     time: Res<Time>,
 ) {
@@ -208,6 +219,10 @@ pub fn route_control_messages(
                 }
                 ClientInbound::Server(ServerMessage::ReturnToMenu) => {
                     next_state.set(AppState::MainMenu);
+                }
+                ClientInbound::Server(ServerMessage::PresetCatalog { presets }) => {
+                    // 服务端权威的选装预设目录：仅存内存副本，供仓库浮层展示与一键填充。
+                    loadout_presets.presets = presets;
                 }
                 // ModelCatalog 已改为经**远程对象池**（Resource 帧）抵达，由
                 // `net::sync_catalog_from_pool` 灌入 `ModelCatalog` 视图，不再走控制通道。
