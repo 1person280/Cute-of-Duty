@@ -9,6 +9,7 @@ use bevy::prelude::*;
 use cute_of_duty_contract::net::protocol::ClientMessage;
 
 use crate::flow::flow_state::{self as flow, AppState, CjkFont, KillCount, LocalPlayer, EXTRACTION_POINT, EXTRACTION_RANGE};
+use crate::flow::WorldCatalog;
 use crate::net::network::NetOut;
 use crate::net::snapshot::SnapshotBuffer;
 
@@ -25,10 +26,17 @@ pub struct ExtractLabel;
 pub struct ExtractPrompt;
 
 /// 生成 HUD：左下 vitals、右上击杀、右下弹药/技能、左上小地图、居中准星、顶部撤离引导。
-pub fn spawn_hud(mut commands: Commands, fonts: Res<CjkFont>, kills: Res<KillCount>) {
+pub fn spawn_hud(
+    mut commands: Commands,
+    fonts: Res<CjkFont>,
+    kills: Res<KillCount>,
+    catalog: Res<WorldCatalog>,
+) {
     if fonts.0.is_none() {
         return;
     }
+    // 静态层（小地图/全景图掩体与站点）取自服务端下发布局；未到达目录时降级为仅动态层。
+    let layout = catalog.layout.clone().unwrap_or_default();
     commands
         .spawn((
             HudRoot,
@@ -43,7 +51,7 @@ pub fn spawn_hud(mut commands: Commands, fonts: Res<CjkFont>, kills: Res<KillCou
         .with_children(|p| {
             super::vitals::spawn_vitals(p, &fonts);
             super::skills::spawn_skills(p, &fonts);
-            super::minimap::spawn_minimap(p, &fonts);
+            super::minimap::spawn_minimap(p, &fonts, &layout);
             super::crosshair::spawn_crosshair(p);
             super::kill::counter::spawn_kill_counter(p, &fonts, &kills);
             spawn_extract_label(p, &fonts);
@@ -60,7 +68,7 @@ pub fn spawn_hud(mut commands: Commands, fonts: Res<CjkFont>, kills: Res<KillCou
             // 低血告警层：压在所有常规 HUD 之上，但在全景图之下。
             super::alert::spawn_alert_overlay(p);
             // 战术全景图覆盖层最后生成（同层内后者在上），确保展开时压住所有 HUD 元素。
-            super::bigmap::spawn_bigmap(p, &fonts);
+            super::bigmap::spawn_bigmap(p, &fonts, &layout);
         });
 }
 

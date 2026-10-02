@@ -1,7 +1,7 @@
-﻿//! 静态世界生成：完整草坪训练场（1×1km 露天搜打撤大场）+ 光照
+//! 静态世界生成：完整草坪训练场（1×1km 露天搜打撤大场）+ 光照
 //!
 //! 设计动机（服务器权威边界）：环境是「不易变」的稳定内容，正应由客户端承载。
-//! 这里复用服务端 `map::lawn::layout()` 的**纯数据**（不触碰任何服务端模拟逻辑），
+//! 这里消费服务端经 `WorldCatalog` 下发的**纯数据布局**（不触碰任何服务端模拟逻辑），
 //! 把它翻译成本地 bevy 静态 mesh —— 只渲染**不变**的部分（地板 / 静态 props / 发光件）。
 //! 一切**会动/会变**的东西（靶、拾取物、玩家、敌人）仍由服务端经快照下发、
 //! `snapshot.rs` 负责绘制，本模块绝不重复生成，避免双份实体。
@@ -11,9 +11,49 @@
 
 use bevy::prelude::*;
 use bevy::pbr::NotShadowCaster;
-use cute_of_duty_contract::map::{
-    self, GlowKind, GlowSpec, MapLayout, MaterialKind, Prop, Shape,
-};
+use cute_of_duty_contract::map::{GlowKind, GlowSpec, MapLayout, MaterialKind, Prop, Shape};
+
+use crate::flow::WorldCatalog;
+
+/// 场景**基础装配**（`Startup` 一次性）：相机 + 共享网格资源 + 全局环境光。
+///
+/// 设计动机（Why）：这三样**不依赖地图布局**，且是 Update 早期系统的硬依赖——
+/// `net::apply_entities` 取 `Res<CubeMesh>`、`menu::settings_apply_ambient` 取 `ResMut<AmbientLight>`，
+/// 缺任一资源即 panic。故它们必须留在 `Startup`（目录尚未到达也先备好），
+/// 不能随地图几何一起延后。地图几何与光照见 [`spawn_world_when_ready`]。
+pub fn spawn_scene_baseline(mut commands: Commands, mut meshes: ResMut<Assets<Mesh>>) {
+    crate::world::spawn_camera(&mut commands);
+    commands.insert_resource(crate::net::CubeMesh {
+        handle: meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
+    });
+    // 全局环境光：供「设置浮层 · 环境亮度」调节写入（世界仅配了 DirectionalLight）。
+    commands.insert_resource(AmbientLight {
+        color: Color::WHITE,
+        brightness: 0.55,
+    });
+}
+
+/// 场景**几何装配**（`Update`，就绪首帧恰好一次）：布局到达后生成光照 + 静态地图。
+///
+/// 设计动机（Why）：地图布局改为服务端下发后不再有编译期静态表可用，`Startup` 又早于连接
+/// （只跑一次，门控永远不通过）；故改挂 `Update` 并用 `Local` 守卫实现「就绪首帧恰好一次」。
+/// 未就绪时直接跳过——光照/几何稍后补齐，期间主菜单为整屏不透明层，无观感影响。
+pub fn spawn_world_when_ready(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+    catalog: Res<WorldCatalog>,
+    mut spawned: Local<bool>,
+) {
+    if *spawned {
+        return;
+    }
+    let Some(layout) = catalog.layout.as_ref() else {
+        return; // 目录未到达：等下一帧
+    };
+    *spawned = true;
+    spawn_world(&mut commands, &mut meshes, &mut materials, layout);
+}
 
 /// 场景主光照（主平行光 + 补光 + 四角点光，参数对齐 0.3.2 `demo/world.rs`）。
 ///
@@ -23,6 +63,7 @@ pub fn spawn_world(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
+    layout: &MapLayout,
 ) {
     // 主平行光（0.3.2 数值：8000 lux，硬阴影）
     commands.spawn((
@@ -57,7 +98,7 @@ pub fn spawn_world(
     ));
 
     // 角部点光：随活动地图（1×1km 草坪场）的四角布置（0.3.2 数值 80000/60m）。
-    let corner = map::lawn::HALF;
+    let corner = layout.half_extent;
     for pos in [(corner, 2.5, corner), (-corner, 2.5, corner), (corner, 2.5, -corner), (-corner, 2.5, -corner)] {
         commands.spawn((
             PointLight {
@@ -72,7 +113,7 @@ pub fn spawn_world(
     }
 
     // 完整草坪训练场（静态部分：地板 + props + glows）
-    spawn_map_layout(&map::lawn::layout(), commands, meshes, materials);
+    spawn_map_layout(layout, commands, meshes, materials);
 }
 
 /// 通用地图渲染器：把任意 `MapLayout` 的静态层落地为 bevy 实体。

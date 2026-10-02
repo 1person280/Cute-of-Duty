@@ -115,6 +115,15 @@ pub fn drain_commands(
                     conn_id,
                     ServerMessage::PresetCatalog { presets: crate::items::presets::all() },
                 );
+                // 世界目录：干员名册 + 活动地图布局（皆为整局不变的静态表），握手后一次性下发。
+                // 客户端不再直读契约静态表，改由此灌入内存后渲染/展示（单一事实来源）。
+                rt.send_to(
+                    conn_id,
+                    ServerMessage::WorldCatalog {
+                        roster: crate::operator::roster().to_vec(),
+                        layout: crate::map::lawn::layout(),
+                    },
+                );
             }
             NetCommand::Input { conn_id, player } => {
                 // 连续量（移动/朝向）只记最新；边沿量（换弹/技能）在一个 Tick 内可能被更晚

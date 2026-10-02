@@ -4,7 +4,7 @@
 //! 体素低模方向相悖），改为**过程化**填充条 + 数值文本；技能图标同样是过程化方块
 //! （底色 + 自下而上的冷却填充 + 读秒），不依赖任何贴图，风格与全局 theme 一致。
 //!
-//! 冷却填充比例由**客户端读服务端干员名册** `operator::roster()` 的 `cooldown_secs` 作分母
+//! 冷却填充比例由**服务端下发名册**（`flow::WorldCatalog.roster`）的 `cooldown_secs` 作分母
 //! 算出（名册是冷数据，与 `operator_id` 一一对应）；剩余冷却值本身来自权威快照
 //! `skill_cd_q/e`，客户端不推演游戏状态。
 //!
@@ -13,9 +13,10 @@
 
 use bevy::prelude::*;
 use cute_of_duty_contract::items::{ItemCategory, LootItem};
-use cute_of_duty_contract::operator::roster;
+use cute_of_duty_contract::operator::OperatorDef;
 
 use crate::flow::flow_state::{self as flow, CjkFont, LocalPlayer};
+use crate::flow::WorldCatalog;
 use crate::net::snapshot::SnapshotBuffer;
 use crate::shared::operator::meta::meta;
 use crate::shared::theme;
@@ -261,6 +262,7 @@ fn spawn_skill_icon(
 pub fn update_vitals_bars(
     snap: Res<SnapshotBuffer>,
     player: Res<LocalPlayer>,
+    catalog: Res<WorldCatalog>,
     mut bars: Query<(&VitalsBar, &mut Node)>,
 ) {
     let snap_entry = snap.current.iter().find(|e| e.entity_id == player.entity_id);
@@ -274,7 +276,7 @@ pub fn update_vitals_bars(
         ),
         None => (1.0, 0.0, 0.0, 0.0, 0),
     };
-    let (max_q, max_e) = skill_cooldowns(op);
+    let (max_q, max_e) = skill_cooldowns(op, &catalog.roster);
 
     for (bar, mut style) in &mut bars {
         match bar {
@@ -370,9 +372,8 @@ fn text_color_for(slot: u8) -> Color {
     }
 }
 
-/// 取某干员的（Q, E）技能满冷却秒数（读服务端名册冷数据；越界回退一号干员）。
-fn skill_cooldowns(operator_id: u32) -> (f32, f32) {
-    let roster = roster();
+/// 取某干员的（Q, E）技能满冷却秒数（读服务端下发的名册冷数据；越界回退一号干员）。
+fn skill_cooldowns(operator_id: u32, roster: &[OperatorDef]) -> (f32, f32) {
     let op = roster.get(operator_id as usize).or_else(|| roster.first());
     match op {
         Some(op) => (op.q.cooldown_secs, op.e.cooldown_secs),

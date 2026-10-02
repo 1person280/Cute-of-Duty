@@ -20,7 +20,10 @@ pub type Pos = [f32; 3];
 pub type HalfExtents = [f32; 3];
 
 /// 几何形状
-#[derive(Clone, Copy, Debug, PartialEq)]
+///
+/// serde 派生说明（Why）：地图布局自 0.14.0 起改为服务端权威下发（`WorldCatalog`），
+/// 客户端不再直读静态表，故整棵 `MapLayout` 类型树需可序列化过线。
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Shape {
     /// 轴对齐长方体，尺寸由 [`Prop::half`] 给出
     Box,
@@ -30,7 +33,7 @@ pub enum Shape {
 
 /// 材质语义：数据层只声明"是什么料"，颜色由渲染层映射。
 /// 避免把具体色值散落在地图数据里。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum MaterialKind {
     /// 混凝土掩体
     Concrete,
@@ -57,7 +60,7 @@ pub enum MaterialKind {
 }
 
 /// 发光件颜色语义（霓虹灯带/信标/出生光垫/功能台）
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum GlowKind {
     /// 霓虹绿（后墙氛围灯）
     Green,
@@ -74,7 +77,7 @@ pub enum GlowKind {
 }
 
 /// 静态物体：掩体、立柱、标线、装饰，一切不动的东西
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Prop {
     pub shape: Shape,
     pub pos: Pos,
@@ -124,7 +127,7 @@ impl Prop {
 }
 
 /// 往返运动参数：沿 X 轴在 `pos.x ± range` 之间来回
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Motion {
     pub speed: f32,
     pub range: f32,
@@ -133,11 +136,11 @@ pub struct Motion {
 }
 
 /// 训练靶：静态靶或按 [`Motion`] 往返移动的靶
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct TargetSpec {
     pub pos: Pos,
     /// 击杀播报中显示的名称
-    pub label: &'static str,
+    pub label: String,
     /// None = 静态靶
     pub motion: Option<Motion>,
 }
@@ -169,23 +172,23 @@ pub enum StationKind {
 }
 
 /// 场景功能站点（交互台本体几何由 props 提供，这里只登记位置与语义）
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StationSpec {
     pub pos: Pos,
     pub kind: StationKind,
-    pub label: &'static str,
+    pub label: String,
 }
 
 /// 场上拾取物
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PickupSpec {
     pub pos: Pos,
-    pub label: &'static str,
+    pub label: String,
     pub kind: PickupKind,
 }
 
 /// 发光件：霓虹灯带、信标、出生光垫
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GlowSpec {
     pub shape: Shape,
     pub pos: Pos,
@@ -194,9 +197,12 @@ pub struct GlowSpec {
 }
 
 /// 一张地图的完整描述：渲染层据此生成全部场景实体
-#[derive(Clone, Debug)]
+///
+/// `Default` 说明（Why）：仅供客户端在 `WorldCatalog` 未到达时的**降级占位**使用
+/// （空地图 = 无静态层），真实布局一律由服务端下发，不存在"默认地图"语义。
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct MapLayout {
-    pub name: &'static str,
+    pub name: String,
     /// 正方形场地半径（米）：地面与围墙覆盖 [-half, +half]
     pub half_extent: f32,
     /// 棋盘格地面边长

@@ -22,9 +22,9 @@ use bevy::prelude::*;
 use cute_of_duty_contract::interact::{InteractChoice, InteractKind, INTERACT_RANGE};
 use cute_of_duty_contract::map::StationKind;
 use cute_of_duty_contract::net::protocol::ClientMessage;
-use cute_of_duty_contract::operator::roster;
 
 use crate::flow::flow_state::{self as flow, CjkFont, LocalPlayer};
+use crate::flow::WorldCatalog;
 use crate::net::network::NetOut;
 use crate::net::snapshot::SnapshotBuffer;
 use crate::shared::operator::meta::meta;
@@ -323,6 +323,7 @@ pub fn interact_input(
     mut loot: ResMut<LootPanelState>,
     wheel_state: Res<ItemWheelState>,
     button: Res<crate::hud::ButtonPanelState>,
+    catalog: Res<WorldCatalog>,
 ) {
     // 滚轮累计（一次事件批可能多帧滚动）。先读完事件，避免让位时把事件留在队列里。
     let scroll: f32 = wheel.read().map(|e| e.y).sum();
@@ -369,7 +370,7 @@ pub fn interact_input(
         }
     }
     if keys.just_pressed(KeyCode::KeyF) || keys.just_pressed(KeyCode::Enter) {
-        confirm_entry(&mut state, &mut loot);
+        confirm_entry(&mut state, &mut loot, catalog.roster.len());
     }
 }
 
@@ -417,7 +418,7 @@ pub fn reset_interact(mut state: ResMut<InteractState>) {
 }
 
 /// 确认当前高亮条目：拾取物直接拾取；功能站点展开二级选项面板；物资箱打开双向格位面板。
-fn confirm_entry(state: &mut InteractState, loot: &mut LootPanelState) {
+fn confirm_entry(state: &mut InteractState, loot: &mut LootPanelState, roster_len: usize) {
     let Some(entry) = state.entries.get(state.selected) else { return };
     let (id, title, kind) = (entry.id, entry.label.clone(), entry.kind);
     match kind {
@@ -429,10 +430,9 @@ fn confirm_entry(state: &mut InteractState, loot: &mut LootPanelState) {
             open_supply_panel(loot, id);
         }
         InteractKind::Station(StationKind::OperatorDesk) => {
-            let options = roster()
-                .iter()
-                .enumerate()
-                .map(|(i, _)| InteractOption {
+            // 名册长度取自服务端下发目录；展示名仍用客户端本地母板 `meta`（稳定展示层）。
+            let options = (0..roster_len)
+                .map(|i| InteractOption {
                     label: format!("切换至 {}", meta(i as u32).name),
                     action: InteractAction::SwitchOperator(i as u32),
                 })

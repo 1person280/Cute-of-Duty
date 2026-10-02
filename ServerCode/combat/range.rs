@@ -28,8 +28,9 @@ pub const TARGET_HIT_RADIUS: f32 = 0.7;
 /// 运动实现在 [`Component::on_tick`]，位置写回 `owner`——和 AI 巡逻同构，
 /// 服务端权威推进后经快照回传，客户端只画。
 pub struct RangeTarget {
-    /// 击杀/命中播报中展示的名称（如“近距靶”）
-    pub label: &'static str,
+    /// 击杀/命中播报中展示的名称（如“近距靶”）。
+    /// 0.14.0 起地图布局由服务端下发、标签为 owned `String`，故此处随之持有 `String`。
+    pub label: String,
     /// 累计命中次数（HUD 计分）
     pub hits: u32,
     /// 往返运动；None = 静态靶
@@ -41,9 +42,9 @@ pub struct RangeTarget {
 }
 
 impl RangeTarget {
-    pub fn static_target(label: &'static str) -> Self {
+    pub fn static_target(label: impl Into<String>) -> Self {
         Self {
-            label,
+            label: label.into(),
             hits: 0,
             motion: None,
             base_x: 0.0,
@@ -52,9 +53,9 @@ impl RangeTarget {
         }
     }
 
-    pub fn moving_target(label: &'static str, motion: TargetMotion) -> Self {
+    pub fn moving_target(label: impl Into<String>, motion: TargetMotion) -> Self {
         Self {
-            label,
+            label: label.into(),
             hits: 0,
             motion: Some(motion),
             base_x: 0.0,
@@ -98,7 +99,7 @@ impl Component for RangeTarget {
 pub fn spawn_target(
     world: &mut World,
     pos: Vec3,
-    label: &'static str,
+    label: impl Into<String>,
     motion: Option<TargetMotion>,
 ) -> EntityId {
     let mut entity = Entity::new_target(0, pos);
@@ -125,7 +126,7 @@ pub fn spawn_range_targets(world: &mut World, targets: &[crate::map::TargetSpec]
         let id = spawn_target(
             world,
             Vec3::new(t.pos[0], t.pos[1], t.pos[2]),
-            t.label,
+            t.label.clone(),
             motion,
         );
         ids.push(id);

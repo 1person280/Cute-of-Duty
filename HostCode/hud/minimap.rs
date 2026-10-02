@@ -1,6 +1,6 @@
 //! HUD 左上角小地图 + 罗盘：以玩家为中心的局部放大图（半径≈[`MINIMAP_RANGE`] 米）
 //!
-//! 设计动机：小地图是**纯表现层**——静态层直接读服务端 `map::lawn::layout()` 的纯数据
+//! 设计动机：小地图是**纯表现层**——静态层读服务端经 `WorldCatalog` 下发的布局纯数据
 //! （不触碰任何模拟逻辑），动态层读权威 `EntitySnapshot`（位置/模型身份是服务端裁决值）。
 //!
 //! 投影采用**以玩家为中心的局部放大**：只画玩家周围约一个 AOI（60m）半径内的内容，
@@ -13,9 +13,10 @@
 //! 八方位读数。朝向换算 `heading_rad(yaw) = (π - yaw) mod 2π`，与相机 yaw 同源。
 
 use bevy::prelude::*;
-use cute_of_duty_contract::map::{lawn, MaterialKind, StationKind};
+use cute_of_duty_contract::map::{MapLayout, MaterialKind, StationKind};
 
 use crate::flow::flow_state::{self as flow, AimRig, CjkFont, LocalPlayer};
+use crate::flow::WorldCatalog;
 use crate::world::model::voxel_for;
 use crate::net::snapshot::SnapshotBuffer;
 
@@ -120,8 +121,7 @@ fn station_color(kind: StationKind) -> Color {
 }
 
 /// 装配小地图（罗盘条 + 方形局部图 + 静态掩体/站点 + 居中玩家标记）。
-pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
-    let layout = lawn::layout();
+pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont, layout: &MapLayout) {
 
     // ---- 罗盘条：刻度滚动，中央指针 + 读数固定 ----
     p.spawn((
@@ -353,13 +353,15 @@ pub fn update_minimap(
     mut statics: StaticsQuery,
     mut player_arrow: Query<&mut Transform, With<MinimapPlayerArrow>>,
     mut heading_text: Query<&mut Text, With<CompassHeadingText>>,
+    catalog: Res<WorldCatalog>,
 ) {
     let me = snap.current.iter().find(|e| e.entity_id == player.entity_id);
     // 玩家中心：优先用权威快照；首帧无快照时退回地图默认出生点（仅影响滚动起点）。
     let (cx, cz) = me
         .map(|m| (m.x, m.z))
         .unwrap_or_else(|| {
-            let sp = lawn::layout().player_spawn;
+            // 首帧无快照：退回服务端下发布局的出生点（未到达目录则用原点，仅影响滚动起点）。
+            let sp = catalog.layout.as_ref().map(|l| l.player_spawn).unwrap_or([0.0; 3]);
             (sp[0], sp[2])
         });
 

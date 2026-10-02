@@ -46,7 +46,7 @@ pub const ENGAGE_BOUND_Z: f32 = 200.0;
 /// 生成完整搜打撤草坪训练场布局。每次调用构建全新数据，可安全修改。
 pub fn layout() -> MapLayout {
     MapLayout {
-        name: "搜打撤草坪训练场",
+        name: "搜打撤草坪训练场".into(),
         half_extent: HALF,
         floor_tile: 25.0,
         player_spawn: [0.0, 0.0, SPAWN_Z],
@@ -113,25 +113,25 @@ pub(crate) fn supply_line() -> Vec<PickupSpec> {
     vec![
         PickupSpec {
             pos: [-2.5, 0.4, SUPPLY_LINE_Z],
-            label: "冰霜手雷",
+            label: "冰霜手雷".into(),
             kind: PickupKind::Grenade { element: ElementType::Ice },
         },
-        PickupSpec { pos: [-1.0, 0.4, SUPPLY_LINE_Z], label: "步枪弹药", kind: PickupKind::Ammo { amount: 30 } },
-        PickupSpec { pos: [0.0, 0.4, SUPPLY_LINE_Z], label: "医疗包", kind: PickupKind::Health { amount: 25.0 } },
-        PickupSpec { pos: [1.0, 0.4, SUPPLY_LINE_Z], label: "护甲片", kind: PickupKind::Armor { amount: 20.0 } },
+        PickupSpec { pos: [-1.0, 0.4, SUPPLY_LINE_Z], label: "步枪弹药".into(), kind: PickupKind::Ammo { amount: 30 } },
+        PickupSpec { pos: [0.0, 0.4, SUPPLY_LINE_Z], label: "医疗包".into(), kind: PickupKind::Health { amount: 25.0 } },
+        PickupSpec { pos: [1.0, 0.4, SUPPLY_LINE_Z], label: "护甲片".into(), kind: PickupKind::Armor { amount: 20.0 } },
         PickupSpec {
             pos: [2.5, 0.4, SUPPLY_LINE_Z],
-            label: "烈焰手雷",
+            label: "烈焰手雷".into(),
             kind: PickupKind::Grenade { element: ElementType::Fire },
         },
         PickupSpec {
             pos: [-10.0, 0.4, SUPPLY_LINE_Z],
-            label: "毒液步枪",
+            label: "毒液步枪".into(),
             kind: PickupKind::Weapon { element: ElementType::Poison },
         },
         PickupSpec {
             pos: [10.0, 0.4, SUPPLY_LINE_Z],
-            label: "雷电步枪",
+            label: "雷电步枪".into(),
             kind: PickupKind::Weapon { element: ElementType::Electric },
         },
     ]
@@ -143,10 +143,10 @@ pub const CRATE_POS: [f32; 3] = [4.0, 0.45, 462.0];
 /// 功能站点登记：补给台 + 干员切换台 + 出生点物资箱（demo 侧据此生成可交互站点）
 pub(crate) fn stations() -> Vec<StationSpec> {
     vec![
-        StationSpec { pos: [-5.0, 0.78, SUPPLY_LINE_Z], kind: StationKind::SupplyTable, label: "补给台" },
-        StationSpec { pos: [5.0, 0.78, SUPPLY_LINE_Z], kind: StationKind::OperatorDesk, label: "干员切换台" },
+        StationSpec { pos: [-5.0, 0.78, SUPPLY_LINE_Z], kind: StationKind::SupplyTable, label: "补给台".into() },
+        StationSpec { pos: [5.0, 0.78, SUPPLY_LINE_Z], kind: StationKind::OperatorDesk, label: "干员切换台".into() },
         // 出生点右前方的物资箱：落地可交互，开箱一次性发放弹药/医疗/护甲。
-        StationSpec { pos: CRATE_POS, kind: StationKind::SupplyCrate, label: "物资箱" },
+        StationSpec { pos: CRATE_POS, kind: StationKind::SupplyCrate, label: "物资箱".into() },
     ]
 }
 
@@ -169,36 +169,36 @@ pub(crate) fn pad_glow() -> Vec<GlowSpec> {
 /// 搜索目标：两列纵向散布，间距错开避免排成直线
 pub(crate) fn search_targets() -> Vec<TargetSpec> {
     vec![
-        TargetSpec { pos: [-360.0, 1.5, 400.0], label: "搜索目标", motion: None },
-        TargetSpec { pos: [360.0, 1.5, 400.0], label: "搜索目标", motion: None },
-        TargetSpec { pos: [-240.0, 1.5, 360.0], label: "搜索目标", motion: None },
-        TargetSpec { pos: [240.0, 1.5, 360.0], label: "搜索目标", motion: None },
-        TargetSpec { pos: [-120.0, 1.5, 320.0], label: "搜索目标", motion: None },
-        TargetSpec { pos: [120.0, 1.5, 320.0], label: "搜索目标", motion: None },
-        TargetSpec { pos: [-300.0, 1.5, 280.0], label: "搜索目标", motion: None },
-        TargetSpec { pos: [300.0, 1.5, 280.0], label: "搜索目标", motion: None },
-        TargetSpec { pos: [-60.0, 1.5, 240.0], label: "搜索目标", motion: None },
-        TargetSpec { pos: [60.0, 1.5, 240.0], label: "搜索目标", motion: None },
+        TargetSpec { pos: [-360.0, 1.5, 400.0], label: "搜索目标".into(), motion: None },
+        TargetSpec { pos: [360.0, 1.5, 400.0], label: "搜索目标".into(), motion: None },
+        TargetSpec { pos: [-240.0, 1.5, 360.0], label: "搜索目标".into(), motion: None },
+        TargetSpec { pos: [240.0, 1.5, 360.0], label: "搜索目标".into(), motion: None },
+        TargetSpec { pos: [-120.0, 1.5, 320.0], label: "搜索目标".into(), motion: None },
+        TargetSpec { pos: [120.0, 1.5, 320.0], label: "搜索目标".into(), motion: None },
+        TargetSpec { pos: [-300.0, 1.5, 280.0], label: "搜索目标".into(), motion: None },
+        TargetSpec { pos: [300.0, 1.5, 280.0], label: "搜索目标".into(), motion: None },
+        TargetSpec { pos: [-60.0, 1.5, 240.0], label: "搜索目标".into(), motion: None },
+        TargetSpec { pos: [60.0, 1.5, 240.0], label: "搜索目标".into(), motion: None },
     ]
 }
 
 /// 搜索区拾取物：左右镜像成对散布，模拟"搜刮战利品"
 pub(crate) fn search_pickups() -> Vec<PickupSpec> {
     vec![
-        PickupSpec { pos: [-180.0, 0.4, 380.0], label: "弹药箱", kind: PickupKind::Ammo { amount: 30 } },
-        PickupSpec { pos: [180.0, 0.4, 380.0], label: "大医疗包", kind: PickupKind::Health { amount: 50.0 } },
+        PickupSpec { pos: [-180.0, 0.4, 380.0], label: "弹药箱".into(), kind: PickupKind::Ammo { amount: 30 } },
+        PickupSpec { pos: [180.0, 0.4, 380.0], label: "大医疗包".into(), kind: PickupKind::Health { amount: 50.0 } },
         PickupSpec {
             pos: [-40.0, 0.4, 300.0],
-            label: "毒素手雷",
+            label: "毒素手雷".into(),
             kind: PickupKind::Grenade { element: ElementType::Poison },
         },
         PickupSpec {
             pos: [40.0, 0.4, 300.0],
-            label: "雷电手雷",
+            label: "雷电手雷".into(),
             kind: PickupKind::Grenade { element: ElementType::Electric },
         },
-        PickupSpec { pos: [-260.0, 0.4, 260.0], label: "护甲片", kind: PickupKind::Armor { amount: 30.0 } },
-        PickupSpec { pos: [260.0, 0.4, 260.0], label: "弹药箱", kind: PickupKind::Ammo { amount: 60 } },
+        PickupSpec { pos: [-260.0, 0.4, 260.0], label: "护甲片".into(), kind: PickupKind::Armor { amount: 30.0 } },
+        PickupSpec { pos: [260.0, 0.4, 260.0], label: "弹药箱".into(), kind: PickupKind::Ammo { amount: 60 } },
     ]
 }
 
@@ -236,15 +236,15 @@ pub(crate) fn zone_markers() -> Vec<Prop> {
 /// 三排射击道静态靶：近（100m）/ 中（200m）/ 远（300m），逐级抬高
 pub(crate) fn engage_targets() -> Vec<TargetSpec> {
     vec![
-        TargetSpec { pos: [-200.0, 1.5, 100.0], label: "射击目标", motion: None },
-        TargetSpec { pos: [0.0, 1.5, 100.0], label: "射击目标", motion: None },
-        TargetSpec { pos: [200.0, 1.5, 100.0], label: "射击目标", motion: None },
-        TargetSpec { pos: [-200.0, 1.8, 0.0], label: "射击目标", motion: None },
-        TargetSpec { pos: [0.0, 1.8, 0.0], label: "射击目标", motion: None },
-        TargetSpec { pos: [200.0, 1.8, 0.0], label: "射击目标", motion: None },
-        TargetSpec { pos: [-200.0, 2.2, -100.0], label: "射击目标", motion: None },
-        TargetSpec { pos: [0.0, 2.2, -100.0], label: "射击目标", motion: None },
-        TargetSpec { pos: [200.0, 2.2, -100.0], label: "射击目标", motion: None },
+        TargetSpec { pos: [-200.0, 1.5, 100.0], label: "射击目标".into(), motion: None },
+        TargetSpec { pos: [0.0, 1.5, 100.0], label: "射击目标".into(), motion: None },
+        TargetSpec { pos: [200.0, 1.5, 100.0], label: "射击目标".into(), motion: None },
+        TargetSpec { pos: [-200.0, 1.8, 0.0], label: "射击目标".into(), motion: None },
+        TargetSpec { pos: [0.0, 1.8, 0.0], label: "射击目标".into(), motion: None },
+        TargetSpec { pos: [200.0, 1.8, 0.0], label: "射击目标".into(), motion: None },
+        TargetSpec { pos: [-200.0, 2.2, -100.0], label: "射击目标".into(), motion: None },
+        TargetSpec { pos: [0.0, 2.2, -100.0], label: "射击目标".into(), motion: None },
+        TargetSpec { pos: [200.0, 2.2, -100.0], label: "射击目标".into(), motion: None },
     ]
 }
 
@@ -253,12 +253,12 @@ pub(crate) fn engage_movers() -> Vec<TargetSpec> {
     vec![
         TargetSpec {
             pos: [0.0, 1.8, 50.0],
-            label: "移动目标",
+            label: "移动目标".into(),
             motion: Some(Motion { speed: 4.0, range: 40.0, start_dir: -1.0 }),
         },
         TargetSpec {
             pos: [0.0, 1.8, -50.0],
-            label: "移动目标",
+            label: "移动目标".into(),
             motion: Some(Motion { speed: 3.0, range: 60.0, start_dir: 1.0 }),
         },
     ]
@@ -292,8 +292,8 @@ pub(crate) fn extract_glow() -> Vec<GlowSpec> {
 /// 撤离目标：撤离途中侧翼压制
 pub(crate) fn extract_targets() -> Vec<TargetSpec> {
     vec![
-        TargetSpec { pos: [-150.0, 1.5, -320.0], label: "撤离目标", motion: None },
-        TargetSpec { pos: [150.0, 1.5, -320.0], label: "撤离目标", motion: None },
+        TargetSpec { pos: [-150.0, 1.5, -320.0], label: "撤离目标".into(), motion: None },
+        TargetSpec { pos: [150.0, 1.5, -320.0], label: "撤离目标".into(), motion: None },
     ]
 }
 

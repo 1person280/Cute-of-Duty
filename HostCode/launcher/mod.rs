@@ -1,4 +1,4 @@
-﻿//! launcher 模块 —— 客户端表现层装配入口（服务器权威架构的表现半边）
+//! launcher 模块 —— 客户端表现层装配入口（服务器权威架构的表现半边）
 //!
 //! 设计动机：表现层各子域（`flow` 状态机、`net` 网络、`menu` 菜单、`hud` 战斗内 UI、
 //! `world` 3D 场景、`shared` 共享资源）是与本模块平级的六个顶层模块（见 main.rs 的
@@ -45,6 +45,8 @@ pub fn run(addr: &str) {
         .init_resource::<crate::flow::ModelCatalog>()
         // 服务端下发的选装预设目录（握手后经控制通道一次性灌入，见 flow::route_control_messages）。
         .init_resource::<crate::flow::LoadoutPresets>()
+        // 服务端下发的世界目录（名册 + 地图布局，握手后灌入；`layout` 就绪即触发场景生成）。
+        .init_resource::<crate::flow::WorldCatalog>()
         // 中文字体句柄默认缺失（Default=None）但资源恒存在，避免任何 UI 系统
         // 在字体注入前的首帧对 `Res<CjkFont>` 取值 panic。
         .init_resource::<crate::flow::CjkFont>()
@@ -81,13 +83,15 @@ pub fn run(addr: &str) {
         // `StateScoped(AppState::*)` 实体（主菜单/加载屏/HUD）永不销毁——进训练场时主菜单
         // 整屏覆盖在 3D 上、UI 闪烁叠加、无法操作。显式开启后离开状态自动递归销毁对应 UI 树。
         .enable_state_scoped_entities::<AppState>()
-        // 全局资源 + 场景体积网格，仅在启动时准备一次。
+        // 全局资源 + UI 资产 + 场景基础装配（相机/共享网格/环境光），仅在启动时准备一次。
+        // 地图几何与光照（依赖下发布局）不在此处：交由 `Update` 首位的
+        // `world::spawn_world_when_ready` 在 `WorldCatalog` 就绪首帧一次性生成。
         .add_systems(
             Startup,
             (
                 crate::flow::setup_global,
                 crate::shared::init_ui_assets,
-                spawn_scene,
+                crate::world::spawn_scene_baseline,
             ),
         )
         // 全局常驻：快照对账、鼠标视角、相机跟随、控制路由、延迟面板、设置应用，以及
@@ -98,7 +102,9 @@ pub fn run(addr: &str) {
             Update,
             (
                 (
-                    crate::net::receive_snapshots,
+                    // 地图几何装配须最先：目录就绪首帧生成光照/静态场景。
+                    // （与前项并成子链：`.chain()` 只对 ≤20 元组提供实现，故封一层降维。）
+                    (crate::world::spawn_world_when_ready, crate::net::receive_snapshots).chain(),
                     // 资源帧先落池，再由池增量同步进 ModelCatalog 视图（下游渲染消费）。
                     crate::net::receive_resources,
                     crate::net::sync_catalog_from_pool,
@@ -251,22 +257,4 @@ pub fn run(addr: &str) {
                 .run_if(in_state(AppState::InGame)),
         )
         .run();
-}
-
-/// 场景初始化：轨道相机 + 静态环境 + 共享体素网格。
-fn spawn_scene(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    crate::world::spawn_camera(&mut commands);
-    crate::world::spawn_world(&mut commands, &mut meshes, &mut materials);
-    commands.insert_resource(crate::net::CubeMesh {
-        handle: meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
-    });
-    // 全局环境光：供「设置浮层 · 环境亮度」调节写入（世界仅配了 DirectionalLight）。
-    commands.insert_resource(AmbientLight {
-        color: Color::WHITE,
-        brightness: 0.55,
-    });
 }

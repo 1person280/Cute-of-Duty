@@ -1,20 +1,19 @@
-﻿//! 战术全景图（按 M 打开）：全屏俯瞰整张活动地图
+//! 战术全景图（按 M 打开）：全屏俯瞰整张活动地图
 //!
 //! 设计动机：与左上角小地图职责分离——小地图是"我周围有什么"，全景图是"整张图长什么样"。
 //! 本视图画出搜打撤四段分区色带、分区边界、撤离信标、全部静态掩体/目标/拾取物/功能站点，
 //! 以及实时玩家定位点与朝向箭头。**全部静态内容一次摆位**（地图数据不变），只有玩家标记
-//! 每帧跟权威快照更新。数据来源与服务端渲染同源（`map::lawn` 纯数据），地图改布局即同步。
+//! 每帧跟权威快照更新。数据来源与服务端渲染同源（服务端经 `WorldCatalog` 下发的布局），地图改布局即同步。
 //!
 //! 打开态只是 `InGame` 内的一枚资源门控（同暂停菜单思路）：画面仍在跑，仅隐藏/显示整屏
 //! 覆盖层，并冻结游戏内输入上报与相机朝向，避免"开着地图还在平移视角/走火"。
 
 use bevy::prelude::*;
 use cute_of_duty_contract::element::ElementType;
-use cute_of_duty_contract::map::lawn;
-use cute_of_duty_contract::map::{PickupKind, StationKind};
+use cute_of_duty_contract::map::{MapLayout, PickupKind, StationKind};
 
 use crate::flow::flow_state::{self as flow, AimRig, CjkFont, LocalPlayer};
-use crate::flow::ModalState;
+use crate::flow::{ModalState, WorldCatalog};
 use crate::net::snapshot::SnapshotBuffer;
 
 /// 全景图是否打开（打开时冻结游戏内输入，仅允许关图按键）。
@@ -102,8 +101,7 @@ fn station_color(kind: StationKind) -> Color {
 }
 
 /// 装配全景图整屏覆盖层（默认隐藏；静态内容一次摆位）。
-pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
-    let layout = lawn::layout();
+pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont, layout: &MapLayout) {
     let half = layout.half_extent;
 
     p.spawn((
@@ -365,10 +363,15 @@ pub fn update_bigmap(
     snap: Res<SnapshotBuffer>,
     player: Res<LocalPlayer>,
     rig: Res<AimRig>,
+    catalog: Res<WorldCatalog>,
     mut dot: Query<&mut Node, (With<BigMapPlayerDot>, Without<BigMapPlayerArrow>)>,
     mut arrow: Query<(&mut Node, &mut Transform), (With<BigMapPlayerArrow>, Without<BigMapPlayerDot>)>,
 ) {
-    let half = lawn::HALF;
+    // 世界→像素的缩放用服务端下发布局的半场尺寸，与静态层摆位同源；未到达目录则跳过。
+    let Some(layout) = catalog.layout.as_ref() else {
+        return;
+    };
+    let half = layout.half_extent;
     let Some(m) = snap.current.iter().find(|e| e.entity_id == player.entity_id) else {
         return;
     };

@@ -6,8 +6,10 @@
 //! 并把状态机推向正确的一环。
 
 use bevy::prelude::*;
+use cute_of_duty_contract::map::MapLayout;
 use cute_of_duty_contract::model::{VoxelAnimationSpec, VoxelModelSpec};
 use cute_of_duty_contract::net::protocol::{EventKind, LoadoutPreset, ServerMessage};
+use cute_of_duty_contract::operator::OperatorDef;
 
 use crate::net::network::{ClientInbound, ControlBuffer};
 
@@ -62,6 +64,20 @@ pub struct ModelCatalog {
 pub struct LoadoutPresets {
     /// 预设清单（当前为服务端全局固定的 3 套）。
     pub presets: Vec<LoadoutPreset>,
+}
+
+/// 服务端下发的世界目录（干员名册 + 活动地图布局，握手后一次性灌入的内存副本）。
+///
+/// 设计动机（Why）：名册与地图布局是整局不变的静态表，归服务端权威（单一事实来源）；
+/// 客户端不再直读契约静态表，改由本资源承载 `ServerMessage::WorldCatalog` 的下发结果。
+/// `layout` 用 `Option` 是因为它是场景生成的**就绪信号**——未到达前消费系统一律跳过，
+/// 到达后由 `world::spawn_scene` 一次性落地（无需重排状态机）。
+#[derive(Resource, Default)]
+pub struct WorldCatalog {
+    /// 干员名册（顺序即切换台展示顺序，与旧静态表一致）。
+    pub roster: Vec<OperatorDef>,
+    /// 活动地图布局；`None` = 尚未收到目录。
+    pub layout: Option<MapLayout>,
 }
 
 /// 本端视角姿态（鼠标自由视角的偏航/俯仰）。
@@ -187,6 +203,7 @@ pub fn route_control_messages(
     mut announces: ResMut<Announcements>,
     mut kills: ResMut<KillCount>,
     mut loadout_presets: ResMut<LoadoutPresets>,
+    mut world_catalog: ResMut<WorldCatalog>,
     mut load_timer: Local<f32>,
     time: Res<Time>,
 ) {
@@ -223,6 +240,12 @@ pub fn route_control_messages(
                 ClientInbound::Server(ServerMessage::PresetCatalog { presets }) => {
                     // 服务端权威的选装预设目录：仅存内存副本，供仓库浮层展示与一键填充。
                     loadout_presets.presets = presets;
+                }
+                ClientInbound::Server(ServerMessage::WorldCatalog { roster, layout }) => {
+                    // 服务端权威的世界目录：名册 + 地图布局，仅存内存副本，
+                    // 供 HUD/切换台展示与 `world::spawn_scene` 据布局生成静态场景。
+                    world_catalog.roster = roster;
+                    world_catalog.layout = Some(layout);
                 }
                 // ModelCatalog 已改为经**远程对象池**（Resource 帧）抵达，由
                 // `net::sync_catalog_from_pool` 灌入 `ModelCatalog` 视图，不再走控制通道。

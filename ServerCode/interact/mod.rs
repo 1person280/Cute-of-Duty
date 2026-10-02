@@ -84,7 +84,7 @@ pub fn spawn_from_layout(world: &mut World, layout: &MapLayout) -> (usize, usize
     for p in &layout.pickups {
         let mut e = Entity::new_loot(0, Vec3::new(p.pos[0], p.pos[1], p.pos[2]));
         e.add_component(Box::new(Interactable::new(
-            p.label,
+            p.label.clone(),
             InteractKind::Pickup(p.kind),
         )));
         world.spawn(e);
@@ -92,7 +92,7 @@ pub fn spawn_from_layout(world: &mut World, layout: &MapLayout) -> (usize, usize
     for (seed, s) in layout.stations.iter().enumerate() {
         let mut e = Entity::new_station(0, Vec3::new(s.pos[0], s.pos[1], s.pos[2]));
         e.add_component(Box::new(Interactable::new(
-            s.label,
+            s.label.clone(),
             InteractKind::Station(s.kind),
         )));
         // 物资箱：挂上权威 4×3 战利品格位（以站点序号轮转固定掉落池，确定性可复现）。

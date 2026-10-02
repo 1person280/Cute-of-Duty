@@ -15,7 +15,7 @@ pub(crate) use state as flow_state;
 
 pub(crate) use state::{
     route_control_messages, setup_global, AppState, CjkFont, LoadoutPresets, LocalPlayer,
-    ModelCatalog,
+    ModelCatalog, WorldCatalog,
 };
 pub(crate) use settings::{apply_setting_step, setting_label, setting_step, GameSettings, SettingKind};
 pub(crate) use loading::{loading_tick, spawn_loading};

@@ -43,7 +43,7 @@ pub const OPERATOR_DESK_POS: [f32; 3] = [4.5, 0.78, SUPPLY_LINE_Z];
 /// 生成完整 CQB 室内训练场布局。每次调用构建全新数据，可安全修改。
 pub fn layout() -> MapLayout {
     MapLayout {
-        name: "CQB室内训练场",
+        name: "CQB室内训练场".into(),
         half_extent: HALF,
         floor_tile: 1.0,
         player_spawn: [0.0, 0.0, 10.5],
@@ -174,25 +174,25 @@ pub(crate) fn supply_line() -> Vec<PickupSpec> {
     vec![
         PickupSpec {
             pos: [-2.5, 0.4, SUPPLY_LINE_Z],
-            label: "冰霜手雷",
+            label: "冰霜手雷".into(),
             kind: PickupKind::Grenade { element: ElementType::Ice },
         },
-        PickupSpec { pos: [-1.0, 0.4, SUPPLY_LINE_Z], label: "步枪弹药", kind: PickupKind::Ammo { amount: 30 } },
-        PickupSpec { pos: [0.0, 0.4, SUPPLY_LINE_Z], label: "医疗包", kind: PickupKind::Health { amount: 25.0 } },
-        PickupSpec { pos: [1.0, 0.4, SUPPLY_LINE_Z], label: "护甲片", kind: PickupKind::Armor { amount: 20.0 } },
+        PickupSpec { pos: [-1.0, 0.4, SUPPLY_LINE_Z], label: "步枪弹药".into(), kind: PickupKind::Ammo { amount: 30 } },
+        PickupSpec { pos: [0.0, 0.4, SUPPLY_LINE_Z], label: "医疗包".into(), kind: PickupKind::Health { amount: 25.0 } },
+        PickupSpec { pos: [1.0, 0.4, SUPPLY_LINE_Z], label: "护甲片".into(), kind: PickupKind::Armor { amount: 20.0 } },
         PickupSpec {
             pos: [2.5, 0.4, SUPPLY_LINE_Z],
-            label: "烈焰手雷",
+            label: "烈焰手雷".into(),
             kind: PickupKind::Grenade { element: ElementType::Fire },
         },
         PickupSpec {
             pos: [-8.5, 0.4, SUPPLY_LINE_Z],
-            label: "毒液步枪",
+            label: "毒液步枪".into(),
             kind: PickupKind::Weapon { element: ElementType::Poison },
         },
         PickupSpec {
             pos: [8.5, 0.4, SUPPLY_LINE_Z],
-            label: "雷电步枪",
+            label: "雷电步枪".into(),
             kind: PickupKind::Weapon { element: ElementType::Electric },
         },
     ]
@@ -201,8 +201,8 @@ pub(crate) fn supply_line() -> Vec<PickupSpec> {
 /// 功能站点登记：补给台 + 干员切换台（demo 侧据此生成可交互站点）
 pub(crate) fn stations() -> Vec<StationSpec> {
     vec![
-        StationSpec { pos: SUPPLY_TABLE_POS, kind: StationKind::SupplyTable, label: "补给台" },
-        StationSpec { pos: OPERATOR_DESK_POS, kind: StationKind::OperatorDesk, label: "干员切换台" },
+        StationSpec { pos: SUPPLY_TABLE_POS, kind: StationKind::SupplyTable, label: "补给台".into() },
+        StationSpec { pos: OPERATOR_DESK_POS, kind: StationKind::OperatorDesk, label: "干员切换台".into() },
     ]
 }
 
@@ -321,7 +321,7 @@ pub(crate) fn hall_mover() -> Vec<TargetSpec> {
     vec![
         TargetSpec {
             pos: [-2.5, 1.5, -4.0],
-            label: "移动靶",
+            label: "移动靶".into(),
             motion: Some(Motion { speed: 2.0, range: 2.0, start_dir: 1.0 }),
         },
     ]
@@ -330,8 +330,8 @@ pub(crate) fn hall_mover() -> Vec<TargetSpec> {
 /// 大厅纵深补给：左右镜像一对（弹药箱 / 大医疗包）
 pub(crate) fn hall_supply() -> Vec<PickupSpec> {
     vec![
-        PickupSpec { pos: [-9.0, 0.4, -2.0], label: "弹药箱", kind: PickupKind::Ammo { amount: 60 } },
-        PickupSpec { pos: [9.0, 0.4, -2.0], label: "大医疗包", kind: PickupKind::Health { amount: 50.0 } },
+        PickupSpec { pos: [-9.0, 0.4, -2.0], label: "弹药箱".into(), kind: PickupKind::Ammo { amount: 60 } },
+        PickupSpec { pos: [9.0, 0.4, -2.0], label: "大医疗包".into(), kind: PickupKind::Health { amount: 50.0 } },
     ]
 }
 
@@ -390,18 +390,18 @@ pub(crate) fn lane_markers() -> Vec<Prop> {
 pub(crate) fn static_targets() -> Vec<TargetSpec> {
     vec![
         // 近线：内侧双靶（大厅拱门内侧可直射）
-        TargetSpec { pos: [-3.0, 1.5, -8.0], label: "近距靶", motion: None },
-        TargetSpec { pos: [3.0, 1.5, -8.0], label: "近距靶", motion: None },
+        TargetSpec { pos: [-3.0, 1.5, -8.0], label: "近距靶".into(), motion: None },
+        TargetSpec { pos: [3.0, 1.5, -8.0], label: "近距靶".into(), motion: None },
         // 中线：外侧双靶
-        TargetSpec { pos: [-9.0, 1.8, -11.0], label: "中距靶", motion: None },
-        TargetSpec { pos: [9.0, 1.8, -11.0], label: "中距靶", motion: None },
+        TargetSpec { pos: [-9.0, 1.8, -11.0], label: "中距靶".into(), motion: None },
+        TargetSpec { pos: [9.0, 1.8, -11.0], label: "中距靶".into(), motion: None },
         // 远线：外侧双靶（贴后墙净空）
-        TargetSpec { pos: [-9.0, 2.2, -14.3], label: "远距靶", motion: None },
-        TargetSpec { pos: [9.0, 2.2, -14.3], label: "远距靶", motion: None },
+        TargetSpec { pos: [-9.0, 2.2, -14.3], label: "远距靶".into(), motion: None },
+        TargetSpec { pos: [9.0, 2.2, -14.3], label: "远距靶".into(), motion: None },
         // 指挥台顶靶：练垂直仰角射击
-        TargetSpec { pos: [0.0, 3.4, 0.0], label: "台顶靶", motion: None },
+        TargetSpec { pos: [0.0, 3.4, 0.0], label: "台顶靶".into(), motion: None },
         // 回廊靶：东侧二层回廊上层位
-        TargetSpec { pos: [13.0, 3.4, -2.0], label: "回廊靶", motion: None },
+        TargetSpec { pos: [13.0, 3.4, -2.0], label: "回廊靶".into(), motion: None },
     ]
 }
 
@@ -411,13 +411,13 @@ pub(crate) fn range_movers() -> Vec<TargetSpec> {
         // 射击馆中段快速横移
         TargetSpec {
             pos: [6.5, 1.8, -9.5],
-            label: "移动靶",
+            label: "移动靶".into(),
             motion: Some(Motion { speed: 3.0, range: 3.0, start_dir: -1.0 }),
         },
         // 射击馆远端中速巡逻
         TargetSpec {
             pos: [-9.0, 1.5, -13.0],
-            label: "移动靶",
+            label: "移动靶".into(),
             motion: Some(Motion { speed: 2.5, range: 2.5, start_dir: 1.0 }),
         },
     ]
@@ -428,12 +428,12 @@ pub(crate) fn range_supply() -> Vec<PickupSpec> {
     vec![
         PickupSpec {
             pos: [-8.0, 0.4, -4.5],
-            label: "毒素手雷",
+            label: "毒素手雷".into(),
             kind: PickupKind::Grenade { element: ElementType::Poison },
         },
         PickupSpec {
             pos: [8.0, 0.4, -4.5],
-            label: "雷电手雷",
+            label: "雷电手雷".into(),
             kind: PickupKind::Grenade { element: ElementType::Electric },
         },
     ]

@@ -123,6 +123,10 @@ pub fn encode_server(msg: &ServerMessage) -> Result<WireMessage, String> {
         ServerMessage::PresetCatalog { .. } => {
             Ok(WireMessage::Data(DataKind::Control, to_json(msg)?))
         }
+        // 世界目录（名册 + 地图布局）含字符串/可变长，同样降级为控制类数据流。
+        ServerMessage::WorldCatalog { .. } => {
+            Ok(WireMessage::Data(DataKind::Control, to_json(msg)?))
+        }
         ServerMessage::ModelCatalog { .. } => {
             Err("模型目录应走资源通道（resource_stream），不应进控制通道".to_string())
         }
@@ -465,6 +469,20 @@ mod tests {
         };
         let WireMessage::Data(kind, bytes) = encode_server(&msg).unwrap() else {
             panic!("预设目录应降级为数据流");
+        };
+        assert_eq!(kind, DataKind::Control);
+        assert_eq!(decode_server_data(kind, &bytes).unwrap(), msg);
+    }
+
+    /// 世界目录（名册 + 地图布局）含字符串/可变长，走控制类数据流且 JSON 往返无损。
+    #[test]
+    fn world_catalog_becomes_control_data() {
+        let msg = ServerMessage::WorldCatalog {
+            roster: crate::operator::roster().to_vec(),
+            layout: crate::map::lawn::layout(),
+        };
+        let WireMessage::Data(kind, bytes) = encode_server(&msg).unwrap() else {
+            panic!("世界目录应降级为数据流");
         };
         assert_eq!(kind, DataKind::Control);
         assert_eq!(decode_server_data(kind, &bytes).unwrap(), msg);

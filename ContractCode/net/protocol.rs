@@ -10,7 +10,9 @@ use crate::element::{ElementType, EntityElementState};
 use crate::equipment::{EquipmentElement, EquipmentTier, EquipmentType};
 use crate::interact::{InteractChoice, InteractInfo};
 use crate::items::{LootItem, TransferDir};
+use crate::map::MapLayout;
 use crate::model::{ModelPreset, VoxelAnimationSpec, VoxelModelSpec};
+use crate::operator::OperatorDef;
 
 /// 权威快照中的单个实体条目。
 ///
@@ -228,6 +230,15 @@ pub enum ServerMessage {
     /// 设计动机（Why）：预设内容归服务端权威（单一事实来源），客户端不内嵌预设数据，
     /// 只展示与回传选中项；静态冷数据、仅连接时发一次，不走每帧快照通道。
     PresetCatalog { presets: Vec<LoadoutPreset> },
+    /// 世界目录（0.14.0 新增）：干员名册 + 活动地图布局，握手后一次性下发。
+    ///
+    /// 设计动机（Why）：名册与地图布局是**整局不变的静态表**，归服务端权威（单一事实来源），
+    /// 客户端不再直读契约静态表（`operator::roster()` / `map::lawn::layout()`）；本消息把二者
+    /// 灌入客户端内存，客户端据此渲染与展示。静态冷数据、仅连接时发一次，不进每帧快照通道。
+    WorldCatalog {
+        roster: Vec<OperatorDef>,
+        layout: MapLayout,
+    },
     /// 撤离成功：客户端据此从训练场回主界面
     ReturnToMenu,
 }

@@ -13,10 +13,15 @@
 //!
 //! 步枪档案（[`rifle_profile`]）同样集中在此，武器数值不散落在渲染层。
 
+use std::sync::LazyLock;
+
 use crate::element::ElementType;
 
 /// 技能形态：技能如何作用于世界
-#[derive(Clone, Copy, Debug, PartialEq)]
+///
+/// serde 派生说明（Why）：干员名册自 0.14.0 起改为服务端权威下发（`WorldCatalog`），
+/// 客户端不再直读静态表，故整棵名册类型树需可序列化过线。
+#[derive(Clone, Copy, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum SkillKind {
     /// 投掷物：沿视线抛出，落地或引信耗尽时在落点结算伤害与机制
     Grenade { damage: f32, radius: f32 },
@@ -27,7 +32,7 @@ pub enum SkillKind {
 }
 
 /// 技能附加机制：除直接伤害外的独特效果（0 值 = 不启用该机制）
-#[derive(Clone, Copy, Debug, PartialEq, Default)]
+#[derive(Clone, Copy, Debug, PartialEq, Default, serde::Serialize, serde::Deserialize)]
 pub struct SkillEffect {
     /// 点燃：命中目标持续灼烧 burn_dps 点/秒，共 burn_secs 秒
     pub burn_dps: f32,
@@ -66,52 +71,56 @@ impl SkillEffect {
 }
 
 /// 单个技能（Q 或 E）的定义
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct SkillDef {
     /// 技能名（HUD 图标下方标签，控制在 4 字以内）
-    pub name: &'static str,
+    pub name: String,
     /// 一句话机制描述（切换台展示）
-    pub desc: &'static str,
+    pub desc: String,
     pub cooldown_secs: f32,
     pub kind: SkillKind,
     pub effect: SkillEffect,
 }
 
 /// 干员定义
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct OperatorDef {
-    pub id: &'static str,
+    pub id: String,
     /// 干员名（HUD 与切换台展示）
-    pub name: &'static str,
+    pub name: String,
     /// 定位（突击手/控场手…）
-    pub title: &'static str,
+    pub title: String,
     /// 元素亲和：决定技能元素与角色表现色
     pub element: ElementType,
     /// 被动描述（展示用）
-    pub passive: &'static str,
+    pub passive: String,
     pub q: SkillDef,
     pub e: SkillDef,
 }
 
-/// 干员名册（顺序即切换台展示顺序与默认干员位次）
-const ROSTER: [OperatorDef; 4] = [
+/// 干员名册（顺序即切换台展示顺序与默认干员位次）。
+///
+/// 由 `const` 改为 [`LazyLock`]（Why）：0.14.0 起名册字段为 owned `String`（需过线序列化），
+/// `String` 不能在 `const` 上下文构造；`LazyLock` 保一次初始化、零额外拷贝，
+/// [`roster`] 的公开签名（`&'static [OperatorDef]`）不变，服务端调用点零改动。
+static ROSTER: LazyLock<Vec<OperatorDef>> = LazyLock::new(|| vec![
     // 火系输出：直接伤害 + 点燃 DoT
     OperatorDef {
-        id: "ember_fox",
-        name: "焰狐",
-        title: "突击手",
+        id: "ember_fox".into(),
+        name: "焰狐".into(),
+        title: "突击手".into(),
         element: ElementType::Fire,
-        passive: "火系压制：技能命中会点燃目标，持续灼烧。",
+        passive: "火系压制：技能命中会点燃目标，持续灼烧。".into(),
         q: SkillDef {
-            name: "爆燃弹",
-            desc: "命中点燃：灼烧目标 3 秒",
+            name: "爆燃弹".into(),
+            desc: "命中点燃：灼烧目标 3 秒".into(),
             cooldown_secs: 5.0,
             kind: SkillKind::Grenade { damage: 40.0, radius: 3.5 },
             effect: SkillEffect::burn(10.0, 3.0),
         },
         e: SkillDef {
-            name: "焦土爆发",
-            desc: "点燃周围目标 3 秒",
+            name: "焦土爆发".into(),
+            desc: "点燃周围目标 3 秒".into(),
             cooldown_secs: 10.0,
             kind: SkillKind::Burst { damage: 30.0, radius: 4.0 },
             effect: SkillEffect::burn(8.0, 3.0),
@@ -119,21 +128,21 @@ const ROSTER: [OperatorDef; 4] = [
     },
     // 冰系控场：冰冻硬控
     OperatorDef {
-        id: "frost_blade",
-        name: "霜刃",
-        title: "控场手",
+        id: "frost_blade".into(),
+        name: "霜刃".into(),
+        title: "控场手".into(),
         element: ElementType::Ice,
-        passive: "冰封控场：被冰冻的目标完全停止行动。",
+        passive: "冰封控场：被冰冻的目标完全停止行动。".into(),
         q: SkillDef {
-            name: "冰锥弹",
-            desc: "冰冻命中目标 3 秒",
+            name: "冰锥弹".into(),
+            desc: "冰冻命中目标 3 秒".into(),
             cooldown_secs: 4.0,
             kind: SkillKind::Grenade { damage: 24.0, radius: 3.0 },
             effect: SkillEffect::freeze(3.0),
         },
         e: SkillDef {
-            name: "冰封领域",
-            desc: "冰冻周围目标 2.5 秒",
+            name: "冰封领域".into(),
+            desc: "冰冻周围目标 2.5 秒".into(),
             cooldown_secs: 12.0,
             kind: SkillKind::Burst { damage: 18.0, radius: 5.5 },
             effect: SkillEffect::freeze(2.5),
@@ -141,21 +150,21 @@ const ROSTER: [OperatorDef; 4] = [
     },
     // 电系机动：位移 + 短眩晕
     OperatorDef {
-        id: "volt_panther",
-        name: "雷豹",
-        title: "游击手",
+        id: "volt_panther".into(),
+        name: "雷豹".into(),
+        title: "游击手".into(),
         element: ElementType::Electric,
-        passive: "高机动作战：突进拉近距离，脉冲电麻敌人。",
+        passive: "高机动作战：突进拉近距离，脉冲电麻敌人。".into(),
         q: SkillDef {
-            name: "电磁突进",
-            desc: "朝视线方向疾冲 7 米",
+            name: "电磁突进".into(),
+            desc: "朝视线方向疾冲 7 米".into(),
             cooldown_secs: 3.5,
             kind: SkillKind::Dash { distance: 7.0 },
             effect: SkillEffect::NONE,
         },
         e: SkillDef {
-            name: "过载脉冲",
-            desc: "电麻周围目标 1.2 秒",
+            name: "过载脉冲".into(),
+            desc: "电麻周围目标 1.2 秒".into(),
             cooldown_secs: 8.0,
             kind: SkillKind::Burst { damage: 26.0, radius: 4.2 },
             effect: SkillEffect::freeze(1.2),
@@ -163,31 +172,31 @@ const ROSTER: [OperatorDef; 4] = [
     },
     // 毒系区域压制：持续毒雾区
     OperatorDef {
-        id: "venom_spider",
-        name: "毒蛛",
-        title: "压制手",
+        id: "venom_spider".into(),
+        name: "毒蛛".into(),
+        title: "压制手".into(),
         element: ElementType::Poison,
-        passive: "区域封锁：毒雾持续侵蚀圈内的一切目标。",
+        passive: "区域封锁：毒雾持续侵蚀圈内的一切目标。".into(),
         q: SkillDef {
-            name: "毒雾弹",
-            desc: "留下毒雾：圈内持续掉血 6 秒",
+            name: "毒雾弹".into(),
+            desc: "留下毒雾：圈内持续掉血 6 秒".into(),
             cooldown_secs: 6.0,
             kind: SkillKind::Grenade { damage: 20.0, radius: 3.5 },
             effect: SkillEffect::zone(6.0, 12.0),
         },
         e: SkillDef {
-            name: "剧毒潮涌",
-            desc: "原地展开毒雾 5 秒",
+            name: "剧毒潮涌".into(),
+            desc: "原地展开毒雾 5 秒".into(),
             cooldown_secs: 11.0,
             kind: SkillKind::Burst { damage: 16.0, radius: 4.5 },
             effect: SkillEffect::zone(5.0, 10.0),
         },
     },
-];
+]);
 
 /// 干员名册
 pub fn roster() -> &'static [OperatorDef] {
-    &ROSTER
+    ROSTER.as_slice()
 }
 
 /// 步枪武器档案：按元素区分的步枪数值
