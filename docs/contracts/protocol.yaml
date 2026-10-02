@@ -1,7 +1,7 @@
 # =============================================================================
 # Cute Of Duty · 线格式契约（machine-readable contract）
 # =============================================================================
-# 状态：草案 v0.13.0 —— 【尚不是权威源】
+# 状态：草案 v0.14.0 —— 【尚不是权威源】
 #   本文件目前是「手工整理的意图」，权威实现已随 0.12.2 契约拆分迁至 ContractCode/net/protocol.rs。
 #   权威源反转（YAML 为准、代码由 YAML 校验）是后续独立任务，见 docs/barek-history.md。
 #
@@ -17,24 +17,28 @@
 # =============================================================================
 
 contract: protocol
-version: 0.13.0
+version: 0.14.0
 status: draft
 owner_module: ContractCode/net
 authoritative_impl: ContractCode/net/protocol.rs
 compat:
-  previous: 0.12.4
+  previous: 0.13.0
   breaking: true
   migration_guide: |
-    新增下行变体 `ServerMessage::PresetCatalog`（服务端权威的选装预设目录），**线格式不兼容**：
-    `WIRE_VERSION` 12 → 13，老客户端连新服务端将在首条绑定包因版本号不符而断开。
+    新增下行变体 `ServerMessage::WorldCatalog`（服务端权威的干员名册 + 活动地图布局），**线格式不兼容**：
+    `WIRE_VERSION` 13 → 14，老客户端连新服务端将在首条绑定包因版本号不符而断开。
     迁移步骤：
-      1. 服务端：`ContractCode/net/packet.rs` 的 `WIRE_VERSION` 置 13；`codec::encode_server` 把
-         `PresetCatalog` 编为控制类数据流（`DataKind::Control` + JSON），与既有变长控制消息同路；
+      1. 服务端：`ContractCode/net/packet.rs` 的 `WIRE_VERSION` 置 14；`codec::encode_server` 把
+         `WorldCatalog` 编为控制类数据流（`DataKind::Control` + JSON），与既有变长控制消息同路；
          连接建立后一次性下发该消息（静态冷数据，不进每帧快照通道）。
-      2. 客户端：升级 `WIRE_VERSION` 至 13；新增 `ServerMessage::PresetCatalog` 分支，把预设目录
-         存入本地资源并在仓库浮层展示；未识别的老客户端无法解析该 JSON 变体，故必须同步升级。
-      3. 浏览器骨架页（`ServerCode/net/web/portal.html`）的绑定包版本号同步置 13。
-    老端处置：老客户端需同步升级到 0.13.0 才能与新服务端互通。
+      2. 客户端：升级 `WIRE_VERSION` 至 14；新增 `ServerMessage::WorldCatalog` 分支，把名册与地图
+         布局存入本地资源（`flow::WorldCatalog`），场景/HUD 改读该资源而不再直读契约静态表
+         （`operator::roster()` / `map::lawn::layout()`）；未识别的老客户端无法解析该 JSON 变体，故必须同步升级。
+      3. 浏览器骨架页（`ServerCode/net/web/portal.html`）的绑定包版本号同步置 14。
+    契约类型同步：`OperatorDef`/`SkillDef`/`SkillKind`/`SkillEffect` 与 `MapLayout`/`Prop`/`GlowSpec`/
+    `TargetSpec`/`StationSpec`/`PickupSpec`/`Motion` 新增 `Serialize/Deserialize`，其中标签/名称字段由
+    `&'static str` 改为 owned `String`（`ROSTER` 由 `const` 改为 `LazyLock`）。
+    老端处置：老客户端需同步升级到 0.14.0 才能与新服务端互通。
 
 # -----------------------------------------------------------------------------
 # 传输层：小定长包 + 指令优先组包 + 双通道（0.12.0 起取代统一 64KB 槽帧）
@@ -65,7 +69,7 @@ transport:
   header:
     bytes: 32
     magic: 0x434F4431            # "COD1"
-    wire_version: 13             # 与协议 y 位对齐（0.13 = 小定长包世代 + 服务端预设目录）
+    wire_version: 14             # 与协议 y 位对齐（0.14 = 小定长包世代 + 服务端预设/世界目录）
     header_layout:               # (offset, width, little-endian)
       - { offset: 0,  width: 4, name: magic }
       - { offset: 4,  width: 2, name: version }
@@ -190,6 +194,13 @@ downlink:
              静态冷数据，经控制类数据流（DataKind::Control + JSON）下发，不进每帧快照通道
         fields:
           - { name: presets, type: "Vec<LoadoutPreset>", required: true, doc: 预设清单（全局固定） }
+      - name: WorldCatalog            # 0.14.0 新增
+        added_in: 0.14.0
+        doc: 握手后一次性下发干员名册 + 活动地图布局；内容归服务端权威（单一事实来源），客户端不再直读静态表。
+             静态冷数据，经控制类数据流（DataKind::Control + JSON）下发，不进每帧快照通道
+        fields:
+          - { name: roster, type: "Vec<OperatorDef>", required: true, doc: 干员名册（顺序即切换台展示顺序） }
+          - { name: layout, type: MapLayout,          required: true, doc: 活动地图布局（地板/props/发光件/站点等静态层） }
       - name: ReturnToMenu
       - name: ModelCatalog          # 0.10.0 新增
         added_in: 0.10.0
@@ -214,6 +225,30 @@ types:
     fields:
       - { name: name,  type: String,        doc: 预设显示名（如「标准」「生存」「爆破」） }
       - { name: items, type: "Vec<String>", doc: 携带物资名清单，与 ClientMessage::Loadout 的 carried 同口径 }
+  OperatorDef:                    # 0.14.0 起随 WorldCatalog 过线
+    owner_module: ContractCode/operator
+    doc: 干员档案（名册一项）：身份/展示字段 + Q/E 技能定义；服务端权威下发，客户端只展示
+    fields:
+      - { name: id,       type: String,      doc: 干员标识（稳定英文 id） }
+      - { name: name,     type: String,      doc: 干员名（HUD 与切换台展示） }
+      - { name: title,    type: String,      doc: 定位（突击手/控场手…） }
+      - { name: element,  type: ElementType, doc: 元素亲和：决定技能元素与角色表现色 }
+      - { name: passive,  type: String,      doc: 被动描述（展示用） }
+      - { name: q,        type: SkillDef,    doc: Q 技能定义 }
+      - { name: e,        type: SkillDef,    doc: E 技能定义 }
+  MapLayout:                      # 0.14.0 起随 WorldCatalog 过线
+    owner_module: ContractCode/map
+    doc: 一张地图的完整描述（静态层）：渲染层据此生成地板/props/发光件，服务端据 targets 生成权威靶
+    fields:
+      - { name: name,         type: String,          doc: 地图名 }
+      - { name: half_extent,  type: f32,             doc: 正方形场地半径（米） }
+      - { name: floor_tile,   type: f32,             doc: 棋盘格地面边长 }
+      - { name: player_spawn, type: "[f32; 3]",      doc: 出生点世界坐标 }
+      - { name: props,        type: "Vec<Prop>",     doc: 静态物体（掩体/立柱/标线/装饰） }
+      - { name: targets,      type: "Vec<TargetSpec>", doc: 训练靶（静态或移动） }
+      - { name: pickups,      type: "Vec<PickupSpec>", doc: 场上拾取物 }
+      - { name: glows,        type: "Vec<GlowSpec>",  doc: 发光件（灯带/信标/光垫） }
+      - { name: stations,     type: "Vec<StationSpec>", doc: 功能站点（补给台/干员切换台/物资箱） }
   PickupKind:
     owner_module: ContractCode/items
     exposes:

@@ -54,6 +54,71 @@
 
 ---
 
+## [0.14.0] · 2026-10-02 · 世界目录下发 + 装配归位（**协议不兼容**）
+
+- **变更类型**：Breaking（**新增下行消息 `ServerMessage::WorldCatalog`，线格式不兼容**）+ Refactor（launcher 纯装配归位）
+- **影响模块**：
+  - `ContractCode`：`operator.rs`（`OperatorDef`/`SkillDef`/`SkillKind`/`SkillEffect` 加 serde，标签字段
+    `&'static str` → `String`，`ROSTER` 由 `const` 改 `LazyLock`）、`map/mod.rs`（`MapLayout`/`Prop`/`GlowSpec`/
+    `TargetSpec`/`StationSpec`/`PickupSpec`/`Motion`/`Shape`/`MaterialKind`/`GlowKind` 加 serde + `PartialEq`，
+    `label`/`name` → `String`，`MapLayout` 加 `Default` 降级占位）、`map/lawn/mod.rs`、`map/training/mod.rs`
+    （字面量 `.into()`）、`net/protocol.rs`（新增 `WorldCatalog` 变体）、`net/packet.rs`（`WIRE_VERSION` 13 → 14）、
+    `net/codec.rs`（编码分支 + 往返测试）
+  - `ServerCode`：`net/stages.rs`（`Connect` 分支下发 `WorldCatalog`）、`combat/range.rs`（`RangeTarget::label`
+    → `String`，构造签名 `impl Into<String>`）、`interact/mod.rs`（`spawn_from_layout` 标签 `clone()`）、
+    `net/web/portal.html`（绑定包版本 13 → 14）
+  - `HostCode`：`flow/state.rs`（新增 `WorldCatalog` 资源 + 路由分支）、`flow/mod.rs`（re-export）、
+    `launcher/mod.rs`（注册资源、移除本地 `spawn_scene` 与 Startup 场景装配）、`world/scene.rs`
+    （新增一次性 `spawn_scene`、`spawn_world` 改收 `&MapLayout`）、`world/camera.rs`（避障碰撞盒改读下发布局）、
+    `hud/root.rs`/`hud/vitals.rs`/`hud/minimap.rs`/`hud/bigmap.rs`/`hud/interact/mod.rs`（名册/布局消费点改读资源）
+  - 文档：`docs/contracts/protocol.yaml`（`wire_version` 13 → 14 + 新消息/类型 + 迁移指南）、
+    `ServerCode/net/module.md`、`README.md`
+- **兼容性**：**不兼容**（`y+1`）
+  - `WIRE_VERSION` **13 → 14**；新增服务端下行变体 `ServerMessage::WorldCatalog`（经
+    `DataKind::Control` + JSON 承载，包帧结构未变）。老客户端 `serde_json` 无法反序列化该变体 →
+    **双端必须同时升级到 `0.14.0`**。
+  - 契约类型同步 serde 化：名册/地图的标签字段由 `&'static str` 改为 owned `String`（过线所需）；
+    服务端行为不变（`roster()` 公开签名 `&'static [OperatorDef]` 保持不变）。
+- **内容**：
+  - **① `roster`/地图布局改下发**：干员名册与活动地图布局（皆为整局不变的静态表）改由服务端在 `Connect`
+    握手后一次性下发，客户端不再直读契约静态表（`operator::roster()` / `map::lawn::layout()`），
+    改从新资源 `flow::WorldCatalog` 消费——落地 [ADR 0003](adr/0003-contract-crate.md) 的"服务端权威、单一事实来源"。
+  - **② `launcher` 资源瘦身**：移除 `launcher/mod.rs` 的本地 `spawn_scene`（其 `insert_resource(CubeMesh/AmbientLight)`
+    违 [ADR 0004](adr/0004-client-layer-convergence.md)「launcher 不得定义组件/资源」）；拆为
+    `world::spawn_scene_baseline`（`Startup`：相机 + `CubeMesh` + `AmbientLight`，不依赖布局且为早期系统硬依赖）
+    与 `world::spawn_world_when_ready`（`Update`，布局就绪首帧生成光照 + 静态地图）——**修正**：初版曾把整个
+    `spawn_scene` 一并延后，导致首帧缺 `CubeMesh`/`AmbientLight` 而 panic（窗口即崩），已按上述拆分修复。
+    launcher 的 `Startup` 现为 `setup_global` + `init_ui_assets` + `spawn_scene_baseline`。
+  - **③ 镜头避障手感修复**（表现层，非本轮回归）：实测发现 SpringArm 贴墙避障"生硬"——根因是原实现
+    收缩侧为**瞬时赋值**、回伸侧为**线性匀速**，视角扫过掩体边缘时臂长瞬跳。改为**非对称、帧率无关的
+    指数平滑** `approach_arm`（`α = 1 - exp(-k·dt)`；收缩 `CAM_ARM_SHRINK_RATE = 25/s`、回伸
+    `CAM_ARM_GROW_RATE = 10/s`），去掉瞬时硬钳，`WALL_MARGIN` 0.25 → 0.30 吸收平滑滞后以继续兜底防穿模。
+- **迁移指南**：
+  1. **服务端**：`ContractCode/net/packet.rs` 的 `WIRE_VERSION` 置 `14`；`codec::encode_server` 把 `WorldCatalog`
+     编为控制类数据流（`DataKind::Control` + JSON）；`net/stages.rs` 的 `Connect` 分支在 `PresetCatalog` 后
+     一次性下发 `WorldCatalog { roster: operator::roster().to_vec(), layout: map::lawn::layout() }`。
+  2. **客户端**：升级 `WIRE_VERSION` 至 `14`；新增 `ServerMessage::WorldCatalog` 分支把名册与布局存入
+     `flow::WorldCatalog`；场景生成（`world::spawn_scene`）改为**等 `layout` 就绪的那一帧**用 `Local` 守卫一次性生成
+     （`Startup` 早于连接、只跑一次，故不能再挂 `Startup`）；HUD/相机/小地图/全景图的静态层改读该资源。
+  3. **浏览器骨架页**（`ServerCode/net/web/portal.html`）绑定包版本号同步置 `14`。
+  4. 契约类型：`OperatorDef`/`SkillDef`/`SkillKind`/`SkillEffect`、`MapLayout` 及其组成类型加
+     `Serialize/Deserialize`，标签/名称字段改 `String`，`ROSTER` 改 `LazyLock`。
+  5. **老端处置**：老客户端需同步升级到 `0.14.0` 才能与新服务端互通（无渐进兼容路径）。
+- **验证**：
+  - `cargo check --workspace --all-targets` 退出码 `0`（本机无 `cargo-wrap`，按 0.12.4 先例经 owner 确认以裸 `cargo` 替代）。
+  - `cargo test -p cute_of_duty_contract` **51 passed**（较 0.13.0 的 50 增 1：`WorldCatalog` 编码往返）。
+  - `cargo test -p cute_of_duty_server` **128 passed / 0 failed**（与 0.13.0 基线一致，服务端零回归）。
+  - `net::codec::tests::world_catalog_becomes_control_data` 证明名册 + 布局经控制类数据流 JSON 往返无损。
+  - `cargo test -p cute_of_duty_host`：新增 `approach_arm_is_frame_rate_independent`（帧率无关收敛）与
+    `approach_arm_never_overshoots`（不超调）两条确定性单测。
+  - **实机验证（2026-10-02）**：进对局世界渲染、HUD 干员名/技能冷却、切换台干员列表、小地图/全景图静态层均正常；
+    客户端无服务器时 Loading 超时降级正常、不崩溃；服务端 + 客户端联合冒烟握手与双通道绑定正常。
+    镜头避障改为指数平滑后**经 owner 复测确认贴墙手感正常**（录屏 2026-10-02 16:27）。
+- **关联**：[protocol.yaml](contracts/protocol.yaml)、[ADR 0003](adr/0003-contract-crate.md)、
+  [ADR 0004](adr/0004-client-layer-convergence.md)、[`ServerCode/net/module.md`](../ServerCode/net/module.md)。
+
+---
+
 ## [0.13.0] · 2026-10-02 · 物库修复（选装生效 + 服务端预设目录）（**协议不兼容**）
 
 - **变更类型**：Fix + Additive（**新增下行消息 `ServerMessage::PresetCatalog`，线格式不兼容**）

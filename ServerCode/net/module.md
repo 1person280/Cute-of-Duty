@@ -50,7 +50,7 @@
 | `NetCommand::Input` | 会话 → 主循环 | `{ conn_id, PlayerInput }` | 同上（连续量记最新 / 边沿量锁存） |
 | `NetCommand::Inventory` | 会话 → 主循环 | `{ conn_id, InventoryAction }` | 同上 |
 | `NetCommand::Disconnect` | 会话 → 主循环 | `{ conn_id }` | 同上 |
-| `ServerMessage::{Handshake, ModelCatalog, PresetCatalog, Snapshot, Event, Control}` | 主循环 → 会话 | 契约类型 | 原生客户端 / 浏览器（经 `web` 桥） |
+| `ServerMessage::{Handshake, ModelCatalog, PresetCatalog, WorldCatalog, Snapshot, Event, Control}` | 主循环 → 会话 | 契约类型 | 原生客户端 / 浏览器（经 `web` 桥） |
 
 > ⚠️ 本表为 `net` 内部命令/消息流；**服务端跨模块事件清单与订阅关系图**仍属 [module-boundaries 第七节](../docs/architecture/module-boundaries.md) 待补项（`?` 列），补齐前不得把既有直接调用改造成事件。
 
@@ -63,4 +63,8 @@
 - 已发生示例：**0.13.0 新增下行变体 `ServerMessage::PresetCatalog`（选装预设目录）→ `y+1`**，`wire_version` 12 → 13，
   附迁移指南（[BarekHistory 0.13.0](../docs/barek-history.md)）与 [protocol.yaml](../docs/contracts/protocol.yaml) 同步；
   该消息经控制类数据流（`DataKind::Control` + JSON）承载，包帧结构未变，破坏点仅在新增变体。
+- 已发生示例：**0.14.0 新增下行变体 `ServerMessage::WorldCatalog`（干员名册 + 活动地图布局）→ `y+1`**，`wire_version` 13 → 14，
+  由 `net::stages::drain_commands` 的 `Connect` 分支在握手后一次性下发（`crate::operator::roster()` 与
+  `crate::map::lawn::layout()`），客户端据此不再直读契约静态表；配套契约类型 serde 化见
+  [BarekHistory 0.14.0](../docs/barek-history.md) 与 [protocol.yaml](../docs/contracts/protocol.yaml)。
 - 线格式权威源当前为**代码**（`ContractCode/net/protocol.rs`）；"YAML 为准、代码由 YAML 校验"的权威源反转列为后续独立任务。
