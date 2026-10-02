@@ -26,7 +26,7 @@ strip = true
 
 [profile.dev]
 opt-level = 1
-# 磁盘约束（Why）：本仓库对磁盘空间有严格限制，`target/` 必须 ≤ 4GB（见 README 第七节开发须知）。
+# 磁盘约束（Why）：本仓库对磁盘空间有严格限制，`target/` 必须 ≤ 4GB（见 README 第八节开发须知）。
 # dev/test 关闭调试信息与增量编译，把临时产物压到最小；`test` profile 默认继承 `dev`，故此处一并生效。
 # 硬上限由 `tools/target_guard.ps1` 在构建前清理保证 —— 构建前先跑它。
 debug = false

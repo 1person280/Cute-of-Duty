@@ -107,6 +107,7 @@
 | `hud` | HUD 面板族（vitals / minimap / bigmap / interact / loot / wheel / alert …） | 各 HUD 资源 | 面板系统 | L1 |
 | `world` | 3D 世界表现（相机 Rig、场景、体素绘制） | `AimRig` | 相机系统 | L1 |
 | `shared` | 共享主题/资产/干员元数据（**纯只读**） | `theme`、`operator::meta` | 常量与查表 | L1 |
+| `shader` | **区域光照着色器套件**（像素风专属）：SceneGrid 重建 + 密度告警 / 三角形区域划分 / 1m³ 单元步进求交 / 五路光照（阴影·AO·反射·间接·漫反射）/ 像素块着色；WGSL 单源 + Bevy/wgpu 渲染图接线 + 调试可视化 | `SceneGrid`、`PixelBlock` 缓冲、`LightingResult` | 渲染系统 + `backend` 管线 | **L0（仅文档 · 计划中，目标 0.15.0）** |
 
 ---
 

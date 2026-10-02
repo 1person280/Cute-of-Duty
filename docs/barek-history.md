@@ -24,6 +24,35 @@
 
 ---
 
+## [未发布] · 2026-10-02 · 区域光照着色器套件计划 + README「已采纳未来形态」收敛（文档先行，未改代码）
+
+- **变更类型**：Refactor（仅文档 / 规范，**未改任何代码**；不触碰线格式，版本号不动）
+- **影响模块**：文档层 + 仓库门面 —— 新增 `docs/plans/0001-区域光照着色器套件.md`、`docs/adr/0008-triangle-region-radiance.md`；
+  `README.md`（新增「六、已采纳未来形态」节 + 版本表 roadmap 收敛 + 文档链接 + 节号顺延七/八）、
+  `docs/architecture/module-boundaries.md`（客户端模块表新增 `shader` 行）、
+  `.agents/skills/compliant-delivery/SKILL.md`（3.3 红线修订）、根 `Cargo.toml`（注释节号同步）。
+- **兼容性**：**兼容** —— 不触碰线格式 / 配置语义 / 公共 Trait；`wire_version` 仍为 **14**，
+  双端 `0.14.0` 互通关系不变（纯文档）。
+- **迁移指南**：不适用（非协议不兼容）。
+- **内容**：
+  - 采纳「**三角形区域光线追踪着色器套件**」为**已采纳未来形态**（README 第六节第 5 条）：像素风专属，
+    以**三角形区域**（非逐像素）为光照计算单位，用 **1m³ 单元网格**作加速结构，产出区域阴影 / 区域 AO / 低精度反射 / 简单间接光；
+    **WGSL 单源并入 Bevy/wgpu**，**DX11 显式剔除**（wgpu 不支持）。
+  - 计划全文落 [`docs/plans/0001`](plans/0001-区域光照着色器套件.md)（整体架构 → 核心数据结构 → 着色器接口 → 各模块实现）；
+    架构决策落 [`ADR 0008`](adr/0008-triangle-region-radiance.md)。
+  - 目标版本 **`0.15.0`（`y+1`，协议不兼容）**：新增成对消息 `ClientMessage::RequestSceneUnits` / `ServerMessage::SceneUnits`，
+    `WIRE_VERSION` **14 → 15** —— **属未来实现阶段落地，本轮不动版本号**。
+  - **README 新增「六、已采纳未来形态」**为全仓唯一权威路线图：把此前散落在各版 Release note / 版本表格中**重复的多目标清单**收敛于此；
+    原「六 文档」→「七」、「七 开发环境」→「八」。
+- **规范层修订（compliant-delivery 3.3）**：Release note 与 README 版本行的「**下一版本目标**」不再逐版复制全文，
+  改为一行「见 README〈六、已采纳未来形态〉」；「**未做**」「**本轮冻结**」两份欠账清单的**逐条结转保持不变**。
+- **验证**：纯文档变更，不涉 `.rs` / 线格式 / 契约语义，故未跑编译；`git status` 仅含上述文档文件；
+  Markdown 相对链接逐条核对可达。
+- **关联**：[计划 0001](plans/0001-区域光照着色器套件.md)、[ADR 0008](adr/0008-triangle-region-radiance.md)、
+  [README](../README.md)、[模块边界](architecture/module-boundaries.md)。
+
+---
+
 ## [未发布] · 2026-10-02 · 单人维护期 L2 评审豁免 + README 免责声明冻结条款（文档先行，未改代码）
 
 - **变更类型**：Refactor（仅规范 / 文档，**未改任何代码**；不触碰线格式，版本号不动）
