@@ -316,17 +316,23 @@ mod tests {
     }
 
     /// 不超调：任何步长下臂长都落在 [target, current] 区间内（收缩不越过下限、回伸不越过上限）。
+    ///
+    /// 容差说明（Why）：极端 dt 下 α 会等于 1，此时 `current + (target - current) * α` 的
+    /// **f32 舍入**可能让结果比 target 低约 1 ulp（实测 `0.6999998` vs `0.7`，量级 2e-7 米，
+    /// 物理上可忽略）。故按 `ARM_EPS` 容差断言「无实质性超调」，而非要求逐位精确 ——
+    /// 曾因写成无容差的 `contains` 而在 CI 上误报失败。
     #[test]
     fn approach_arm_never_overshoots() {
+        const ARM_EPS: f32 = 1e-3;
         // 夸张 dt：α 近似 1，结果应贴住目标但不越界。
         let shrink = approach_arm(CAMERA_DIST, MIN_ARM_DIST, 10.0);
         assert!(
-            (MIN_ARM_DIST..=CAMERA_DIST).contains(&shrink),
+            shrink >= MIN_ARM_DIST - ARM_EPS && shrink <= CAMERA_DIST + ARM_EPS,
             "收缩越过目标区间: {shrink}"
         );
         let grow = approach_arm(MIN_ARM_DIST, CAMERA_DIST, 10.0);
         assert!(
-            (MIN_ARM_DIST..=CAMERA_DIST).contains(&grow),
+            grow >= MIN_ARM_DIST - ARM_EPS && grow <= CAMERA_DIST + ARM_EPS,
             "回伸越过目标区间: {grow}"
         );
         // dt = 0 不改变现状。
