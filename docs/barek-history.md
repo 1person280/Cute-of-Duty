@@ -24,6 +24,39 @@
 
 ---
 
+## [0.14.1] · 2026-10-03 · 文档大扫除（`module.md` 规范化 + Bevy 0.16 声明）
+
+- **变更类型**：Refactor（**仅文档 / 规范 + 版本号**，**未改任何代码**；不触碰线格式）
+- **影响模块**：文档层 + 仓库门面 —— 新建 `docs/module/`（14 份模块文档）；
+  `docs/architecture/module-boundaries.md`（第七节改写为 B 规范）；`CONTRIBUTING.md`（文档表位置 + 过渡纪律数量）；
+  `README.md`（技术栈版本声明 + 版本表 `0.14.1` 行）；`docs/contracts/web.yaml`（`related.module` 改指新路径）；
+  `docs/plans/0001-区域光照着色器套件.md`、`docs/adr/0002`·`0004`·`0008`（旧 `module.md` 路径改指 `docs/module/`；Bevy 引用同步）；
+  `HostCode/Cargo.toml`（Bevy 0.16 声明注记）；三端 `Cargo.toml`（版本 `0.14.0` → `0.14.1`）。
+- **兼容性**：**兼容**（`z+1`）—— 不触碰线格式 / 配置语义 / 公共 Trait；`wire_version` 仍为 **14**，
+  双端 `0.14.1` 与 `0.14.0` 的互通关系不变。
+- **迁移指南**：不适用（非协议不兼容）。
+- **内容**：
+  - **① 文档大扫除（已实施）**
+    - `module.md` 规范化：统一迁至 B 规范 `docs/module/<Crate>.<module>.md`（旧 `ServerCode/net/module.md` →
+      [`Server.net.md`](module/Server.net.md)）；新建 14 份模块文档 —— Host 7（`launcher`/`flow`/`net`/`hud`/`menu`/`world`/`shared`）、
+      Server 5（`items`/`inventory`/`equipment`/`combat`/`interact`）、Contract 1（`lib`），外加 `Server.net` 迁移。
+    - 全仓旧 `module.md` 路径引用改指新路径（README `0.12.3` 条、`CONTRIBUTING.md`、`web.yaml`、`plan 0001`、
+      ADR 0002 / 0004 / 0008、本文件 `0.14.0` / `0.12.3` 条目）。
+    - `module-boundaries.md` 第七节改写为 B 规范（位置说明 + 模板 + 已完成 14 项清单 + 待补清单）。
+    - `CONTRIBUTING.md` 第八节文档表 `module.md` 位置改为 `docs/module/<Crate>.<module>.md`；过渡纪律数量 **0 → 14**。
+  - **② Bevy 0.16 版本声明（声明态 · 源码迁移本轮未实施）**
+    - README / `module-boundaries` / `plan 0001` / ADR 0008 中静态写死的「Bevy 0.15」同步为 **「Bevy 0.16」**，
+      并就地加注「**迁移未实施 · 当前基线 0.15**」。
+    - `HostCode/Cargo.toml`：`bevy` 依赖**仍锁 `0.15`**（未迁移）；注释登记 0.16 迁移的弃用清单
+      （`get_single*` / `get_single_mut*` → `single*`，**计划不迁移**）。
+    - **0.16 源码迁移未实施** —— 本机**无 `cargo-wrap`**（`tools/` 下无源码，PATH / Desktop / `.cargo` 均无 `cargo-wrap.exe`），
+      故**未跑任何编译验证**。待该迁移实施后，`0.14.1` 方为「**完全体**」。
+- **验证**：**纯文档 / 版本号变更，不涉 `.rs` / 线格式 / 契约语义，故未跑编译**；`git status` 仅含文档 + 三端 `Cargo.toml` 版本号；
+  Markdown 相对链接逐条核对可达。
+- **关联**：[module-boundaries 第七节](architecture/module-boundaries.md)、[`docs/module/`](module/)、[README](../README.md)。
+
+---
+
 ## [未发布] · 2026-10-02 · 区域光照着色器套件计划 + README「已采纳未来形态」收敛（文档先行，未改代码）
 
 - **变更类型**：Refactor（仅文档 / 规范，**未改任何代码**；不触碰线格式，版本号不动）
@@ -101,7 +134,7 @@
     （新增一次性 `spawn_scene`、`spawn_world` 改收 `&MapLayout`）、`world/camera.rs`（避障碰撞盒改读下发布局）、
     `hud/root.rs`/`hud/vitals.rs`/`hud/minimap.rs`/`hud/bigmap.rs`/`hud/interact/mod.rs`（名册/布局消费点改读资源）
   - 文档：`docs/contracts/protocol.yaml`（`wire_version` 13 → 14 + 新消息/类型 + 迁移指南）、
-    `ServerCode/net/module.md`、`README.md`
+    `docs/module/Server.net.md`、`README.md`
 - **兼容性**：**不兼容**（`y+1`）
   - `WIRE_VERSION` **13 → 14**；新增服务端下行变体 `ServerMessage::WorldCatalog`（经
     `DataKind::Control` + JSON 承载，包帧结构未变）。老客户端 `serde_json` 无法反序列化该变体 →
@@ -144,7 +177,7 @@
     客户端无服务器时 Loading 超时降级正常、不崩溃；服务端 + 客户端联合冒烟握手与双通道绑定正常。
     镜头避障改为指数平滑后**经 owner 复测确认贴墙手感正常**（录屏 2026-10-02 16:27）。
 - **关联**：[protocol.yaml](contracts/protocol.yaml)、[ADR 0003](adr/0003-contract-crate.md)、
-  [ADR 0004](adr/0004-client-layer-convergence.md)、[`ServerCode/net/module.md`](../ServerCode/net/module.md)。
+  [ADR 0004](adr/0004-client-layer-convergence.md)、[`Server.net.md`](../module/Server.net.md)。
 
 ---
 
@@ -257,7 +290,7 @@
   - `cargo-wrap test -p cute_of_duty_server` → **119 passed / 0 failed**（较 0.12.2 的 89 增 30：`web::{http,ws,router,portal}`、`config::load_web_config` 等）。
   - 全仓扫描：无下划线 `.rs`、无超 600 行文件（本轮同时收口「文件名禁下划线」公约）。
   - **待实机验证**：浏览器打开 `http://127.0.0.1:8080/` 门户、`/api/status`（Bearer token）、`ws://…/ws` 握手后收到 `Handshake` 与周期性 `Snapshot`、HTTPS 门户；Windows 工具链对 `ring` 的编译可行性（`cargo-wrap build --workspace --release`）。
-- **关联**：[ADR 0007](adr/0007-native-web-service.md)、[web.yaml](contracts/web.yaml)、[protocol.yaml](contracts/protocol.yaml)、[`ServerCode/net/module.md`](../ServerCode/net/module.md)
+- **关联**：[ADR 0007](adr/0007-native-web-service.md)、[web.yaml](contracts/web.yaml)、[protocol.yaml](contracts/protocol.yaml)、[`Server.net.md`](../module/Server.net.md)
 
 ---
 

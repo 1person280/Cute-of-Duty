@@ -37,7 +37,7 @@
 ## 二、分层（依赖只许自上而下）
 
 ```
-┌─ 表现层（HostCode/cod1，Bevy 0.15）────────────────────────────┐
+┌─ 表现层（HostCode/cod1，Bevy 0.16·迁移未实施）────────────────────┐
 │  launcher(纯装配)  flow  menu  hud  world  shared  net(适配)   │
 └───────────────────────────┬───────────────────────────────────┘
                             │ 只依赖契约 crate（不得依赖 ServerCode）
@@ -224,9 +224,13 @@
 
 ---
 
-## 七、每个模块必须补 `module.md`（模板 + 待办清单）
+## 七、每个模块的 `module.md`（B 规范 · 模板 + 待办清单）
 
-**位置**：`ServerCode/<模块>/module.md`、`HostCode/<模块>/module.md`
+**位置（B 规范）**：统一放 `docs/module/<Crate>.<module>.md`，**不再分散**到各 crate 目录。
+- `<Crate>` ∈ `Host` / `Server` / `Contract`；`<module>` 为该 crate 顶层模块名。
+- 单 crate 无子模块层者取 `lib`（如 `Contract.lib.md`）；多词模块名保持单段（如 `Host.launcher.md`）。
+- 相对链接以 `docs/module/` 为基准：`../adr/…`、`../barek-history.md`、`../contracts/…`、`../architecture/module-boundaries.md`。
+
 **必含 5 节**：`## 边界` / `## 数据所有权` / `## 接口` / `## 事件` / `## 成熟度(L0–L3)`
 **模板**：
 
@@ -244,23 +248,28 @@
 L? — <依据>；破坏性变更流程…
 ```
 
-**待补清单（按本文件优先级排序）**
-- [ ] `ServerCode/items/module.md`（L0 → 先定边界）〔依据 ADR 0002〕
-- [ ] `ServerCode/inventory/module.md`〔依据 ADR 0002：显式写"不负责战局内格位"〕
-- [ ] `ServerCode/equipment/module.md`〔依据 ADR 0002：显式写"不负责手持/弹夹"〕
-- [ ] `ServerCode/combat/module.md`〔依据 ADR 0002：显式写"不负责装备等级/元素"〕
-- [ ] `ServerCode/interact/module.md`
-- [x] `ServerCode/net/module.md`（L2，须与 protocol.yaml 同步）—— **已于 2026-09-29 补（0.12.3，见 `ServerCode/net/module.md`）**
-- [ ] `ContractCode/module.md`（新 crate，依据 ADR 0003）
-- [ ] `HostCode/launcher/module.md`（依据 ADR 0004：只写装配职责）
-- [ ] `HostCode/flow/module.md`（依据 ADR 0004：`ModalState` 唯一所有者）
-- [ ] `HostCode/net/module.md`（依据 ADR 0003：只吃契约 crate）
-- [ ] `HostCode/hud/module.md`（依据 ADR 0004：禁 `use crate::menu::`）
-- [ ] 其余模块（见第三节/第四节表）
+**已完成清单（B 规范，`docs/module/`）**
+- [x] [Server.net.md](./../module/Server.net.md)（L2，须与 protocol.yaml 同步）—— 由旧 `ServerCode/net/module.md` 迁入
+- [x] [Contract.lib.md](./../module/Contract.lib.md)（依据 ADR 0003）
+- [x] [Host.launcher.md](./../module/Host.launcher.md)（依据 ADR 0004：只写装配职责）
+- [x] [Host.flow.md](./../module/Host.flow.md)（依据 ADR 0004：`ModalState` 唯一所有者）
+- [x] [Host.net.md](./../module/Host.net.md)（依据 ADR 0003：只吃契约 crate）
+- [x] [Host.hud.md](./../module/Host.hud.md)（依据 ADR 0004：禁 `use crate::menu::`）
+- [x] [Host.menu.md](./../module/Host.menu.md)
+- [x] [Host.world.md](./../module/Host.world.md)
+- [x] [Host.shared.md](./../module/Host.shared.md)
+- [x] [Server.items.md](./../module/Server.items.md)（L0 → 先定边界）〔依据 ADR 0002〕
+- [x] [Server.inventory.md](./../module/Server.inventory.md)〔依据 ADR 0002：显式写"不负责战局内格位"〕
+- [x] [Server.equipment.md](./../module/Server.equipment.md)〔依据 ADR 0002：显式写"不负责手持/弹夹"〕
+- [x] [Server.combat.md](./../module/Server.combat.md)〔依据 ADR 0002：显式写"不负责装备等级/元素"〕
+- [x] [Server.interact.md](./../module/Server.interact.md)（L1→L2 待定，定级前按 L2）
+
+**待补清单**
+- [ ] 服务端其余模块（`config` / `element` / `map` / `model` / `entity` / `engine` / `player` / `operator` / `damage` / `gamemode` / `storage` / `hal`，见第三节表）
 - [ ] 服务端事件清单与订阅关系图（补第三节 `?` 列）
 
-**过渡纪律（当前 `module.md` 落地 = 1：`ServerCode/net/module.md`）**
-- 未补期间：任何触碰某模块的 PR，必须**同时**补该模块 `module.md`，否则不予合入（"碰到就补，不碰不堵"）。
+**过渡纪律**
+- 未补期间：任何触碰某模块的 PR，必须**同时**补该模块 `docs/module/<Crate>.<module>.md`，否则不予合入（"碰到就补，不碰不堵"）。
 - `L2` 集合以本文件成熟度列为准；标注 `待定` 的模块（`interact`）定级前按 L2 流程处理。
 
 ---

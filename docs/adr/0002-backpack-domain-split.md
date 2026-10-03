@@ -68,10 +68,10 @@
 
 ### 5. 迁移路径（**代码暂停期间只落文档，不实施**）
 
-1. 补 `ServerCode/items/module.md`、`ServerCode/inventory/module.md`、`ServerCode/equipment/module.md`，写明上表。
-2. 在 `inventory/module.md` 的「边界」节显式写"**不负责战局内格位**"。
-3. 在 `equipment/module.md` 的「边界」节显式写"**不负责手持/弹夹**"。
-4. 在 `combat/module.md` 的「边界」节显式写"**不负责装备等级/元素**"。
+1. 补 `docs/module/Server.items.md`、`docs/module/Server.inventory.md`、`docs/module/Server.equipment.md`，写明上表。
+2. 在 `docs/module/Server.inventory.md` 的「边界」节显式写"**不负责战局内格位**"。
+3. 在 `docs/module/Server.equipment.md` 的「边界」节显式写"**不负责手持/弹夹**"。
+4. 在 `docs/module/Server.combat.md` 的「边界」节显式写"**不负责装备等级/元素**"。
 5. 把 `docs/contracts/` 补 `items.yaml`（格位载荷契约），与 `protocol.yaml` 的 `backpack` / `container` 字段对齐。
 6. 上述完成后，才允许在 `items` / `inventory` 上新增代码。
 

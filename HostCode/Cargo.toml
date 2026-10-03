@@ -1,6 +1,6 @@
 [package]
 name = "cute_of_duty_host"
-version = "0.14.0"
+version = "0.14.1"
 edition = "2021"
 license = "GPL-3.0-with-linking-exception"
 authors = ["B站@3493264141322312", "Kimi AI Collaborator"]
@@ -28,6 +28,11 @@ tokio = { version = "1.35", features = ["rt-multi-thread", "time", "macros", "ne
 # 已于 0.12.4 迁移完毕：`NodeBundle`/`PbrBundle`/`Camera3dBundle`/`DirectionalLightBundle`/
 # `PointLightBundle`/`ButtonBundle` 六类弃用 Bundle（91 处构造点 / 17 文件）全部改为
 # required-components 新写法（直接 spawn 组件元组），构建期弃用告警 276 → 0。
+#
+# 0.16 版本（小步升级第二站）：**声明态 · 本轮未实施** —— 依赖仍锁 `0.15`，源码未迁移。
+# 实施时同 0.15 纪律「只迁强制破坏项」，0.16 中"已弃用但仍可编译"的 API 一律不动，仅在此登记：
+#   - `get_single*` / `get_single_mut*` 系列：0.16 起弃用，改名为 `single*`（返回 `Result`）
+#     —— 计划**不迁移**（仍可编译），构建期仅出现对应弃用告警。
 #
 # 注意：不启用 dynamic_linking（bevy_dylib.dll 动态装载）。实测本机 MinGW(GNU)
 # 工具链下 bevy_dylib 链接报 `export ordinal too large: 242786` —— Windows PE 导出

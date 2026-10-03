@@ -157,7 +157,7 @@ cargo-wrap build --release --workspace       # 客户端表现改动（debug 产
 
 | 文档 | 位置 | 必含内容 |
 |---|---|---|
-| `module.md` | **每个模块目录下** | `边界` / `数据所有权` / `接口` / `事件` / `成熟度(L0–L3)` |
+| `module.md` | **`docs/module/<Crate>.<module>.md`**（B 规范；单 crate 取 `lib`，如 `Contract.lib.md`） | `边界` / `数据所有权` / `接口` / `事件` / `成熟度(L0–L3)` |
 | `barek-history.md` | `docs/` | 变更类型 / 兼容性 / 迁移指南；**冻结区**（未验证 / 不许动 / 已确认不动）亦标注于此，标题加「待实机验证」 |
 | 契约 | `docs/contracts/*.yaml` | 机器可读的线格式与跨模块载荷定义 |
 | ADR | `docs/adr/*.md` | 重大决策：背景 / 决策 / 后果 / 未决事项 / 替代方案 |
@@ -169,7 +169,7 @@ cargo-wrap build --release --workspace       # 客户端表现改动（debug 产
 | L2 | 对外契约 | 破坏性变更须迁移指南 + 契约同步 + `y+1` | **≥2 名 reviewer，maintainer 必须参与** |
 | L3 | 冻结 | **只允许加性变更，语义不可改** | 同 L2 |
 
-> **`module.md` 过渡纪律**：仓库现有 `module.md` 数量 = **0**。未补期间，任何触碰某模块的 PR 必须**同时**补上该模块的 `module.md`，否则不予合入（"碰到就补，不碰不堵"）；补全清单见 [module-boundaries 第七节](docs/architecture/module-boundaries.md)。
+> **`module.md` 过渡纪律**：仓库现有 `module.md` 数量 = **14**（统一置于 `docs/module/`）。未补期间，任何触碰某模块的 PR 必须**同时**补上该模块的 `module.md`，否则不予合入（"碰到就补，不碰不堵"）；补全清单见 [module-boundaries 第七节](docs/architecture/module-boundaries.md)。
 > **L2 集合**以 module-boundaries 成熟度列中标记 L2 的模块为准（禁用"等"字兜底）；标 `待定` 的模块（当前 `interact`）在定级前按 L2 流程处理。
 > **单人维护期过渡条款**：仓库当前仅 **1 名登记贡献者**（见 [CLA 签署台账](docs/cla-signatures.md)）——该期间 L2 变更**豁免**上表「≥2 名 reviewer」，由 maintainer **自审**，但必须**同时**满足：① BarekHistory 条目含**迁移指南**；② `docs/contracts/*.yaml` 同步；③ 五道红线全绿且附**可核对凭据**；④ 该次提交/发布记录中**声明为豁免**。出现**第 2 名登记贡献者**后本条款**自动失效**，恢复「≥2 名 reviewer」门槛（届时须回溯复核豁免期内的 L2 变更）。
 

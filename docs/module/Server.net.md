@@ -1,6 +1,6 @@
-# net · module.md
+# Server.net · module.md
 
-> 服务端网络层（`ServerCode/net/`）。分层定位：**基础设施层**。线格式契约（`codec`/`packet`/`protocol`/`resource_stream`/`scheduler`）已于 0.12.2 随 [ADR 0003](../docs/adr/0003-contract-crate.md) 迁至 `cute_of_duty_contract::net`，本模块经 `pub use` 保持 `crate::net::*` 公开路径不变，并只保留**服务端专属编排**。
+> 服务端网络层（`ServerCode/net/`）。分层定位：**基础设施层**。线格式契约（`codec`/`packet`/`protocol`/`resource_stream`/`scheduler`）已于 0.12.2 随 [ADR 0003](../adr/0003-contract-crate.md) 迁至 `cute_of_duty_contract::net`，本模块经 `pub use` 保持 `crate::net::*` 公开路径不变，并只保留**服务端专属编排**。
 
 ## 边界
 
@@ -10,7 +10,7 @@
 - **权威快照构建与分发**：`broadcaster`（`build_snapshot`，含 AOI 过滤）+ `aoi`（兴趣区域剔除）。
 - **AOI 边缘预取**：`prefetch`（按距离÷速度预测即将进入视野的实体，取 6 个）。
 - **主循环阶段编排**：`stages`（消费命令 → 应用到权威世界 → 回执播报，从 `main.rs` 抽出）。
-- **内置 Web 服务**：`web` 子域（HTTP/HTTPS 门户、运维 API、WebSocket 游玩桥，见 [ADR 0007](../docs/adr/0007-native-web-service.md)）。
+- **内置 Web 服务**：`web` 子域（HTTP/HTTPS 门户、运维 API、WebSocket 游玩桥，见 [ADR 0007](../adr/0007-native-web-service.md)）。
 
 **本模块不负责**（明确划出）：
 - 线格式的**类型定义与纯编解码**——归 `ContractCode/net`（`protocol`/`packet`/`codec`/`scheduler`/`resource_stream`）。
@@ -40,7 +40,7 @@
 | `predict_prefetch(...)` | 函数 | 世界 → 预取键集合 | 公开路径稳定 |
 | `WebOpsPort`（`status`/`players`/`announce`/`kick`） | **Trait** | 领域能力 Port，由 `main.rs` 实现（`AuthorityOps`） | 破坏性变更须走 L2 流程 |
 | `web::serve(config, ops, rt)` | 函数 | 装配并拉起 HTTP/HTTPS 监听 | 由 `web::spawn::spawn_web` 调用 |
-| 线格式类型（`ServerMessage`/`ClientMessage`/`PacketHeader`…） | 类型 | 权威见 `ContractCode/net`；本模块 `pub use` | **L2 线格式契约**，见 `docs/contracts/protocol.yaml` |
+| 线格式类型（`ServerMessage`/`ClientMessage`/`PacketHeader`…） | 类型 | 权威见 `ContractCode/net`；本模块 `pub use` | **L2 线格式契约**，见 [protocol.yaml](../contracts/protocol.yaml) |
 
 ## 事件
 
@@ -52,19 +52,19 @@
 | `NetCommand::Disconnect` | 会话 → 主循环 | `{ conn_id }` | 同上 |
 | `ServerMessage::{Handshake, ModelCatalog, PresetCatalog, WorldCatalog, Snapshot, Event, Control}` | 主循环 → 会话 | 契约类型 | 原生客户端 / 浏览器（经 `web` 桥） |
 
-> ⚠️ 本表为 `net` 内部命令/消息流；**服务端跨模块事件清单与订阅关系图**仍属 [module-boundaries 第七节](../docs/architecture/module-boundaries.md) 待补项（`?` 列），补齐前不得把既有直接调用改造成事件。
+> ⚠️ 本表为 `net` 内部命令/消息流；**服务端跨模块事件清单与订阅关系图**仍属 [module-boundaries 第七节](../architecture/module-boundaries.md) 待补项（`?` 列），补齐前不得把既有直接调用改造成事件。
 
 ## 成熟度
 
 **L2（对外契约：被其它 crate / 线格式依赖）** —— 依据：`net` 定义/承载线格式，被 `HostCode` 与 `ContractCode` 依赖。
 
-- 破坏性变更流程：`y+1`（协议不兼容）必附**迁移指南** + `docs/barek-history.md` 条目 + `docs/contracts/protocol.yaml` 同步；**≥2 名 reviewer（maintainer 必须参与）**。
+- 破坏性变更流程：`y+1`（协议不兼容）必附**迁移指南** + [barek-history](../barek-history.md) 条目 + [protocol.yaml](../contracts/protocol.yaml) 同步；**≥2 名 reviewer（maintainer 必须参与）**。
 - 加性/细节变更：`z+1`，老端必须能忽略新字段继续运行（如 0.12.3 内置 Web 服务：**不触碰线格式**，`wire_version` 仍为 12）。
 - 已发生示例：**0.13.0 新增下行变体 `ServerMessage::PresetCatalog`（选装预设目录）→ `y+1`**，`wire_version` 12 → 13，
-  附迁移指南（[BarekHistory 0.13.0](../docs/barek-history.md)）与 [protocol.yaml](../docs/contracts/protocol.yaml) 同步；
+  附迁移指南（[BarekHistory 0.13.0](../barek-history.md)）与 [protocol.yaml](../contracts/protocol.yaml) 同步；
   该消息经控制类数据流（`DataKind::Control` + JSON）承载，包帧结构未变，破坏点仅在新增变体。
 - 已发生示例：**0.14.0 新增下行变体 `ServerMessage::WorldCatalog`（干员名册 + 活动地图布局）→ `y+1`**，`wire_version` 13 → 14，
   由 `net::stages::drain_commands` 的 `Connect` 分支在握手后一次性下发（`crate::operator::roster()` 与
   `crate::map::lawn::layout()`），客户端据此不再直读契约静态表；配套契约类型 serde 化见
-  [BarekHistory 0.14.0](../docs/barek-history.md) 与 [protocol.yaml](../docs/contracts/protocol.yaml)。
+  [BarekHistory 0.14.0](../barek-history.md) 与 [protocol.yaml](../contracts/protocol.yaml)。
 - 线格式权威源当前为**代码**（`ContractCode/net/protocol.rs`）；"YAML 为准、代码由 YAML 校验"的权威源反转列为后续独立任务。

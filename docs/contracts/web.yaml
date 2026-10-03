@@ -127,5 +127,5 @@ websocket:
 related:
   adr: docs/adr/0007-native-web-service.md
   protocol: docs/contracts/protocol.yaml    # transport.carriers 节：websocket 为同一包格式的另一载体
-  module: ServerCode/net/module.md
+  module: docs/module/Server.net.md
   barek_history: docs/barek-history.md

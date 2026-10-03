@@ -80,7 +80,7 @@ impl ModalState {
 
 ## 迁移路径（**文档先行阶段不实施**）
 
-1. 在 `HostCode/flow/` 新增 `ModalState`（所有者）与其订阅系统；在 `flow/module.md` 写明所有权。
+1. 在 `HostCode/flow/` 新增 `ModalState`（所有者）与其订阅系统；在 `docs/module/Host.flow.md` 写明所有权。
 2. 在 `docs/architecture/module-boundaries.md` 第六节登记事件：`menu.modal_opened` / `menu.modal_closed` / `hud.modal_opened` / `hud.modal_closed`，载荷 `ModalKind`。
 3. `menu` / `hud` 各面板的开关点改为发事件（不再直接改自己的 `open` 供他模块读）。
 4. `hud_bigmap.rs` 的 `gameplay_input_active` 改为读 `ModalState::blocks_gameplay_input()`，删除 `use crate::menu::PauseMenu`。
@@ -96,7 +96,7 @@ impl ModalState {
 - 与 ADR 0003 配合后，客户端形成 `launcher（装配）→ 各模块 → contract` 的清晰单向图。
 
 **代价**
-- `ModalState` 成为新的**热点资源**：必须在 `flow/module.md` 明确"只允许 `flow` 写"。
+- `ModalState` 成为新的**热点资源**：必须在 `docs/module/Host.flow.md` 明确"只允许 `flow` 写"。
 - 搬迁期间 `launcher` 与 `world`/`hud` 会短暂同时持有相关代码，需一次性搬完避免双份。
 
 ## 未决事项（Open Questions）
