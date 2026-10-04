@@ -333,10 +333,10 @@ TCP 的可靠传输更好保障**元素状态、技能效果、背包交互**等
 | 3 | **跟进 OpenWRC**（对比 EA WRC 更容易上手） | 跟进中 | — |
 | 4 | **借鉴明日方舟式角色模式**（目标：进入游戏即大世界场景） | 跟进中 | — |
 | 5 | **三角形区域光线追踪着色器套件**（像素风专属区域光照：区域阴影 / 区域 AO / 低精度反射 / 简单间接光；WGSL 单源并入 Bevy/wgpu，剔除 DX11） | **已采纳 · 计划中**（目标 `0.15.0`） | [计划 0001](docs/plans/0001-区域光照着色器套件.md) · [ADR 0008](docs/adr/0008-triangle-region-radiance.md) |
-| 6 | **自研优秀 Rust 编译器**：以 RustJ 参考为起点，改造为**能真正进入 Rust 项目/生态**的编译器 —— 规避原案 Java + GPLv3 硬伤（改 MIT/Apache 双许可、原生实现）、面向**真实 Rust 工程**实际可编译、统一缓存与内存预算、单文件分发体验 | 未做（自 `0.14.1` 采纳） | — |
+| 6 | **自研优秀 Rust 编译器（RustJ）**：以 RustJ 参考为起点，改造成**能真正进入真实 Rust 项目**的编译器 —— **保留 Java + JVM/ZGC 原案**（一套内存管理代码全架构通吃）、**GPLv3**、单个 `RustJ.jar` 分发（`java -Xms1G -Xmx4G -RJT=16 RustJ.jar`，产物入 `./RustJ/`）、统一缓存块与自适应内存预算；以**真实工程三期递进**为验收靶 | 设计中（自 `0.14.1` 采纳） | [计划 0003](docs/plans/0003-RustJ编译器.md) |
 
 > 第 5 条为本次新采纳，**目前只有设计文档、尚无代码**；其落地属**协议不兼容**变更（`y+1`），实现时按发布五件套正式发布。
-> 第 6 条为本次新采纳，**仅作路线图定位，暂无设计文档与代码**；实现路径为长期项，不阻塞游戏主线。
+> 第 6 条为本次新采纳，**已补设计文档（[计划 0003](docs/plans/0003-RustJ编译器.md)）、尚无代码**；实现路径为长期项，不阻塞游戏主线。
 
 ---
 
@@ -350,6 +350,7 @@ TCP 的可靠传输更好保障**元素状态、技能效果、背包交互**等
 - **架构与契约**
   - [模块边界总览](docs/architecture/module-boundaries.md) / [ADR 0001–0008](docs/adr/)
   - [计划 0001 · 区域光照着色器套件](docs/plans/0001-区域光照着色器套件.md) —— 已采纳未来形态第 5 条的设计文档
+  - [计划 0003 · RustJ 编译器](docs/plans/0003-RustJ编译器.md) —— 已采纳未来形态第 6 条的设计文档
   - [线格式契约 protocol.yaml](docs/contracts/protocol.yaml) / [Web 服务契约 web.yaml](docs/contracts/web.yaml) / [BarekHistory 变更台账](docs/barek-history.md)（冻结区已并入其中：改了但未验证的改动直接写入 BarekHistory 条目并标注「待实机验证」）
 - **AI 协作工作流**：`.agents/skills/`（[改动前拷问](.agents/skills/plan-interrogation/) / [游戏美术创作](.agents/skills/game-art-creation/) / [地图建模验收](.agents/skills/map-acceptance/) / [合规交付](.agents/skills/compliant-delivery/)）
 
