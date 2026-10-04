@@ -8,7 +8,7 @@
 - **连接装配与重连**：`network`——同端口建**控制**（恒 256B）与**资源**（恒 4096B）双 TCP 连接，各首发角色绑定包；失败无限重连（间隔 2s，容忍先开客户端）。
 - **下行消费**：`downlink`——控制下行线程（快照 / 控制消息 / Ping-Pong 打点）与资源下行线程（按 `key` 跨 4096B 包重组落池）。
 - **上行意图**：`uplink`（线程侧发包 + Ping 打点）、`pilot`（`input_system`：把按键/视角折成 `PlayerInput`，仅在与上一帧不同才发）。
-- **快照对账渲染**：`snapshot`——把 `EntitySnapshot` 映射为体素造型（更新坐标 / 生成缺失 / 递归销毁消失），按 `ModelPreset`+`tint` 缓存材质（防材质单调累积）。
+- **快照对账渲染**：`snapshot`——把 `EntitySnapshot` 映射为体素造型（更新坐标 / 生成缺失 / 递归销毁消失；0.16 起由 `despawn()` 统一递归），按 `ModelPreset`+`tint` 缓存材质（防材质单调累积）。
 - **远程资源对象池**：`remote`——固定 16MB · 256×64KB 固定地址槽（在位 250 + 预取 6），资源按 `key` 落槽、实体突现即复用；增量同步进 `flow::ModelCatalog`。
 - **延迟面板**：`latency`——CapsLock 显隐；显示握手耗时 + 常态 RTT（均由网络线程打点，不含 Bevy 帧时间）。
 
