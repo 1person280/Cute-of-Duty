@@ -50,7 +50,7 @@ const BLINK_HZ: f32 = 3.0;
 const AMMO_ALERT: Color = Color::srgb(0.95, 0.25, 0.20);
 
 /// 装配右下武器/弹药面板 + 顶部公告流。
-pub fn spawn_skills(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
+pub fn spawn_skills(p: &mut ChildSpawnerCommands<'_>, fonts: &CjkFont) {
     p.spawn((
         Node {
             position_type: PositionType::Absolute,
@@ -129,7 +129,7 @@ pub fn spawn_skills(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
 }
 
 /// 单个武器槽：方形键位徽标 + 槽内武器名。
-fn spawn_weapon_slot(row: &mut ChildBuilder<'_>, fonts: &CjkFont, slot: u8, name: &str) {
+fn spawn_weapon_slot(row: &mut ChildSpawnerCommands<'_>, fonts: &CjkFont, slot: u8, name: &str) {
     row.spawn((
         Node {
             flex_direction: FlexDirection::Row,

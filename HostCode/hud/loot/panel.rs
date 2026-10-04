@@ -1,4 +1,4 @@
-﻿//! HUD 格位搬运面板（统一形态）：**左「来源」右「背包」两个 4×3 网格 + 鼠标拖拽 / Shift 快捷**
+//! HUD 格位搬运面板（统一形态）：**左「来源」右「背包」两个 4×3 网格 + 鼠标拖拽 / Shift 快捷**
 //!
 //! 设计动机（Why）：物资箱与补给台此前是两套别扭的操作（键盘逐格搬运 / 二级选项菜单）。
 //! 0.6-Snapshot-9 统一为**与仓库选装完全一致**的形态（见 `menu/arsenal/`）：
@@ -105,7 +105,7 @@ pub struct LootGhost;
 pub struct LootGhostText;
 
 /// 装配格位搬运面板（标题 + 两个 4×3 网格 + 操作提示，默认隐藏）。
-pub fn spawn_loot_panel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
+pub fn spawn_loot_panel(p: &mut ChildSpawnerCommands<'_>, fonts: &CjkFont) {
     p.spawn((
         LootPanelRoot,
         (
@@ -170,7 +170,7 @@ pub fn spawn_loot_panel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
 }
 
 /// 生成一侧网格（标题 + `GRID_ROWS × GRID_COLS` 格位；网格容器本身是拖拽落区）。
-fn spawn_grid(cols: &mut ChildBuilder<'_>, fonts: &CjkFont, side: u8, title: &str) {
+fn spawn_grid(cols: &mut ChildSpawnerCommands<'_>, fonts: &CjkFont, side: u8, title: &str) {
     cols.spawn(Node {
         flex_direction: FlexDirection::Column,
         row_gap: Val::Px(8.0),

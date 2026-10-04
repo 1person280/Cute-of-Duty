@@ -123,7 +123,7 @@ pub fn sync_interact_menu(
     let Ok(list_entity) = list.get_single() else {
         return;
     };
-    commands.entity(list_entity).despawn_descendants();
+    commands.entity(list_entity).despawn_related::<Children>();
     for (i, opt) in state.options.iter().enumerate() {
         let selected = i == state.option_selected;
         let label = opt.label.clone();

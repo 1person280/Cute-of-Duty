@@ -495,7 +495,7 @@ pub fn spawn_menu(
 
 /// 右下角/底部小号操作按钮：居中单行标签，构建即挂 `Interaction`（悬停样式统一）。
 pub fn spawn_action_button(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     fonts: &CjkFont,
     label: &str,
     width: f32,

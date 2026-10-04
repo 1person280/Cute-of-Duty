@@ -28,7 +28,7 @@ pub struct SettingValueText(pub SettingKind);
 
 /// 设置行：标签 + ◀ 值 ▶。
 pub fn spawn_setting_row(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     fonts: &CjkFont,
     settings: &GameSettings,
     kind: SettingKind,
@@ -77,7 +77,7 @@ pub fn spawn_setting_row(
 
 /// 步进按钮：构建即挂 `Interaction`，命中经 `main_menu_behaviour` 修改设置值。
 pub fn spawn_step_button(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     fonts: &CjkFont,
     glyph: &str,
     kind: SettingKind,
@@ -109,7 +109,7 @@ pub fn spawn_step_button(
 }
 
 /// 开源代码鸣谢面板：逐条列出核心开源库及其用途（与 v0.3.2 一致）。
-pub fn spawn_credits_panel(parent: &mut ChildBuilder, fonts: &CjkFont) {
+pub fn spawn_credits_panel(parent: &mut ChildSpawnerCommands, fonts: &CjkFont) {
     /// (库名 · 版本, 一句话说明"是什么、用在哪")。
     const CREDITS: &[(&str, &str)] = &[
         ("Bevy 0.14", "3D 游戏引擎（MIT / Apache-2.0）—— 渲染、输入、UI、ECS 场景调度"),

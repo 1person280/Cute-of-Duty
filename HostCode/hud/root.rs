@@ -73,7 +73,7 @@ pub fn spawn_hud(
 }
 
 /// 撤离引导：顶部中央的距离/提示文本；另加一块入区后闪烁的居中大字提示。
-fn spawn_extract_label(p: &mut ChildBuilder, fonts: &CjkFont) {
+fn spawn_extract_label(p: &mut ChildSpawnerCommands, fonts: &CjkFont) {
     p.spawn((
         ExtractLabel,
         Node {

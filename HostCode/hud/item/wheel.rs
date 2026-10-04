@@ -109,7 +109,7 @@ pub struct ItemWheelCenterText;
 pub struct ItemWheelKeyText;
 
 /// 装配径向轮盘（整屏遮罩 + 顶部键位提示 + 中心卡片 + N 个扇区卡片，默认隐藏）。
-pub fn spawn_item_wheel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
+pub fn spawn_item_wheel(p: &mut ChildSpawnerCommands<'_>, fonts: &CjkFont) {
     p.spawn((
         ItemWheelRoot,
         Node {

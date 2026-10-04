@@ -32,7 +32,7 @@ const ALERT_RED: (f32, f32, f32) = (0.85, 0.08, 0.08);
 const LAYERS: [(f32, f32); 3] = [(72.0, 0.30), (44.0, 0.62), (18.0, 1.0)];
 
 /// 装配三层边缘光（默认全透明；低血时由 `update_alert` 点亮）。
-pub fn spawn_alert_overlay(p: &mut ChildBuilder<'_>) {
+pub fn spawn_alert_overlay(p: &mut ChildSpawnerCommands<'_>) {
     for (width, weight) in LAYERS {
         p.spawn((
             HudEdgeGlow { weight },

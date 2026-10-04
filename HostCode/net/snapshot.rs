@@ -138,7 +138,7 @@ pub fn apply_entities(
             let is_local = local.entity_id != 0 && rendered.id == local.entity_id;
             let has_spec = catalog.models.iter().any(|m| m.preset == entry.model_preset);
             if is_local && voxel.is_none() && has_spec {
-                commands.entity(entity).despawn_recursive();
+                commands.entity(entity).despawn();
                 continue; // 不入 local_ids → 下一步按体素模型重新生成
             }
         }
@@ -167,7 +167,7 @@ pub fn apply_entities(
             // 必须**递归**销毁：造型根下挂着躯干/头部子方块，bevy 0.14 的 `despawn()`
             // 是非递归的（`EntityCommands::despawn` 只删单个实体、且不动父子关系），
             // 用它会把子方块留成"孤儿"——既永远停在旧坐标变成幽灵，又让父级引用悬空。
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
     }
 }

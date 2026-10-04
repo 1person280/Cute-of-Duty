@@ -121,7 +121,7 @@ pub struct InteractMenuList;
 pub struct InteractOptionIndex(pub usize);
 
 /// 装配就近交互列表（**常显小面板**，无附近目标时隐藏）与站点二级选项面板（默认隐藏）。
-pub fn spawn_interact_ui(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
+pub fn spawn_interact_ui(p: &mut ChildSpawnerCommands<'_>, fonts: &CjkFont) {
     // ---- 就近列表：小面板贴在准星右下侧，**不铺满全屏、不加整屏遮罩**（避免常显时糊住画面） ----
     p.spawn((
         InteractPanel,

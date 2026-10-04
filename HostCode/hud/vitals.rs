@@ -69,7 +69,7 @@ const ARMOR_BLUE: Color = Color::srgb(0.25, 0.55, 0.95);
 const SKILL_CD_FILL: Color = Color::srgba(1.0, 0.72, 0.2, 0.55);
 
 /// 装配 vitals 面板（左下角：干员名 → HP 180×22 → 护甲 140×10 → Q/E 图标 → 道具槽）。
-pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
+pub fn spawn_vitals(p: &mut ChildSpawnerCommands<'_>, fonts: &CjkFont) {
     p.spawn((
         Node {
             position_type: PositionType::Absolute,
@@ -204,7 +204,7 @@ pub fn spawn_vitals(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
 
 /// 单个技能图标：面板底 + 自下而上的冷却填充 + 中央读数 + 底部键位标签。
 fn spawn_skill_icon(
-    row: &mut ChildBuilder<'_>,
+    row: &mut ChildSpawnerCommands<'_>,
     fonts: &CjkFont,
     key: &str,
     bar: VitalsBar,

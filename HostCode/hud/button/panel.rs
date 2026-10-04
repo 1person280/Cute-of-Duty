@@ -98,7 +98,7 @@ const BTN_W: f32 = 132.0;
 const BTN_H: f32 = 46.0;
 
 /// 装配按钮面板（整屏遮罩 + 标题 + 自动换行的按钮组，默认隐藏）。
-pub fn spawn_button_panel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
+pub fn spawn_button_panel(p: &mut ChildSpawnerCommands<'_>, fonts: &CjkFont) {
     p.spawn((
         ButtonPanelRoot,
         (
@@ -165,7 +165,7 @@ const BUTTONS: &[(ButtonKind, &str)] = &[
 ];
 
 /// 生成单个可点击按钮。
-fn spawn_button(p: &mut ChildBuilder<'_>, fonts: &CjkFont, kind: ButtonKind, label: &str) {
+fn spawn_button(p: &mut ChildSpawnerCommands<'_>, fonts: &CjkFont, kind: ButtonKind, label: &str) {
     p.spawn((
         kind,
         Interaction::default(),

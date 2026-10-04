@@ -30,6 +30,8 @@ pub fn spawn_scene_baseline(mut commands: Commands, mut meshes: ResMut<Assets<Me
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
         brightness: 0.55,
+        // 0.16 新增字段：本世界无光照贴图网格，取默认 true 保持既有全局环境光语义。
+        affects_lightmapped_meshes: true,
     });
 }
 

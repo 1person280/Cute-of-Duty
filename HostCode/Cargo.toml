@@ -29,8 +29,11 @@ tokio = { version = "1.35", features = ["rt-multi-thread", "time", "macros", "ne
 # `PointLightBundle`/`ButtonBundle` 六类弃用 Bundle（91 处构造点 / 17 文件）全部改为
 # required-components 新写法（直接 spawn 组件元组），构建期弃用告警 276 → 0。
 #
-# 0.16 版本（小步升级第二站）：**声明态 · 本轮未实施** —— 依赖仍锁 `0.15`，源码未迁移。
-# 实施时同 0.15 纪律「只迁强制破坏项」，0.16 中"已弃用但仍可编译"的 API 一律不动，仅在此登记：
+# 0.16 版本（小步升级第二站）：**已实施**（计划 0002）—— 依赖锁 `0.16`，仅迁强制破坏项：
+#   - `ChildBuilder` → `ChildSpawnerCommands`（类型改名）
+#   - `despawn_recursive()` → `despawn()`（0.16 起 despawn 已递归）
+#   - `despawn_descendants()` → `despawn_related::<Children>()`（掏空子级）
+# 0.16 中"已弃用但仍可编译"的 API 一律不动，仅在此登记：
 #   - `get_single*` / `get_single_mut*` 系列：0.16 起弃用，改名为 `single*`（返回 `Result`）
 #     —— 计划**不迁移**（仍可编译），构建期仅出现对应弃用告警。
 #
@@ -38,7 +41,7 @@ tokio = { version = "1.35", features = ["rt-multi-thread", "time", "macros", "ne
 # 工具链下 bevy_dylib 链接报 `export ordinal too large: 242786` —— Windows PE 导出
 # 序数 16 位上限 65535，而 bevy 导出的全部符号约 24 万超出该硬限制。此路需 MSVC
 # 工具链才能走通，故按预案回退为静态链接；launcher 模块收敛目标不受影响。
-bevy = { version = "0.15" }
+bevy = { version = "0.16" }
 
 [[bin]]
 name = "cod1"

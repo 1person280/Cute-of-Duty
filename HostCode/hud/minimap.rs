@@ -39,7 +39,7 @@ const MAP_CENTER: f32 = MAP_BORDER + MAP_INNER * 0.5;
 #[derive(Component)]
 pub struct MinimapLayer;
 
-/// 动态实体点容器（每帧被 `despawn_descendants` 掏空重建）。
+/// 动态实体点容器（每帧被 `despawn_related::<Children>()` 掏空重建）。
 #[derive(Component)]
 pub struct MinimapDots;
 
@@ -121,7 +121,7 @@ fn station_color(kind: StationKind) -> Color {
 }
 
 /// 装配小地图（罗盘条 + 方形局部图 + 静态掩体/站点 + 居中玩家标记）。
-pub fn spawn_minimap(p: &mut ChildBuilder<'_>, fonts: &CjkFont, layout: &MapLayout) {
+pub fn spawn_minimap(p: &mut ChildSpawnerCommands<'_>, fonts: &CjkFont, layout: &MapLayout) {
 
     // ---- 罗盘条：刻度滚动，中央指针 + 读数固定 ----
     p.spawn((
@@ -338,9 +338,9 @@ type StaticsQuery<'w, 's> = Query<
 
 /// 每帧更新：罗盘滚动 + 方位读数 + 静态层重投影 + 玩家标记旋转 + 动态实体点重建。
 ///
-/// 清空动态点用 [`DespawnRecursiveExt::despawn_descendants`]（一次性掏空 `MinimapDots`
-/// 容器）而非逐点 `despawn`：bevy 0.14 单实体 `despawn` 不维护父子关系，被杀的点仍留在
-/// `Children` 列表里，每帧累积成百上千失效 ID，最终递归销毁 HUD 树时刷屏 `error[B0003]`。
+/// 清空动态点用 `despawn_related::<Children>()`（一次性掏空 `MinimapDots`
+/// 容器）而非逐点 `despawn`：0.16 起父子关系由 ECS 统一维护（`Children` 关系），
+/// 经关系一次性清空，避免逐点删除留下失效 ID 累积。
 #[allow(clippy::type_complexity)]
 pub fn update_minimap(
     mut commands: Commands,
@@ -401,7 +401,7 @@ pub fn update_minimap(
     let Ok(container) = layer.get_single() else {
         return;
     };
-    commands.entity(container).despawn_descendants();
+    commands.entity(container).despawn_related::<Children>();
     commands.entity(container).with_children(|p| {
         for e in &snap.current {
             let px = project(e.x, cx);

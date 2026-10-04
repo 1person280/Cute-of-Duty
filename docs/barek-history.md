@@ -24,14 +24,14 @@
 
 ---
 
-## [0.14.1] · 2026-10-03 · 文档大扫除（`module.md` 规范化 + Bevy 0.16 声明）
+## [0.14.1] · 2026-10-03 · 文档大扫除（`module.md` 规范化 + Bevy 0.16 迁移）
 
-- **变更类型**：Refactor（**仅文档 / 规范 + 版本号**，**未改任何代码**；不触碰线格式）
+- **变更类型**：Refactor（文档 / 规范 + 版本号 + **Bevy 0.15 → 0.16 源码迁移**；不触碰线格式）
 - **影响模块**：文档层 + 仓库门面 —— 新建 `docs/module/`（14 份模块文档）；
   `docs/architecture/module-boundaries.md`（第七节改写为 B 规范）；`CONTRIBUTING.md`（文档表位置 + 过渡纪律数量）；
   `README.md`（技术栈版本声明 + 版本表 `0.14.1` 行）；`docs/contracts/web.yaml`（`related.module` 改指新路径）；
   `docs/plans/0001-区域光照着色器套件.md`、`docs/adr/0002`·`0004`·`0008`（旧 `module.md` 路径改指 `docs/module/`；Bevy 引用同步）；
-  `HostCode/Cargo.toml`（Bevy 0.16 声明注记）；三端 `Cargo.toml`（版本 `0.14.0` → `0.14.1`）。
+  `HostCode/Cargo.toml`（Bevy `0.15` → `0.16`）；18 份 `HostCode` `.rs`（0.16 强制项迁移）；三端 `Cargo.toml`（版本 `0.14.0` → `0.14.1`）。
 - **兼容性**：**兼容**（`z+1`）—— 不触碰线格式 / 配置语义 / 公共 Trait；`wire_version` 仍为 **14**，
   双端 `0.14.1` 与 `0.14.0` 的互通关系不变。
 - **迁移指南**：不适用（非协议不兼容）。
@@ -44,15 +44,21 @@
       ADR 0002 / 0004 / 0008、本文件 `0.14.0` / `0.12.3` 条目）。
     - `module-boundaries.md` 第七节改写为 B 规范（位置说明 + 模板 + 已完成 14 项清单 + 待补清单）。
     - `CONTRIBUTING.md` 第八节文档表 `module.md` 位置改为 `docs/module/<Crate>.<module>.md`；过渡纪律数量 **0 → 14**。
-  - **② Bevy 0.16 版本声明（声明态 · 源码迁移本轮未实施）**
-    - README / `module-boundaries` / `plan 0001` / ADR 0008 中静态写死的「Bevy 0.15」同步为 **「Bevy 0.16」**，
-      并就地加注「**迁移未实施 · 当前基线 0.15**」。
-    - `HostCode/Cargo.toml`：`bevy` 依赖**仍锁 `0.15`**（未迁移）；注释登记 0.16 迁移的弃用清单
-      （`get_single*` / `get_single_mut*` → `single*`，**计划不迁移**）。
-    - **0.16 源码迁移未实施** —— 本机**无 `cargo-wrap`**（`tools/` 下无源码，PATH / Desktop / `.cargo` 均无 `cargo-wrap.exe`），
-      故**未跑任何编译验证**。待该迁移实施后，`0.14.1` 方为「**完全体**」。
-- **验证**：**纯文档 / 版本号变更，不涉 `.rs` / 线格式 / 契约语义，故未跑编译**；`git status` 仅含文档 + 三端 `Cargo.toml` 版本号；
-  Markdown 相对链接逐条核对可达。
+  - **② Bevy 0.16 迁移（已实施 · 编译验证通过）**
+    - README / `module-boundaries` / `plan 0001` / ADR 0008 中静态写死的「Bevy 0.15」同步为 **「Bevy 0.16」**
+      （原「迁移未实施 · 当前基线 0.15」注记已在本版清除）。
+    - `HostCode/Cargo.toml`：`bevy` 依赖 `0.15` → **`0.16`**；注释保留弃用清单
+      （`get_single*` / `get_single_mut*` → `single*`，**仍计划不迁移**）。
+    - **仅迁「编译不过」的强制破坏项**（以 `cargo check` 报错为唯一权威）：`ChildBuilder` →
+      `ChildSpawnerCommands`（24 处 / 18 文件）、`despawn_recursive()` → `despawn()`（5 处）、
+      `despawn_descendants()` → `despawn_related::<Children>()`（2 处）、`AmbientLight` 新增字段
+      `affects_lightmapped_meshes`（1 处）。
+    - `despawn_recursive` 实测仅为**弃用告警**（非强制），按计划顺手迁移以消除告警；`get_single*`
+      弃用告警仍保留（不动）。
+    - **验证偏离**：本机**无 `cargo-wrap`**（`tools/` 下无源码，PATH / Desktop / `.cargo` 均无 `cargo-wrap.exe`），
+      经 owner 确认，**以裸 `cargo` 过渡**执行验证（见「验证」）。
+- **验证**：`cargo check --workspace --all-targets`（**裸 `cargo` 过渡**，无 `cargo-wrap`）→ **退出码 0**、0 error；
+  余 `get_single*` 弃用告警为计划内不迁项。release 构建归发布闸门。Markdown 相对链接逐条核对可达。
 - **关联**：[module-boundaries 第七节](architecture/module-boundaries.md)、[`docs/module/`](module/)、[README](../README.md)。
 
 ---

@@ -35,7 +35,7 @@ fn cell_style() -> Node {
 }
 
 /// 预设按钮：点击后以服务端下发目录的第 `index` 套预设覆盖携带清单（内容归服务端权威）。
-fn spawn_preset_button(parent: &mut ChildBuilder, fonts: &CjkFont, index: usize, label: &str) {
+fn spawn_preset_button(parent: &mut ChildSpawnerCommands, fonts: &CjkFont, index: usize, label: &str) {
     parent
         .spawn((
             PresetButton { index },

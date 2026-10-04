@@ -63,7 +63,7 @@ pub struct BpAmmoText;
 pub struct BpHintText;
 
 /// 装配背包面板（标题 + 左「武器/弹药」右「4×3 补给品」+ 操作提示，默认隐藏）。
-pub fn spawn_backpack_panel(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
+pub fn spawn_backpack_panel(p: &mut ChildSpawnerCommands<'_>, fonts: &CjkFont) {
     p.spawn((
         BackpackPanelRoot,
         (

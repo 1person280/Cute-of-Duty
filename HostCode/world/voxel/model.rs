@@ -170,7 +170,7 @@ pub fn spawn_voxel_body(
 
 /// 递归构建一根骨（枢轴实体 + 所属盒 + 子骨）。
 fn build_bone(
-    parent: &mut ChildBuilder,
+    parent: &mut ChildSpawnerCommands,
     bone: &VoxelBone,
     bones: &[VoxelBone],
     s: f32,

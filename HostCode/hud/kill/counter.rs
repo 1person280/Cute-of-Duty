@@ -14,7 +14,7 @@ use crate::shared::theme;
 pub struct KillCounterText;
 
 /// 装配击杀计数（右上，旧版 `top:14,right:16`）。
-pub fn spawn_kill_counter(p: &mut ChildBuilder<'_>, fonts: &CjkFont, count: &KillCount) {
+pub fn spawn_kill_counter(p: &mut ChildSpawnerCommands<'_>, fonts: &CjkFont, count: &KillCount) {
     p.spawn((
         KillCounterText,
         (

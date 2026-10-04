@@ -40,7 +40,7 @@ pub fn update_crosshair(rig: Res<AimRig>, mut bars: Query<&mut BackgroundColor, 
 }
 
 /// 装配白色十字准星（全屏居中零尺寸锚点 + 绝对定位四线/点）。
-pub fn spawn_crosshair(p: &mut ChildBuilder<'_>) {
+pub fn spawn_crosshair(p: &mut ChildSpawnerCommands<'_>) {
     p.spawn((
         CrosshairRoot,
         Node {

@@ -91,8 +91,8 @@ pub fn pause_toggle(
         _ => {
             *pause = PauseMenu::Closed;
             if let Some(ui) = ui {
-                // bevy 0.14 `despawn()` 不递归，UI 树必须 `despawn_recursive`。
-                commands.entity(ui.root).despawn_recursive();
+                // 0.16 起 `despawn()` 已自动递归，直接 `despawn` 即可（原 `despawn_recursive` 已弃用）。
+                commands.entity(ui.root).despawn();
                 commands.remove_resource::<PauseMenuUi>();
                 commands.remove_resource::<PauseGrace>();
             }
@@ -241,7 +241,7 @@ pub fn pause_menu_interaction(
             PauseAction::Resume => {
                 *pause = PauseMenu::Closed;
                 if let Some(ui) = ui.as_ref() {
-                    commands.entity(ui.root).despawn_recursive();
+                    commands.entity(ui.root).despawn();
                     commands.remove_resource::<PauseMenuUi>();
                     commands.remove_resource::<PauseGrace>();
                 }
@@ -393,7 +393,7 @@ pub fn teardown_pause(
     // 复位「无 UI 时释放鼠标」的软开关，避免把上一局的交还状态带到下一局。
     released.0 = false;
     if let Some(ui) = ui {
-        commands.entity(ui.root).despawn_recursive();
+        commands.entity(ui.root).despawn();
     }
     commands.remove_resource::<PauseMenuUi>();
     commands.remove_resource::<PauseGrace>();

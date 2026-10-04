@@ -101,7 +101,7 @@ fn station_color(kind: StationKind) -> Color {
 }
 
 /// 装配全景图整屏覆盖层（默认隐藏；静态内容一次摆位）。
-pub fn spawn_bigmap(p: &mut ChildBuilder<'_>, fonts: &CjkFont, layout: &MapLayout) {
+pub fn spawn_bigmap(p: &mut ChildSpawnerCommands<'_>, fonts: &CjkFont, layout: &MapLayout) {
     let half = layout.half_extent;
 
     p.spawn((

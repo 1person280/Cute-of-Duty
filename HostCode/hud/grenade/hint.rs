@@ -1,4 +1,4 @@
-﻿//! 持雷提示（HUD）：按本人快照 `held_grenade` 派生「手持手雷 — 左键投掷 · Esc 取消」。
+//! 持雷提示（HUD）：按本人快照 `held_grenade` 派生「手持手雷 — 左键投掷 · Esc 取消」。
 //!
 //! 设计动机（Why）：手雷采用 legacy「先瞄准后释放」流程——服务端把取出后的手雷置入
 //! **持握态**（快照字段 `held_grenade`），此时左键=投掷、Esc=取消放回。玩家必须有明确
@@ -33,7 +33,7 @@ pub struct HeldGrenadeState {
 pub struct GrenadeHintRoot;
 
 /// 装配持雷提示（屏幕下方居中，默认隐藏；显隐由 [`sync_held_grenade`] 派生）。
-pub fn spawn_grenade_hint(p: &mut ChildBuilder<'_>, fonts: &CjkFont) {
+pub fn spawn_grenade_hint(p: &mut ChildSpawnerCommands<'_>, fonts: &CjkFont) {
     p.spawn((
         GrenadeHintRoot,
         (
