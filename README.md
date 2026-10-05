@@ -333,7 +333,7 @@ TCP 的可靠传输更好保障**元素状态、技能效果、背包交互**等
 | 3 | **跟进 OpenWRC**（对比 EA WRC 更容易上手） | 跟进中 | — |
 | 4 | **借鉴明日方舟式角色模式**（目标：进入游戏即大世界场景） | 跟进中 | — |
 | 5 | **三角形区域光线追踪着色器套件**（像素风专属区域光照：区域阴影 / 区域 AO / 低精度反射 / 简单间接光；WGSL 单源并入 Bevy/wgpu，剔除 DX11） | **已采纳 · 计划中**（目标 `0.15.0`） | [计划 0001](docs/plans/0001-区域光照着色器套件.md) · [ADR 0008](docs/adr/0008-triangle-region-radiance.md) |
-| 6 | **自研优秀 Rust 编译器（RustJ）**：以 RustJ 参考为起点，改造成**能真正进入真实 Rust 项目**的编译器 —— **保留 Java + JVM/ZGC 原案**（一套内存管理代码全架构通吃）、**GPLv3**、单个 `RustJ.jar` 分发（仓库根 `./RustJ.jar`，产物入 `./RustJ/out/`）、统一缓存块与自适应内存预算；以**真实工程三期递进**为验收靶 | **实现中 · 一期 hello 闭环已实现**（自 `0.14.1` 采纳） | [计划 0003](docs/plans/0003-RustJ编译器.md) |
+| 6 | **自研优秀 Rust 编译器（RustJ）**：以 RustJ 参考为起点，改造成**能真正进入真实 Rust 项目**的编译器 —— **保留 Java + JVM/ZGC 原案**（一套内存管理代码全架构通吃）、**GPLv3**、单个 `RustJ.jar` 分发（仓库根 `./RustJ.jar`，产物入 `./RustJ/out/`）、统一缓存块与自适应内存预算；以**真实工程三期递进**为验收靶 | **实现中 · 二期 2b.3 已实现**（一期 hello 闭环 + 二期最小原生链路 / 算术 / 控制流；自 `0.14.1` 采纳） | [计划 0003](docs/plans/0003-RustJ编译器.md) · [计划 0004](docs/plans/0004-RustJ二期实现.md) · 详见〈九、RustJ 编译器〉 |
 
 > 第 5 条为本次新采纳，**目前只有设计文档、尚无代码**；其落地属**协议不兼容**变更（`y+1`），实现时按发布五件套正式发布。
 > 第 6 条为本次新采纳，**一期 hello 闭环已实现**（原型源码 [`RustJCode/main.java`](RustJCode/main.java)，编译器产物根 `./RustJ.jar`，运行产物 `./RustJ/out/`）；二期起仍为长期项，不阻塞游戏主线。
@@ -350,7 +350,8 @@ TCP 的可靠传输更好保障**元素状态、技能效果、背包交互**等
 - **架构与契约**
   - [模块边界总览](docs/architecture/module-boundaries.md) / [ADR 0001–0008](docs/adr/)
   - [计划 0001 · 区域光照着色器套件](docs/plans/0001-区域光照着色器套件.md) —— 已采纳未来形态第 5 条的设计文档
-  - [计划 0003 · RustJ 编译器](docs/plans/0003-RustJ编译器.md) —— 已采纳未来形态第 6 条的设计文档
+  - [计划 0003 · RustJ 编译器](docs/plans/0003-RustJ编译器.md) —— 已采纳未来形态第 6 条的设计文档（上游定位 / 分发 / 分期）
+  - [计划 0004 · RustJ 二期实现](docs/plans/0004-RustJ二期实现.md) —— 二期「最小原生链路」落地计划与进度（详见〈九、RustJ 编译器〉）
   - [线格式契约 protocol.yaml](docs/contracts/protocol.yaml) / [Web 服务契约 web.yaml](docs/contracts/web.yaml) / [BarekHistory 变更台账](docs/barek-history.md)（冻结区已并入其中：改了但未验证的改动直接写入 BarekHistory 条目并标注「待实机验证」）
 - **AI 协作工作流**：`.agents/skills/`（[改动前拷问](.agents/skills/plan-interrogation/) / [游戏美术创作](.agents/skills/game-art-creation/) / [地图建模验收](.agents/skills/map-acceptance/) / [合规交付](.agents/skills/compliant-delivery/)）
 
@@ -376,6 +377,82 @@ TCP 的可靠传输更好保障**元素状态、技能效果、背包交互**等
 - **底层冻结红线（2026-09-25 起生效，2026-09-29 修订为「小步升级」）**：仍**禁止一次性大跳**——曾把 bevy 直接升到 0.19，因大量 API 变动与稳定性问题回退到 0.14。自 `0.12.1` 起改为**逐个小版本推进**（`0.14 → 0.15 → …`）：每次只迁「不迁就编译不过」的**强制破坏项**（如 0.15 的 `TextBundle`/`TextStyle` 删除、`Style` 改名 `Node`、`SpatialBundle` 移除、`PbrBundle` 字段类型改 `Mesh3d`/`MeshMaterial3d`），已弃用但仍可编译的 bundle 留待下一小步，每步都要实机验证后再发。`ServerCode` 不依赖 bevy，升级不影响服务端分离。
 - **release 构建偶发 `os error 3`（路径找不到）**：编译 bevy crate 写 `.fingerprint` 时失败，非代码错误，疑似 target 残留 + LTO / `codegen-units=1` 重负载；重试会触发整树重建，必要时先 `cargo clean`。
 - **ServerCode 遗留 dead_code 告警**：`combat/shooter.rs` 的 `Vec3Helper::dot` 暂未被调用，属无碍告警，后续接入近战/命中反馈时可复用。
+
+---
+
+## 九、RustJ 编译器
+
+> 对应〈六、已采纳未来形态〉第 6 条。上游设计见 [计划 0003](docs/plans/0003-RustJ编译器.md)，落地进度见 [计划 0004](docs/plans/0004-RustJ二期实现.md)。
+> RustJ 是**随仓库分发的独立工具，不绑定游戏版本号**——它不碰线格式，因此**不触发协议 `y+1`**、不打 tag、不写 BarekHistory。
+
+### 9.1 这是什么 / 现在做到哪
+
+RustJ 是一个**用 Java 写的、能编译 Rust 的编译器**：把 Rust 源码编译成真正的原生可执行文件，且**整条工具链纯 Java、零外部工具链**（不依赖 LLVM、clang、rust-lld）。
+
+一句话链路：
+
+```
+Rust 源码 → 词法/语法 → 纯数据 AST → 自产 x86-64 机器码 → 标准 PE/COFF 目标文件 → 自研 Java 链接器 → win-x64 PE exe
+```
+
+用**进程退出码**断言证明「真 codegen → 真链接 → 真执行」（如 `fn main() -> i32 { 42 }` 运行后 `ERRORLEVEL` 必须为 42）。
+
+分期进度：
+
+| 期 | 内容 | 状态 |
+|---|---|---|
+| 一期 | 转译 Java 后端，跑通 `hello` 闭环 | ✅ 已实现 |
+| 二期 2a | 最小原生链路：极小子集 → 自产 COFF → 自研链接器 → win-x64 PE | ✅ 已实现 |
+| 二期 2b.1 | 变量绑定 `let` + 算术 `+ - *`（优先级 / 括号） | ✅ 已验证（`arith.rs` 退出码 7） |
+| 二期 2b.2 | `/ %`、一元负号、6 种比较运算符 | ✅ 已验证（`ops.rs` 退出码 7） |
+| 二期 2b.3 | 发射层重构（AST 变纯数据）+ 控制流 `if/else` · `while` · 赋值 · `return` | ✅ 已验证（`flow.rs` 退出码 55） |
+| 二期 2b.4+ | 多函数 / 调用 → 结构体 → 模块 → 类型系统 / 泛型 → trait | ⏳ 计划中 |
+| 二期 2c / 2d | sysroot 接入 / 增量缓存 | ⏳ 计划中 |
+
+**当前支持的语言子集**：`fn` + i32 字面量 + `let` + 赋值（`x = e;`，不引入 `mut`）+ 算术与比较 + `if/else` / `while` / `return`；类型一律 i32，比较结果为 i32 的 0/1。**暂不支持**：多函数 / 调用、结构体、模块、泛型、trait、`for`/`loop`/`match`。
+
+### 9.2 代码结构
+
+目录范式 **`RustJCode/<宽泛目的>/<具体实现>`**，子目录即 Java 包；**一 class 一文件、单文件 < 100 行（≤99）、类与文件名统一小写**。
+
+```
+RustJCode/
+├── main.java        入口（默认包）：读源码 → 编排 前端 → 后端 → 链接 → 写出 exe
+├── ast/             纯数据语法树节点（只存结构，不含任何机器码）
+├── frontend/        词法 / 语法 / 符号表
+├── backend/         机器码发射 / 目标文件 / 链接 / PE 装配
+├── error/           前后端共用的编译期错误
+└── examples/        .rs 验收用例（min / arith / ops / flow）
+```
+
+| 包 | 宽泛目的 | 关键类 |
+|---|---|---|
+| 根 | 流水线编排 | `main` |
+| `ast/` | 纯数据语法树 | 表达式 `expr` `intlit` `ident` `binop` `unop` `op`；语句 `stmt` `block` `letstmt` `assignstmt` `ifstmt` `whilestmt` `returnstmt`；`function` |
+| `frontend/` | 词法、语法、符号表 | `token` `lexer` `cursor` `parser` `stmts` `exprs` `locals` |
+| `backend/` | 机器码、目标文件、链接、PE | `arch`（架构接口）`x64`（win-x64 实现）`codebuffer` `codegen` `eval` `coff` `lld` `pe` |
+| `error/` | 共用编译期错误 | `rustjerror` |
+
+**为什么这样分层（设计要点）**：
+
+- **AST 是纯数据**：语法树节点只存结构，不含任何机器码；机器码发射全在 `backend/`。依赖方向为 `frontend → ast`、`backend → ast`（两者互不引用），`error` 独立成包供前后端单向依赖，**全程无环**。
+- **后端面向 `arch` 接口**：`arch` 定义一套抽象栈机指令（入栈/出栈、加/减/乘、比较、跳转、标号……），`x64` 是它在 win-x64 上的实现。**未来支持其他硬件架构，只需再实现 `arch` 一个类**，前端与 AST 完全不动。
+- **`codebuffer` 负责标号回填**：x86-64 的 `jmp`/`jz` 是相对跳转，需先占位、后回填目标地址；该职责单独成类，让 `x64` 守住 < 100 行。
+
+分发形态：源码在 `RustJCode/`，编译为**单个 `RustJ.jar`**（仓库根），运行产物落在 `RustJ/out/`。
+
+### 9.3 与其他 Rust 编译器的对比
+
+> 各编译器定位不同，下表只陈述事实、不作优劣排序。
+
+| 编译器 | 实现语言 | 后端 | 语言覆盖 | 标准库 | 自举 | 目标平台 | 定位 |
+|---|---|---|---|---|---|---|---|
+| **rustc**（官方） | Rust | LLVM | 完整 Rust | 完整 `std` | ✅ 自举 | 多平台 | 参考实现，日常使用的事实标准 |
+| **gccrs** | Rust（GCC 前端） | GCC `GENERIC` / GIMPLE | 覆盖中（在建） | 部分 | 否 | GCC 支持平台 | 把 Rust 接入 GCC 生态（GCC 内实验性、仍在完善） |
+| **mrustc** | C++ | C（转译） | 大体覆盖（无借用检查） | 够用于引导 | 否（用于引导 rustc） | 多平台 | 免 LLVM 的引导用编译器 |
+| **RustJ**（本项目） | Java（JVM） | 自研 x86-64 机器码发射 | 极小子集（在建） | 无（零 sysroot） | 否 | 目前仅 win-x64 | 教学 / 实验：纯 Java、零外部工具链的全自研链路 |
+
+一句话概括区别：**rustc 是全功能的参考实现，gccrs 服务于 GCC 生态，mrustc 用于免 LLVM 引导，RustJ 则是一个用 Java 从零手写机器码发射与链接器的小型实验编译器**——它的价值在「整条链路可控、可读、零外部依赖」，而非语言覆盖度。
 
 ---
 
