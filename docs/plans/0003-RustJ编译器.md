@@ -1,6 +1,7 @@
 # 计划 0003 · RustJ 编译器
 
-> **状态：已采纳 · 一期原型已落地（二期起仍为设计）** —— 一期 hello 闭环原型见 [`RustJCode/main.java`](../../RustJCode/main.java)，**为临时代码**，勿依赖。
+> **状态：已采纳 · 二期（最小原生链路）执行中** —— 二期实现计划见 [`0004-RustJ二期实现.md`](0004-RustJ二期实现.md)；
+> 一期 hello 闭环原型（Rust→Java→外部 `javac`）已被二期**整体重写**，`RustJCode/` 现为二期纯 Java 原生后端。
 > **归属版本：不绑定游戏版本号** —— RustJ 是随仓库分发的**独立工具**（Java 产物），不触碰线格式 → **不触发 `y+1`**；
 > 若未来并入某期发布的「五件套」，届时随当期版本号正式发布。
 > **归属**：仓库根 `./RustJ.jar`（单文件分发）+ 源码目录 `./RustJCode/` + 编译工作目录 `./RustJ/`；**不进入** `ServerCode` / `HostCode` 双 crate 的依赖关系。
@@ -57,7 +58,7 @@ RustJ/
 ├── out/            # 最终产物：bin / lib / cdylib / staticlib
 ├── deps/           # 依赖 crate 的 .rlib / .rmeta
 ├── sysroot/        # 首次运行从 jar 解压：core / alloc / std
-├── linker/         # rust-lld 等平台链接器（按平台分目录）
+├── linker/         # 预留：自研 Java 链接器无需外部二进制，此目录暂空
 ├── incremental/    # 增量编译缓存（working / finalized 会话隔离）
 └── cache/          # 缓存块、元数据、指纹
 ```
@@ -65,12 +66,14 @@ RustJ/
 - **sysroot 自包含**：`core/alloc/std` 的 `.rlib` + 元数据随 jar 打包，首次运行解压，此后纯本地编译。
 - **rlib 即 ar 归档**：需能读写归档内的 `.o` / `.rmeta` / 符号表 / 元数据。
 - **会话隔离**：增量目录用 working/finalized 会话，避免并发编译损坏缓存。
-- **链接器按平台分离**：`linker/win-x64/rust-lld.exe` 等。
+- **链接器自研**：`RustJCode/backend/lld.java` 为纯 Java 链接器，不依赖 `rust-lld` 等外部二进制。
 
 ### 2.3 源码目录 `./RustJCode/`
 
-Java 源码（编译器主体）置于 `./RustJCode/`，**扁平结构、禁 `src/` 等 Java 老传统套娃嵌套**
-（对齐本项目「语义化文件名 + 最多 2 级深度」的洁癖红线）。
+Java 源码（编译器主体）置于 `./RustJCode/`，按**宽泛目的**分子目录（子目录即 Java 包）：
+`ast/`（表达式 / 函数语法树）、`frontend/`（词法 / 语法 / 符号表）、`backend/`（机器码 / 目标文件 / 链接 / PE）、
+`error/`（前后端共用的编译期错误）；入口 `main.java` 留在根、属默认包。
+**一 class 一文件、单文件 < 100 行、类与文件名统一小写**，每个 class 头部注释说明职责与对外能力。
 与编译工作目录 `./RustJ/` **分名**，避免「输出目录 = 源码目录」的重名混淆。
 
 ### 2.4 运行流程
@@ -81,7 +84,7 @@ Java 源码（编译器主体）置于 `./RustJCode/`，**扁平结构、禁 `sr
 4. 从 `RustJ/deps/` 或远程缓存加载 `.rlib` / `.rmeta`；
 5. 编译前端：词法 → 语法 → HIR/MIR → 借用检查 → 宏展开；
 6. 代码生成中间产物；
-7. 调用内置 `rust-lld` 链接，配合 sysroot 产出可执行文件 / 库；
+7. 调用自研 Java 链接器（`lld`）把目标文件链接为可执行文件 / 库；
 8. 产物写入 `RustJ/out/`，增量缓存写入 `RustJ/incremental/`。
 
 ---
@@ -111,14 +114,16 @@ Java 源码（编译器主体）置于 `./RustJCode/`，**扁平结构、禁 `sr
 | **三期（终靶）** | **本仓 `ServerCode` 纯逻辑部分** | 用 RustJ 编译 `ServerCode` 中**无 bevy、无 `proc_macro`** 的逻辑部分并通过其确定性测试 | 前述 + 真实工程规模的模块与类型系统 |
 
 **分期纪律**：每期以「能编出**可运行且行为正确**的真实产物」为准，**不用「能解析」冒充「能编译」**；
-未达终靶前，本文不标「已发布」。一期已落地**临时原型**（Rust→Java→外部 `javac`，产物为 JVM `.class`，**非〈2.4〉原生 exe**），二期起须把后端重做为真实 codegen。
+未达终靶前，本文不标「已发布」。一期已落地**临时原型**（Rust→Java→外部 `javac`，产物为 JVM `.class`，**非〈2.4〉原生 exe**），
+二期起把后端重做为真实 codegen（**自研 Java 链接器**，见 [`0004`](0004-RustJ二期实现.md)），**原临时原型已被整体重写**。
+**二期进展**：2a「最小原生链路」与 2b.1「变量绑定 + 算术表达式」已完成并端到端验证，详见 [`0004`](0004-RustJ二期实现.md)。
 
 ### 参照的原案优先级（P0–P3）
 
 | 优先级 | 内容 | 对应本计划分期 |
 |---|---|---|
 | P0 | 核心编译器（词法/语法/类型检查/代码生成）+ sysroot 打包 | 一期 |
-| P1 | 链接器集成（rust-lld）+ 增量缓存 | 二期 |
+| P1 | 自研 Java 链接器 + 增量缓存 | 二期 |
 | P2 | `proc_macro` 支持 + Cargo 兼容 | 三期及之后 |
 | P3 | 跨平台分发（Linux / Windows / macOS） | 远期 |
 
@@ -126,7 +131,7 @@ Java 源码（编译器主体）置于 `./RustJCode/`，**扁平结构、禁 `sr
 
 ## 五、明确不做
 
-- **一期仅交付临时原型**（[`RustJCode/main.java`](../../RustJCode/main.java)）：只跑通 hello 子集闭环，**产物为 JVM `.class`**（**非**〈2.4〉原生 exe）；**不做** rust-lld / sysroot / 对象文件 / 增量缓存 / `-RJT`·`-RJCC` 实际生效（留待二期）。
+- **一期仅交付临时原型**（原 `RustJCode/main.java`，**二期已被整体重写**）：一期只跑通 hello 子集闭环、**产物为 JVM `.class`**（**非**〈2.4〉原生 exe）；`rust-lld` / sysroot / 对象文件 / 增量缓存 / `-RJT`·`-RJCC` 实际生效留待二期之后（二期**自研 Java 链接器**，不引入 `rust-lld`）。
 - **不改为 MIT/Apache 双许可**（与 README 早期措辞相反，本计划定为 **GPLv3**）。
 - **不做原生 Rust 重写**（定位即为保留 Java 实现）。
 - **不侵入 `cargo`/`rustc` 环境**：不实现 `RUSTC_WRAPPER`、不替换 PATH 中的 `rustc`（远期可选，本期不列）。
@@ -137,23 +142,24 @@ Java 源码（编译器主体）置于 `./RustJCode/`，**扁平结构、禁 `sr
 
 ## 六、验证
 
-- **一期原型验证命令**（本机 Java 25；仅编译 Java 原型，**无需 cargo-wrap**、不改三个游戏 crate）：
+- **二期最小原生链路验证命令**（本机 Java 25；仅编译 Java 源码，**无需 cargo-wrap**、不改三个游戏 crate）：
   ```powershell
-  javac -d build RustJCode/main.java          # 编译原型
-  jar cfe RustJ.jar main -C build .           # 打包根 ./RustJ.jar
-  java -jar RustJ.jar hello.rs                # 编译 hello.rs -> ./RustJ/out/Hello.class
-  java -cp RustJ/out Hello                    # 运行产物
+  javac -d build -sourcepath RustJCode (Get-ChildItem RustJCode -Recurse -Filter *.java).FullName   # 递归编译全部 Java 源码
+  jar cfe RustJ.jar main -C build .               # 打包根 ./RustJ.jar
+  java -jar RustJ.jar RustJCode/examples/min.rs   # -> RustJ/out/main.o 与 RustJ/out/main.exe
+  .\RustJ\out\main.exe; echo "exit=$LASTEXITCODE" # 期望 exit=0（把末值改为 42 则期望 exit=42）
   ```
   > 若 PATH 中无 `jar`（本机即如此：`javac` 走 Oracle `javapath` 而 `jar` 不在其中），改用 `"<JDK>\bin\jar"`，如 `"C:\Program Files\Java\jdk-25.0.4\bin\jar"`。
 - 文档落地时的自查：README〈六〉第 6 条链接与〈七〉索引指向本文件的**链接可达性**。
-- 各期实现阶段的验证命令（届时另开实现计划）：
-  - 产物可运行性：`RustJ/out/` 下产物能启动并输出预期结果；
+- 各期实现阶段的验证命令：
+  - 产物可运行性：`RustJ/out/` 下产物能启动并以预期退出码结束；
   - 终靶确定性：以 `ServerCode` 现有测试为准，行为须与 `cargo test` 一致。
 
 ---
 
 ## 七、关联
 
+- [计划 0004 · RustJ 二期实现（最小原生链路）](0004-RustJ二期实现.md)（本计划二期的落地实现）
 - [README〈六、已采纳未来形态〉第 6 条](../../README.md)（本计划对应的路线图条目）
 - 参考材料：《RustJ 技术对话记录与开发参考》（外部设计参考，非本仓文件）
 - [计划 0001 · 三角形区域光线追踪着色器套件](0001-区域光照着色器套件.md) / [计划 0002 · Bevy 0.16 强制破坏项迁移](0002-bevy-0.16-强制破坏项迁移.md)
