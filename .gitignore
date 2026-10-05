@@ -4,6 +4,12 @@
 # cargo-wrap 工具构建产物（禁用编译缓存以省磁盘）
 /tools/cargo-wrap/target/
 
+# RustJ 编译器（计划 0003）：jar 与运行产物不入库，仅入库 RustJCode/main.java
+/RustJ.jar
+/RustJ/
+/build/
+*.class
+
 # 本机 IDE / 编辑器
 .idea/
 .vscode/

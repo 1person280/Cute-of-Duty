@@ -1,9 +1,9 @@
 # 计划 0003 · RustJ 编译器
 
-> **状态：已采纳 · 设计中（未实现）** —— 本文只描述设计与路线，**不含任何可运行代码**。
+> **状态：已采纳 · 一期原型已落地（二期起仍为设计）** —— 一期 hello 闭环原型见 [`RustJCode/main.java`](../../RustJCode/main.java)，**为临时代码**，勿依赖。
 > **归属版本：不绑定游戏版本号** —— RustJ 是随仓库分发的**独立工具**（Java 产物），不触碰线格式 → **不触发 `y+1`**；
 > 若未来并入某期发布的「五件套」，届时随当期版本号正式发布。
-> **归属**：仓库根 `./tools/RustJ.jar`（单文件分发）+ 源码目录 `./RustJCode/` + 编译工作目录 `./RustJ/`；**不进入** `ServerCode` / `HostCode` 双 crate 的依赖关系。
+> **归属**：仓库根 `./RustJ.jar`（单文件分发）+ 源码目录 `./RustJCode/` + 编译工作目录 `./RustJ/`；**不进入** `ServerCode` / `HostCode` 双 crate 的依赖关系。
 > **范式去向**：README〈六、已采纳未来形态〉第 6 条。
 
 ---
@@ -24,7 +24,7 @@
 | 实现语言 | **保留 Java + JVM/ZGC 原案**，不重写为原生 Rust | Java 兼容性好，**一套内存管理代码可全架构运行**；ZGC 自动回收编译期短命对象，省去手写缓存失效/释放逻辑 |
 | 许可证 | **GPLv3**（与游戏一致） | 与 Cute of Duty 同许可、同目录层，复用现有 `LICENSE`；不引入第二套许可治理成本 |
 | 分发形态 | **单个 `RustJ.jar`** | 「一个 jar + 一条命令」——对齐原案的傻瓜化分发体验 |
-| 落位 | 工具 `./tools/RustJ.jar`；源码 `./RustJCode/`；产物 → `./RustJ/` | 与仓库既有 `tools/` 工具并列；Java 源码目录 `./RustJCode/`（扁平、**禁 `src/` 套娃嵌套**），编译工作目录 `./RustJ/`（原案 `javac/` 的更名），二者**分名不冲突** |
+| 落位 | 工具 `./RustJ.jar`（仓库根）；源码 `./RustJCode/`；产物 → `./RustJ/out/` | 仓库根单文件分发；Java 源码目录 `./RustJCode/`（扁平、**禁 `src/` 套娃嵌套**），编译工作目录 `./RustJ/`（原案 `javac/` 的更名），二者**分名不冲突** |
 | 运行方式 | `java -Xms1G -Xmx4G -RJT=16 RustJ.jar` | `-Xms/-Xmx` 控堆、`-RJT` 控**线程数**、`-RJCC` 控**缓存块**、默认以当前目录为工程根 |
 | 接入方式 | **独立 CLI**（不侵入用户 `cargo`/`rustc` 环境） | 落地最快、风险最低；`RUSTC_WRAPPER` 适配层列为远期可选，本期不承诺 |
 | 验收靶子 | **真实工程三期递进**（见第四节） | 避免沦为「只能编译玩具语言」的空壳 |
@@ -106,12 +106,12 @@ Java 源码（编译器主体）置于 `./RustJCode/`，**扁平结构、禁 `sr
 
 | 期 | 靶子 | 交付判据 | 覆盖 Rust 子集 |
 |---|---|---|---|
-| **一期** | `hello world` 单文件闭环 | `RustJ.jar` 能编出可运行的单文件程序 | 字面量 / 变量 / 函数 / 基本表达式 / `println!` |
+| **一期** | `hello world` 单文件闭环 | `RustJ.jar` 能编出可运行的单文件程序（**已实现临时原型**） | 字面量 / 变量 / 函数 / 基本表达式 / `println!` |
 | **二期** | **无宏、无外部 crate 的小 crate** | 能编译含多模块 / 结构体 / `trait` / 基础泛型的单 crate 工程 | 模块系统 / 结构体 / trait / 泛型 / 借用检查基础 |
 | **三期（终靶）** | **本仓 `ServerCode` 纯逻辑部分** | 用 RustJ 编译 `ServerCode` 中**无 bevy、无 `proc_macro`** 的逻辑部分并通过其确定性测试 | 前述 + 真实工程规模的模块与类型系统 |
 
 **分期纪律**：每期以「能编出**可运行且行为正确**的真实产物」为准，**不用「能解析」冒充「能编译」**；
-未达终靶前，本文状态保持「设计中（未实现）」。
+未达终靶前，本文不标「已发布」。一期已落地**临时原型**（Rust→Java→外部 `javac`，产物为 JVM `.class`，**非〈2.4〉原生 exe**），二期起须把后端重做为真实 codegen。
 
 ### 参照的原案优先级（P0–P3）
 
@@ -126,7 +126,7 @@ Java 源码（编译器主体）置于 `./RustJCode/`，**扁平结构、禁 `sr
 
 ## 五、明确不做
 
-- **本期不写任何 Java 代码、不产出 `RustJ.jar`、不放 `main.class`** —— 本文只描述设计与路线。
+- **一期仅交付临时原型**（[`RustJCode/main.java`](../../RustJCode/main.java)）：只跑通 hello 子集闭环，**产物为 JVM `.class`**（**非**〈2.4〉原生 exe）；**不做** rust-lld / sysroot / 对象文件 / 增量缓存 / `-RJT`·`-RJCC` 实际生效（留待二期）。
 - **不改为 MIT/Apache 双许可**（与 README 早期措辞相反，本计划定为 **GPLv3**）。
 - **不做原生 Rust 重写**（定位即为保留 Java 实现）。
 - **不侵入 `cargo`/`rustc` 环境**：不实现 `RUSTC_WRAPPER`、不替换 PATH 中的 `rustc`（远期可选，本期不列）。
@@ -137,10 +137,17 @@ Java 源码（编译器主体）置于 `./RustJCode/`，**扁平结构、禁 `sr
 
 ## 六、验证
 
-- 本文为纯设计文档，**不跑本地编译**（对齐项目「纯文档变更可不执行本地编译」的既定纪律）。
+- **一期原型验证命令**（本机 Java 25；仅编译 Java 原型，**无需 cargo-wrap**、不改三个游戏 crate）：
+  ```powershell
+  javac -d build RustJCode/main.java          # 编译原型
+  jar cfe RustJ.jar main -C build .           # 打包根 ./RustJ.jar
+  java -jar RustJ.jar hello.rs                # 编译 hello.rs -> ./RustJ/out/Hello.class
+  java -cp RustJ/out Hello                    # 运行产物
+  ```
+  > 若 PATH 中无 `jar`（本机即如此：`javac` 走 Oracle `javapath` 而 `jar` 不在其中），改用 `"<JDK>\bin\jar"`，如 `"C:\Program Files\Java\jdk-25.0.4\bin\jar"`。
 - 文档落地时的自查：README〈六〉第 6 条链接与〈七〉索引指向本文件的**链接可达性**。
 - 各期实现阶段的验证命令（届时另开实现计划）：
-  - 产物可运行性：`RustJ/out/` 下二进制能启动并输出预期结果；
+  - 产物可运行性：`RustJ/out/` 下产物能启动并输出预期结果；
   - 终靶确定性：以 `ServerCode` 现有测试为准，行为须与 `cargo test` 一致。
 
 ---
