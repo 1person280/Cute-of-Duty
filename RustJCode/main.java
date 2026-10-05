@@ -1,17 +1,16 @@
 /*
  * RustJ 二期命令行入口与编译流水线编排。
  *
- * 做什么：串联「读源码 → 词法 → 语法 → 机器码 → COFF → 链接 → PE」全流程，
+ * 做什么：串联「读源码 → 词法 → 语法 → 代码生成 → COFF → 链接 → PE」全流程，
  *         是整条工具链唯一的对外入口（位于默认包，保持在 RustJCode 根目录）。
  *
  * 提供什么功能：
  *   - main(String[] args)：解析参数（-RJT / -RJCC 暂为占位）、读取 .rs 源文件、
  *     驱动各阶段，并把 .o 与 .exe 写入 RustJ/out/。
- *   - emit(function fn)：把 ast.function 编译为 .text 段字节
- *     （序言 + let 绑定 + 返回表达式 + 尾声）。
+ *   - emit(function fn)：选定目标后端把 ast.function 发为 .text 段字节。
  */
 import ast.function;
-import ast.letstmt;
+import backend.codegen;
 import backend.coff;
 import backend.lld;
 import backend.x64;
@@ -60,16 +59,10 @@ public class main {
         System.out.println("[RustJ] 可执行文件: " + root.relativize(exePath));
     }
 
-    /* 生成函数体机器码：序言 → let 绑定 → 返回表达式 → 尾声。 */
+    /* 选定 win-x64 后端，把函数发为 .text 段字节（EAX 即返回值/退出码）。 */
     private static byte[] emit(function fn) {
         x64 out = new x64();
-        out.begin(fn.lets.size() * 4);
-        for (letstmt s : fn.lets) {
-            s.init.emit(out);                   // 求值初始化表达式 → EAX
-            out.storeEax(s.offset);             // 存入变量槽
-        }
-        fn.body.emit(out);                      // 返回表达式 → EAX
-        out.end();
+        codegen.emit(fn, out);
         return out.finish();
     }
 }

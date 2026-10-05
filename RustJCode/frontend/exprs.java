@@ -1,20 +1,22 @@
 /*
  * 表达式子解析器（优先级分层）。
  *
- * 做什么：把表达式部分从 parser 里独立出来，按优先级自低到高递归下降：
+ * 做什么：按优先级自低到高递归下降解析表达式：
  *   compare（== != < <= > >=）→ add（+ -）→ mul（* / %）→ unary（一元 -）→ atom（字面量/变量/括号）。
  *   独立成类，是为了让每个文件都守住「单文件 < 100 行」的上限，也让「语句」与「表达式」职责分明。
  *
  * 提供什么功能：
  *   - exprs(cursor cur, locals syms)：绑定游标与符号表。
- *   - parse()：解析一个完整表达式，返回其 AST 根节点（求值结果落在 EAX）。
+ *   - parse()：解析一个完整表达式，返回其 AST 根节点（纯数据，发射交给后端）。
  */
 package frontend;
 
-import ast.compute.*;
+import ast.binop;
 import ast.expr;
 import ast.ident;
 import ast.intlit;
+import ast.op;
+import ast.unop;
 import error.rustjerror;
 
 public final class exprs {
@@ -33,8 +35,8 @@ public final class exprs {
     private expr compare() {
         expr left = add();
         while (isCompare()) {
-            String op = cur.take().text;
-            left = compare(op, left, add());
+            int kind = compareKind(cur.take().text);
+            left = new binop(kind, left, add());
         }
         return left;
     }
@@ -42,9 +44,8 @@ public final class exprs {
     private expr add() {
         expr left = mul();
         while (cur.peek("+") || cur.peek("-")) {
-            String op = cur.take().text;
-            expr right = mul();
-            left = op.equals("+") ? new plus(left, right) : new minus(left, right);
+            int kind = cur.take().text.equals("+") ? op.ADD : op.SUB;
+            left = new binop(kind, left, mul());
         }
         return left;
     }
@@ -52,10 +53,9 @@ public final class exprs {
     private expr mul() {
         expr left = unary();
         while (cur.peek("*") || cur.peek("/") || cur.peek("%")) {
-            String op = cur.take().text;
-            expr right = unary();
-            left = op.equals("*") ? new times(left, right)
-                    : op.equals("/") ? new div(left, right) : new rem(left, right);
+            String o = cur.take().text;
+            int kind = o.equals("*") ? op.MUL : o.equals("/") ? op.DIV : op.REM;
+            left = new binop(kind, left, unary());
         }
         return left;
     }
@@ -63,7 +63,7 @@ public final class exprs {
     private expr unary() {
         if (cur.peek("-")) {
             cur.advance();
-            return new neg(unary());
+            return new unop(op.NEG, unary());
         }
         return atom();
     }
@@ -86,12 +86,12 @@ public final class exprs {
                 || cur.peek("<=") || cur.peek(">") || cur.peek(">=");
     }
 
-    private expr compare(String op, expr left, expr right) {
-        if (op.equals("==")) return new eq(left, right);
-        if (op.equals("!=")) return new ne(left, right);
-        if (op.equals(">=")) return new ge(left, right);
-        if (op.equals("<=")) return new le(left, right);
-        if (op.equals(">")) return new gt(left, right);
-        return new lt(left, right);
+    private int compareKind(String o) {
+        if (o.equals("==")) return op.EQ;
+        if (o.equals("!=")) return op.NE;
+        if (o.equals("<=")) return op.LE;
+        if (o.equals(">=")) return op.GE;
+        if (o.equals("<")) return op.LT;
+        return op.GT;
     }
 }

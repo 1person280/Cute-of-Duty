@@ -1,17 +1,16 @@
 /*
- * x86-64 机器码发射器：以 win-x64 为唯一目标，把 AST 求值过程编码为原始指令字节，
- * 并负责 rbp 栈帧的建立与拆除。
+ * x86-64 机器码发射器（backend.arch 的 win-x64 实现）。
  *
- * 提供：begin/end（序言与尾声）；movEaxImm/loadEax/storeEax（常量与变量槽读写）；
- * push/pop/mov（栈机与寄存器搬运）；add/sub/imul/neg/cdq/idiv（算术）；
- * cmp 与 setE/setNE/setL/setLE/setG/setGE/movzxEaxAl（比较，结果 0/1）；finish（返回 .text 段字节流）。
+ * 做什么：把抽象栈机指令编码为 x86-64 原始指令字节，并负责 rbp 栈帧的建立与拆除。
+ * 提供什么功能：实现 backend.arch 全部方法——序言/尾声、常量与变量槽读写、栈机搬运、
+ *   算术与比较指令，最后 finish() 返回 .text 段字节流。
  * 约定：求值结果统一落在 EAX，它同时是函数返回值与进程退出码。
  */
 package backend;
 
 import java.io.ByteArrayOutputStream;
 
-public final class x64 {
+public final class x64 implements arch {
     private final ByteArrayOutputStream code = new ByteArrayOutputStream();
 
     /* 序言：push rbp ; mov rbp, rsp ; sub rsp, 16 字节对齐后的栈帧大小。 */

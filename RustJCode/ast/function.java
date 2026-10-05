@@ -1,26 +1,22 @@
 /*
- * 一个函数的语法树表示。
+ * 一个函数的语法树表示（纯数据）。
  *
- * 做什么：承载 `fn 名字() -> i32 { <let 序列> <返回表达式> }` 的整体结构。
- *
+ * 做什么：承载 `fn 名字() -> i32 <块>` 的整体结构。
  * 提供什么功能：
- *   - function(String name, List<letstmt> lets, expr body)：保存函数名、
- *     按源码顺序排列的 let 绑定，以及作为返回值的最终表达式。
- *   - 字段 name 决定产物符号名与输出文件名；
- *     字段 lets 决定栈帧大小；字段 body 提供函数的返回值（EAX）。
+ *   - name：函数名，决定产物符号名与输出文件名；
+ *   - body：函数体块（语句列表 + 尾表达式），尾表达式的值即返回值（EAX）；
+ *   - frameBytes：栈帧字节数，由语法分析期按局部变量总数算出。
  */
 package ast;
 
-import java.util.List;
-
 public final class function {
     public final String name;
-    public final List<letstmt> lets;
-    public final expr body;
+    public final block body;
+    public final int frameBytes;
 
-    public function(String name, List<letstmt> lets, expr body) {
+    public function(String name, block body, int frameBytes) {
         this.name = name;
-        this.lets = lets;
         this.body = body;
+        this.frameBytes = frameBytes;
     }
 }

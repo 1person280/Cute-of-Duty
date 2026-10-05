@@ -7,6 +7,7 @@
  *   - declare(String name, int line)：登记新变量，返回其 rbp 相对偏移（-4, -8, ...）；
  *     重复声明时报错。
  *   - offsetOf(String name, int line)：按名查偏移；未声明时报错。
+ *   - size()：已声明变量总数，供语法分析期算出栈帧字节数。
  *   - 使语法分析期即可同步完成「名字 → 偏移」解析与最基本的语义检查。
  */
 package frontend;
@@ -35,5 +36,9 @@ public final class locals {
             throw new rustjerror(line, "未声明的变量: " + name);
         }
         return offset;
+    }
+
+    public int size() {
+        return count;
     }
 }
