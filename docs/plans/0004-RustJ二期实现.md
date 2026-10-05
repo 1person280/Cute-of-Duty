@@ -1,7 +1,7 @@
 # 计划 0004 · RustJ 二期实现（最小原生链路）
 
 > **状态：执行中** —— 二期 2a「最小原生链路」已完成（Rust 极小子集 → 自产 COFF → 自研 Java 链接器 → win-x64 PE exe 端到端闭环）；
-> 二期 2b.1「变量绑定 + 算术表达式」、2b.2「表达式补全与比较」已完成并验证。
+> 二期 2b.1「变量绑定 + 算术表达式」、2b.2「表达式补全与比较」、2b.3「发射层重构 + 控制流」已完成并验证。
 > **归属版本：不绑定游戏版本号** —— 沿用 [`0003-RustJ编译器.md`](0003-RustJ编译器.md) 的定位：RustJ 是随仓库分发的独立工具，
 > 不触碰线格式 → **不触发 `y+1`**、不打 tag、不写 BarekHistory。
 > **归属**：仓库根 `./RustJ.jar`（单文件分发）+ 源码目录 `./RustJCode/` + 编译工作目录 `./RustJ/`。
@@ -43,14 +43,14 @@
 | 包（目录） | 宽泛目的 | 文件（class） |
 |---|---|---|
 | 根（默认包） | 入口与流水线编排 | `main` |
-| `ast/` | 取值类语法树节点 | `expr` `intlit` `ident` `letstmt` `function` |
-| `ast/compute/` | 计算类语法树节点 | `plus` `minus` `times` `div` `rem` `neg` `eq` `ne` `lt` `le` `gt` `ge`（+ `compute` 说明该子目录的存在理由） |
-| `frontend/` | 词法、语法、符号表 | `token` `lexer` `cursor` `parser` `exprs` `locals` |
-| `backend/` | 机器码、目标文件、链接、PE | `x64` `coff` `lld` `pe` |
+| `ast/` | 纯数据语法树节点 | 表达式 `expr` `intlit` `ident` `binop` `unop` `op`；语句 `stmt` `block` `letstmt` `assignstmt` `ifstmt` `whilestmt` `returnstmt`；函数 `function` |
+| `frontend/` | 词法、语法、符号表 | `token` `lexer` `cursor` `parser` `stmts` `exprs` `locals` |
+| `backend/` | 机器码、目标文件、链接、PE | `arch`（发射接口）`x64`（win-x64 实现）`codebuffer` `codegen` `eval` `coff` `lld` `pe` |
 | `error/` | 前后端共用的编译期错误 | `rustjerror` |
 
-**依赖方向（无环）**：`frontend → ast → backend`；`frontend`、`backend` 各自单向依赖 `error`；`main` 依赖全部。
-`rustjerror` 独立成包，是为了让前后端都只单向依赖它，避免 `frontend ↔ backend` 互引。
+**依赖方向（无环）**：`frontend → ast`、`backend → ast`；`frontend`、`backend` 各自单向依赖 `error`；`main` 依赖全部。
+`ast` 为**纯数据**（不含任何机器码）；机器码发射全在 `backend`，故依赖为 `backend → ast`（2b.3 由原 `ast → backend` 反转而来），
+新增硬件架构只需再实现 `arch` 接口一个类。`rustjerror` 独立成包，是为了让前后端都只单向依赖它，避免 `frontend ↔ backend` 互引。
 
 ---
 
@@ -72,7 +72,8 @@
 |---|---|---|
 | 2b.1 | 变量绑定 + 算术表达式（`let`、`+ - *`、优先级、括号、`return`/末表达式） | `arith.rs` 退出码断言 7；`min.rs` 回归 0 ✅ |
 | 2b.2 | 表达式补全与比较（`/ %`、一元负号、`== != < <= > >=`） | `ops.rs` 退出码断言 7；符号语义与 Rust 一致 ✅ |
-| 2b.3+ | 后续特性（控制流 → 多函数/调用 → 结构体 → 模块 → 类型系统/泛型 → trait） | 待定 |
+| 2b.3 | 发射层重构（AST 纯数据）+ 控制流（`if/else`、`while`、`return`、赋值） | `flow.rs` 退出码断言 55；三例回归不变 ✅ |
+| 2b.4+ | 后续特性（多函数/调用 → 结构体 → 模块 → 类型系统/泛型 → trait） | 待定 |
 
 **2b.1 已定决策**（经 `plan-interrogation` 逐条确认）：
 起手特性 = 变量绑定 + 算术表达式；子集边界 = `let` + i32 字面量 + `+ - *`（含优先级/括号）+ `return`/末表达式；
@@ -83,7 +84,12 @@ codegen = 栈帧局部变量 `[rbp-4n]` + 后序栈机求值；AST = 多态类�
 比较结果 = i32 的 0/1（`cmp` + `setcc` + `movzx`），不引入独立 bool；优先级 = 比较 < `+ -` < `* / %` < 一元 `-` < atom。
 `/ %` 用 `cdq` + `idiv`，符号语义与 Rust 一致（向零截断、余数随被除数）。
 
-后续子期（方向占位）：**2b.3+** 更多语言特性、**2c** sysroot 接入、**2d** 增量缓存。
+**2b.3 已定决策**：发射从 AST 移出交后端（`arch` 接口 + `x64` 实现 + `codegen`/`eval` 走树），AST 变纯数据，
+运算符由 12 个节点类收敛为 `binop`/`unop`/`op`（依赖方向反转为 `backend → ast`；2b.2 的「一运算符一 class / `ast/compute` 子包」由此收敛，该子包已删除）；
+语句模型 = 统一 `block` + 语句列表（块可嵌套，尾表达式即块值）；控制流 = `if/else` + `while` + `return` + 赋值（`x = e;`，不引入 `mut`）；
+分支 = 条件求值入 EAX 后 `test eax,eax` + `jz`，标号与 rel32 相对跳转由 `codebuffer` 回填。
+
+后续子期（方向占位）：**2b.4+** 更多语言特性、**2c** sysroot 接入、**2d** 增量缓存。
 
 ---
 
@@ -92,14 +98,16 @@ codegen = 栈帧局部变量 `[rbp-4n]` + 后序栈机求值；AST = 多态类�
 ```powershell
 javac -d build -sourcepath RustJCode (Get-ChildItem RustJCode -Recurse -Filter *.java).FullName
 jar cfe RustJ.jar main -C build .
-java -jar RustJ.jar RustJCode/examples/arith.rs
-.\RustJ\out\main.exe; echo "exit=$LASTEXITCODE"   # 期望 7
+java -jar RustJ.jar RustJCode/examples/flow.rs
+.\RustJ\out\main.exe; echo "exit=$LASTEXITCODE"   # 期望 55（arith.rs 期望 7、ops.rs 期望 7、min.rs 期望 0）
 ```
 
 - **回归**：`min.rs` 期望 `exit=0`；把其末值改为 `42` 重编，期望 `exit=42` —— 证明是**真执行**而非占位。
 - **优先级**：`arith.rs` 为 `let x = 1 + 2 * 3; x`，期望 `exit=7`（验证 `*` 高于 `+`）。
 - **运算符**：`ops.rs` 覆盖 `/ %`、一元负号与 6 种比较，期望 `exit=7`。
 - **符号语义**：`-7 / 2` 与 `-7 % 2` 应分别得 `-3` 与 `-1`（与 Rust 一致）。
+- **控制流**：`flow.rs` 为 `while` 累加 1..10（应得 55），并用两个 `if/else` 分别覆盖真/假分支；分支未按预期执行则结果偏离 55，期望 `exit=55`。
+- **提前返回**：`return`（含 `if/else` 中提前返回）经端到端验证（如 `x==1` 返回 1、`else` 返回 3）。
 - **语义检查**：`let x = y;`（`y` 未声明）与重复 `let x` 均以带行号的 `rustjerror` 报错并退出码 1。
 
 ---
@@ -111,7 +119,8 @@ java -jar RustJ.jar RustJCode/examples/arith.rs
 - ❌ 不导入任何 OS 函数（本切片零 import）。
 - ❌ 不做增量缓存 / `-RJT` / `-RJCC` 实际生效（**继续占位**）。
 - ❌ 本切片不含模块 / 结构体 / trait / 泛型（子期 2b 后续）。
-- ❌ 2b.1 / 2b.2 不含 `if`/循环、函数调用、多函数（2b.3+）。
+- ❌ 2b.3 不含 `for`/`loop`/`break`/`continue`/`match`、函数调用、多函数（2b.4+）。
+- ❌ 不引入 `bool` 类型 / 真值字面量（条件沿用比较节点产出的 i32 0/1）；赋值不引入 `mut`（对任意已声明变量可写）。
 - ❌ 不侵入 `cargo`/`rustc`；不改游戏三 crate；不碰线格式 / 契约 YAML。
 - ❌ 不改游戏版本号、不触发 `y+1`、不打 tag、不写 BarekHistory。
 
