@@ -1,0 +1,61 @@
+name: Bug 报告
+description: 报告一个可复现的缺陷
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈！请先确认：已尝试最新 Release，且服务端与客户端版本一致（两者版本号需相同）。
+  - type: input
+    id: version
+    attributes:
+      label: 版本号
+      description: 双端各自的版本号（主菜单可见），如 0.14.1 / 0.14.1
+      placeholder: 服务端 x.y.z · 客户端 x.y.z
+    validations:
+      required: true
+  - type: dropdown
+    id: side
+    attributes:
+      label: 发生在哪个端
+      options:
+        - 客户端
+        - 服务端
+        - 两者都涉及
+        - 不确定
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统
+      options:
+        - Windows 11
+        - Windows 10
+        - Linux
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 从启动到触发缺陷的完整步骤，越具体越好
+      placeholder: |
+        1. 双击 启动游戏.bat
+        2. 进入训练场后按 F 打开交互面板
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望行为
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际行为
+      description: 若有报错弹窗 / 日志 / 截图，请一并粘贴（注意打码 token 等敏感信息）
+    validations:
+      required: true

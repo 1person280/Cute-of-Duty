@@ -7,6 +7,11 @@
 基于 Rust + Bevy 0.16 的 3D 像素风 FPS · 服务端权威模拟与客户端表现层双 crate
 配置文件表驱动的全部玩法规则 · 单一事实来源
 
+![Cute Of Duty](docs/media/cover_1280x720.png)
+
+**三步跑起来**：① 下载 [最新 Release](https://github.com/1person280/Cute-of-Duty/releases) 的双端 zip 并解压 → ② 先运行 `cod_server.exe` → ③ 再运行 `cod1.exe` 进入训练场（详见[快速开始](#一快速开始)）
+
+[![CI](https://github.com/1person280/Cute-of-Duty/actions/workflows/rust.yml/badge.svg)](https://github.com/1person280/Cute-of-Duty/actions/workflows/rust.yml)
 [![License: GPL-3.0 (code)](https://img.shields.io/badge/License-GPL--3.0--linking--exception-blue.svg)](LICENSE)
 [![License: CC BY-NC-SA 4.0 (assets)](https://img.shields.io/badge/License-CC_BY--NC--SA_4.0-lightgrey.svg)](LICENSE-ASSETS)
 [![Version](https://img.shields.io/badge/Version-0.14.1-blue.svg)](#五版本历史)
@@ -43,9 +48,16 @@
 
 ### 直接试玩（无需编译）
 
-> 先运行 **`target/release/cod_server.exe`**（服务端权威模拟），再运行
-> **`target/release/cod1.exe`**（客户端表现层）。**顺序不可颠倒**——服务端未起时客户端不会进入训练场
-> （客户端已实现每 2s 自动重连，服务端起来后会自动接入）。
+**方式一（推荐）：双击 `启动游戏.bat`**——Release zip 内自带（源码见 [`tools/启动游戏.bat`](tools/启动游戏.bat)）：
+自动先起服务器、等端口就绪后再启动客户端；客户端退出时自动收尾服务器进程。
+
+**方式二（手动）**：先运行 **`cod_server.exe`**（服务端权威模拟），再运行
+**`cod1.exe`**（客户端表现层）。**顺序不可颠倒**——服务端未起时客户端不会进入训练场
+（客户端已实现每 2s 自动重连，服务端起来后会自动接入）。
+
+> **单人即可完整游玩**：本地起一个服务器就是完整的单机体验——训练场 CQB 与 1×1km
+> 露天搜打撤大场内的靶机、物资箱、功能台均由服务端权威模拟并经快照下发，
+> **不需要其他玩家**也能完成「进图 → 搜刮 → 交战 → 撤离」整局循环。
 
 ### 本地编译
 
@@ -62,7 +74,33 @@ cargo-wrap build --release --workspace      # 发布构建，产出 cod_server.e
 > `HostCode`（客户端表现层，动态装载 `bevy_dylib`）。默认构建**完全不编译 bevy**，核心逻辑秒级增量迭代；
 > 只有构建客户端时才触发 Bevy 全量编译。Windows 下 debug 产物可达 >2GB 并触发 `os error 193`，故用 release。
 
+### 自建服务器（联机）
+
+服务端与客户端都支持用**第一个命令行参数**指定地址（默认 `127.0.0.1:8888`，仅本机回环）：
+
+```powershell
+# 服务器侧：监听所有网卡，供局域网 / 公网联机
+cod_server.exe 0.0.0.0:8888
+
+# 玩家侧：连接指定服务器
+cod1.exe 服务器地址:8888
+```
+
+服务端进程还**内置 Web 入口**（服务器门户 / 运维 API / 浏览器游玩桥），由 `ServerCode/config/web.yaml` 驱动（运行时同路径文件可覆盖，语义同 `element_reactions.yaml`）：
+
+| 项 | 说明 |
+|---|---|
+| 门户 / 状态页 | `http://服务器IP:8080`（在线人数 / 版本 / 公告） |
+| HTTPS | 端口 `8443`，内置证书加载，路径 `certs/fullchain.pem` + `certs/privkey.pem`（`web.yaml` 可改） |
+| 运维 API | `/api/status` · `/api/players` · `/api/announce` · `/api/kick`，Bearer token 鉴权 |
+| token 配置 | **只从环境变量读取**（变量名默认 `COD_WEB_TOKEN`，可在 `web.yaml` 改名）——**不落配置文件、不写日志** |
+
+> 安全建议：Web 明文端口（8080）建议仅内网使用或置于反向代理后；token 不要写进任何仓库、脚本或聊天窗口。
+
 ### Demo 操作方式
+
+<details>
+<summary><b>完整操作表（点开展开）</b></summary>
 
 | 按键组 | 具体按键 | 默认触发 |
 |---|---|---|
@@ -89,6 +127,8 @@ cargo-wrap build --release --workspace      # 发布构建，产出 cod_server.e
 > SpringArm 撞墙缩回（贴墙最小 0.7m）、离墙缓伸，地面高度钳制 ≥0.35m；射击判定自相机视线出发（与准星一致），
 > 曳光从枪口收敛到命中点；命中靶板中心红心判定弱点（×1.8 伤害，即时射线无下坠）；手雷保持 12 m/s² 重力抛物线，
 > 且必须"先瞄准后释放"。
+
+</details>
 
 ---
 

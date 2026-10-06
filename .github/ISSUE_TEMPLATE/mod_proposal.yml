@@ -1,0 +1,36 @@
+name: Mod / 内容提案
+description: 提议新的配置表内容、地图、物品、干员或 Mod 思路
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        本项目**改玩法 = 改 YAML / 纯数据**，核心库不硬编码玩法——提案时请尽量往
+        「改哪张表、加什么数据」的方向描述，越接近配置表越容易落地。
+  - type: dropdown
+    id: kind
+    attributes:
+      label: 提案类型
+      options:
+        - 新地图 / 场景改动
+        - 新物品 / 装备 / 物资
+        - 新干员 / 技能
+        - 元素反应 / 数值平衡
+        - 游戏模式
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: 提案内容
+      description: 想要什么、为什么有趣、大致的数值 / 数据形态
+    validations:
+      required: true
+  - type: textarea
+    id: tables
+    attributes:
+      label: 涉及的配置表 / 模块（若知道）
+      description: 如 element_reactions.yaml、items/presets.rs、ContractCode/map/...
+    validations:
+      required: false
