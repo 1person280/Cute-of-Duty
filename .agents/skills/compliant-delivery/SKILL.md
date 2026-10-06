@@ -168,9 +168,10 @@ git push -u origin <branch>          # origin = https://github.com/1person280/Cu
 |---|---|---|
 | `cod_server.exe` | `target/release/` | 服务端，先启动（默认 `127.0.0.1:8888`） |
 | `cod1.exe` | `target/release/` | 客户端，后启动 |
+| `启动游戏.bat` | `tools/启动游戏.bat` | **一键启动**（自 0.14.1 补发起入包）：先起服等就绪再拉客户端，退出自动收尾；须与双端 exe 同级（zip 根） |
 | `menu/` | `HostCode/menu/` | 客户端资源（`icon/settings.png` 图标 + `zcool_kuaile.ttf` 字体等） |
 | `LICENSE` / `LICENSE-ASSETS` / `CLA.md` | 仓库根 | **许可随版本发布**，缺一不可 |
-| `使用说明.txt` | 生成 | 运行顺序 + 资源路径提示（见下） |
+| `使用说明.txt` | 生成 | 一键启动 + 运行顺序 + 资源路径提示（见下） |
 
 命名规范：`CuteOfDuty-<版本号>-win64.zip`（如 `CuteOfDuty-0.10-win64.zip`）。
 
@@ -236,6 +237,6 @@ Remove-Item $stage -Recurse -Force; Remove-Item $zip -Force   # 省磁盘：GitH
 - 提交信息：`<type>(<scope>): 为什么`，一次一件事，重构≠功能。
 - 推送：分支语义化，`main` 不 force-push、不重写历史；L2 先开 Issue + ≥2 reviewer（单人维护期按 2.3 过渡条款豁免，但须在记录中声明）。
 - 发布：统一版本号 `x.y.z`（`x` 内核 · `y` 协议 · `z` 细节，各按判据 +1），**无 v 前缀**；**版本信息必须 4 个汉字**（Release 标题 `x.y.z：<4字简述>`，如 `0.11.0：通信优化`）；五件套（README 版本表 / BarekHistory / tag / GitHub Release / 双端 exe 二进制 zip）一次对齐；**每次 release 必带简短代码更改 + 扁平化更新**；**上版「未做 / 本轮冻结」两份欠账清单未了结者必须逐条结转（标注来源版本，不得静默丢失 / 不得"与上版一致"整段省略），「未做」须按来源版本分组、一条一行、组间留空行；「下一版本目标」不逐版复制，只写「见 README〈六、已采纳未来形态〉」**；冻结项不写"已完成"。
-- 打包：只打 `--release` 双端 exe；zip 含 exe + `menu/` + 三份许可 + 使用说明；命名 `CuteOfDuty-<版本号>-win64.zip`；补发用 `gh release upload --clobber`，上传后删本地 zip；说明须写明资源绝对路径限制。
+- 打包：只打 `--release` 双端 exe；zip 含 exe + `启动游戏.bat` + `menu/` + 三份许可 + 使用说明；命名 `CuteOfDuty-<版本号>-win64.zip`；补发用 `gh release upload --clobber`，上传后删本地 zip；说明须写明资源绝对路径限制。
 - 免责声明：README 顶部免责声明仍在位（**项目成为热门项目之前不得移除 / 缩短 / 弱化**）。
 - 编译一律 `cargo-wrap`；发布构建一律 `--release`。

@@ -174,7 +174,7 @@ GitHub 不提供转化漏斗，用**可得的公开计数**做代理指标：
 - [x] B1 一键启动脚本已入库 `tools/启动游戏.bat`（缺 exe 报错分支实测通过；服务器端口就绪探测对真实 release 服务器实测通过；**双击全流程待 owner 实机验收**——打 Release zip 时放入根目录）
 - [x] B2 README 明确单人可玩路径
 - [x] B3 自建服务器章节无 token 明文
-- [ ] C1 awesome-bevy PR 已提交（**已提交待合并**：bevyengine/bevy-assets#618，2026-10-06）
+- [x] C1 awesome-bevy PR 已合并（bevyengine/bevy-assets#618，2026-10-06 无评审意见直接合入）
 - [x] C2 Discussions 已开启（默认板块）+ Bug/Mod 提案两类 issue 表单就绪（随下次 push 生效）
 - [ ] C3 下一 Release 说明含玩家视角摘要段（模板已备，见 C3 节）
 - [x] 九、合规红线 6 条逐条自检通过
