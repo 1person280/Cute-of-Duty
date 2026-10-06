@@ -156,6 +156,8 @@ git push -u origin <branch>          # origin = https://github.com/1person280/Cu
    gh release create x.y.z --title "x.y.z：<4字简述>" --notes-file <说明文件>
    ```
 5. **二进制分发包（zip 资产）**：把 `--release` 产出的双端 exe 打包成 zip 挂到该 Release —— 见 3.4。
+6. **Release note 顶部玩家视角摘要段**（自 0.15.0 起，源自计划 0005 C3）：置于正文最顶部、技术账之前——
+   `**本版本你终于能**：①<人话能力 1> ②<人话能力 2>。**上手**：下载 zip → 解压 → 双击 启动游戏.bat。**遇到问题**：Issue（Bug 报告模板）/ 讨论区。`
 
 ### 3.4 双端 exe 打包（Release 资产）
 

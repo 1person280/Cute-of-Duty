@@ -1,6 +1,8 @@
 # 0005 · GitHub 宣发计划
 
-> **执行状态**（2026-10-06）：阶段 A（A1–A4）、B（B1–B3）、C（C1–C3，C1 待合并 / C3 待下个 Release）均已落地。
+> **执行状态**（2026-10-06）：**已全部收口**——A（A1–A4）、B（B1–B3）落地；C1 已合并（bevy-assets#618）、
+> C2 生效、C3 已收敛进 [compliant-delivery 技能 3.3 第 6 条](../../.agents/skills/compliant-delivery/SKILL.md)
+> （每次 Release 自动执行，本计划不再挂账）；阶段 D 迁出至 [0006 暂缓项](0006-GitHub宣发暂缓项.md)。
 > B1 落地偏差：启动脚本**入库 `tools/启动游戏.bat`**（修正原「不入库」决定——不入库则无法版本化迭代，
 > Release 打包也无固定来源；`tools/` 为既有脚本惯例位置）。
 > A1 落地偏差：头图复用宣发封面 `cover_1280x720.png`（横版视频无法直接内嵌 README），
@@ -117,24 +119,20 @@ GitHub 不提供转化漏斗，用**可得的公开计数**做代理指标：
 - 加两类 issue 模板：**Bug（附版本号/双端版本/复现步骤）** 与 **Mod/内容提案**。
 - 单人项目优势：回复快 = 好感度高，GitHub 用户吃这套；但需设定节奏，避免被 issue 淹没。
 
-### C3. Release 节奏 = 宣发节奏
-- 每个 Release 的说明首行用「**本版本你终于能做什么**」的人话，而非 changelog 堆砌（现有版本说明已是逐条技术账，建议**顶部加一段玩家视角摘要**）。
-- **摘要段模板**（置于 Release 说明正文最顶部，技术账保持在其后）：
-  > **本版本你终于能**：①<人话能力 1> ②<人话能力 2>。
-  > **上手**：下载 zip → 解压 → 双击 `启动游戏.bat`。
-  > **遇到问题**：[Issue（Bug 报告）](https://github.com/1person280/Cute-of-Duty/issues/new?template=bug_report.yml) / [讨论区](https://github.com/1person280/Cute-of-Duty/discussions)。
+### C3. Release 节奏 = 宣发节奏（**已收敛进 compliant-delivery 技能 3.3 第 6 条**）
+- 玩家视角摘要段（本版本你终于能 / 上手 / 反馈入口）自 0.15.0 起作为 Release 五件套第 6 件，
+  模板与执行点见 [SKILL.md 3.3](../../.agents/skills/compliant-delivery/SKILL.md)——每次发布自动带上，
+  本计划不再挂账。
 - 预发布照常挂 `--prerelease`，正式版不挂——保住 release feed 的信噪比。
 - watcher 会在发版时收到通知，**稳定发版本身就是持续曝光**。
 
 ---
 
-## 七、阶段 D · 暂缓项（高成本，明确不做）
+## 七、阶段 D · 暂缓项（已迁出 → [0006](0006-GitHub宣发暂缓项.md)）
 
-| 项 | 为什么暂缓 |
-|---|---|
-| 浏览器 3D 客户端 | 客户端依赖 `bevy_dylib` 动态装载 + 独立服务端进程 TCP；浏览器既无 dylib 也无原生 TCP。工作量大，属独立版本工程，**不在本宣发计划内** |
-| Steam 商店页 | 超出「仅 GitHub」范围；且与「非商业同人」定位存在张力，需先解决定位问题 |
-| 内嵌网页试玩（Pages） | 现有 Web 桥只能握手收快照，**不能渲染游戏**；先做 B1 的本地一键包收益更高 |
+浏览器 3D 客户端 / Steam 商店页 / 内嵌网页试玩三项整体迁出至
+[0006 GitHub 宣发暂缓项](0006-GitHub宣发暂缓项.md)（含各自的卡点与重启条件）。
+**任意一项要动工时单开 0007+ 计划文档，不回填本计划。**
 
 ---
 
@@ -171,10 +169,11 @@ GitHub 不提供转化漏斗，用**可得的公开计数**做代理指标：
 - [x] A1 README 首屏含定位 + 头图 + 三步跑起来
 - [x] A2 徽章数值与 `Cargo.toml` / `rust.yml` 一致，CI badge 动态
 - [x] A3 仓库 About 已配 Topics（11 个）
-- [x] B1 一键启动脚本已入库 `tools/启动游戏.bat`（缺 exe 报错分支实测通过；服务器端口就绪探测对真实 release 服务器实测通过；**双击全流程待 owner 实机验收**——打 Release zip 时放入根目录）
+- [x] B1 一键启动脚本已入库 `tools/启动游戏.bat`（缺 exe 分支与端口就绪探测实测通过；双击全流程经 owner 实机验收通过，2026-10-06；已随 0.14.1 zip `--clobber` 补发）
 - [x] B2 README 明确单人可玩路径
 - [x] B3 自建服务器章节无 token 明文
 - [x] C1 awesome-bevy PR 已合并（bevyengine/bevy-assets#618，2026-10-06 无评审意见直接合入）
 - [x] C2 Discussions 已开启（默认板块）+ Bug/Mod 提案两类 issue 表单就绪（随下次 push 生效）
-- [ ] C3 下一 Release 说明含玩家视角摘要段（模板已备，见 C3 节）
+- [x] C3 已收敛进 compliant-delivery 技能 3.3 第 6 条（自 0.15.0 起每次 Release 自动执行）
+- [x] 阶段 D 已迁出至 [0006 暂缓项](0006-GitHub宣发暂缓项.md)（动工时单开 0007+，不回填本计划）
 - [x] 九、合规红线 6 条逐条自检通过
