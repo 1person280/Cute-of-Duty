@@ -17,7 +17,7 @@
 # =============================================================================
 
 contract: protocol
-version: 0.14.0
+version: 0.14.2
 status: draft
 owner_module: ContractCode/net
 authoritative_impl: ContractCode/net/protocol.rs

@@ -24,6 +24,35 @@
 
 ---
 
+## [0.14.2] · 2026-10-06 · 傻瓜上手（仓库首个正式版）
+
+- **变更类型**：Fix（**发布治理 / 文档 / 工具**，无 `.rs` 代码更改；不触碰线格式）
+- **影响模块**：仓库门面 —— `README.md`（版本表 `0.14.2` 行）、`docs/plans/0005-GitHub宣发计划.md`（收口）、
+  `docs/plans/0006-GitHub宣发暂缓项.md`（新建，阶段 D 迁出）、`.agents/skills/compliant-delivery/SKILL.md`
+  （打包清单纳入一键脚本 + Release note 第 6 件摘要段规约）、`.github/ISSUE_TEMPLATE/`（Bug / Mod 提案表单）、
+  `docs/media/cover_1280x720.png`（README 头图）、`tools/启动游戏.bat`（一键启动，GBK 编码）、
+  三端 `Cargo.toml` / `Cargo.lock`（版本 `0.14.1` → `0.14.2`）、
+  `docs/contracts/{protocol,web}.yaml`（**`version:` 漏网随动修正**：`0.14.0` / `0.13.0` → `0.14.2`）。
+- **兼容性**：**兼容**（`z+1`）—— 不触碰线格式 / 配置语义 / 公共 Trait；`wire_version` 仍为 **14**，
+  双端 `0.14.2` 与 `0.14.x` 互通。契约 YAML 仅修 `version:` 字段（文档元信息），**不含线格式语义变化**。
+- **迁移指南**：不适用（非协议不兼容）。
+- **内容**：
+  - **① 分发包一键启动**：Release zip 新增 `启动游戏.bat`（先起服务器 → TCP 8888 就绪探测 → 拉起客户端；
+    客户端退出自动收尾服务器进程）；`使用说明.txt` 重写（一键步骤 + 资源路径编译期绑定的运行限制声明）。
+    自本版起 `启动游戏.bat` 为固定入包项（`compliant-delivery` 3.4 打包清单）。
+  - **② GitHub 宣发基建收口**（计划 0005 全项落地）：README 首屏商店化（头图 / 三步跑起来 / CI 动态徽章 /
+    操作长表折叠）、topics 补全、bevy-assets **PR #618 收录已合并**、Discussions 开通 + 两类 issue 表单、
+    自建服务器文档化（`COD_WEB_TOKEN` 环境变量纪律）。
+  - **③ 版本号漏网修正**：契约 YAML `version:` 自 0.13.0 起未随动（0.14.0/0.14.1 两版均漏），
+    本版一并同步至 `0.14.2`；后续由 compliant-delivery 五件套检查项兜底。
+  - **④ 首个正式版说明**：经 owner 决定取消预发布标记（Bevy 弃用迁徙要到 0.17+ 才有压力，
+    且当前无恶性 bug），自本版起 Release 不再默认挂 `--prerelease`，是否预发布逐版判断。
+- **验证**：零 `.rs` 变更（`git diff 0.14.1` 仅版本号 / 文档 / 工具 / 资产），按「纯文档 + 版本号变更
+  不跑编译」惯例免编译；zip 复用 `0.14.1` release exe（tag 后游戏代码零 diff）；一键启动全流程
+  经 owner 实机验收通过（2026-10-06）。
+- **关联**：[README 版本表](../README.md)、[计划 0005](plans/0005-GitHub宣发计划.md)、
+  [0006 暂缓项](plans/0006-GitHub宣发暂缓项.md)、[bevy-assets#618](https://github.com/bevyengine/bevy-assets/pull/618)。
+
 ## [0.14.1] · 2026-10-03 · 文档大扫除（`module.md` 规范化 + Bevy 0.16 迁移）
 
 - **变更类型**：Refactor（文档 / 规范 + 版本号 + **Bevy 0.15 → 0.16 源码迁移**；不触碰线格式）
