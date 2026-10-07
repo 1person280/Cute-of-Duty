@@ -1910,7 +1910,7 @@ checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
 name = "cute_of_duty_contract"
-version = "0.14.2"
+version = "0.14.3"
 dependencies = [
  "serde",
  "serde_json",
@@ -1918,7 +1918,7 @@ dependencies = [
 
 [[package]]
 name = "cute_of_duty_host"
-version = "0.14.2"
+version = "0.14.3"
 dependencies = [
  "bevy",
  "cute_of_duty_contract",
@@ -1929,7 +1929,7 @@ dependencies = [
 
 [[package]]
 name = "cute_of_duty_server"
-version = "0.14.2"
+version = "0.14.3"
 dependencies = [
  "blake3",
  "criterion",

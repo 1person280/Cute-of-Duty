@@ -4,6 +4,7 @@
 //! 表现层按子域拆成与 `launcher` 平级的六个顶层模块（`flow`/`net`/`menu`/`hud`/
 //! `world`/`shared`），`launcher` 仅作装配层把它们的系统挂进 Bevy App。
 
+mod diag;
 mod flow;
 mod hud;
 mod launcher;

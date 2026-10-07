@@ -134,7 +134,9 @@ pub fn run(addr: &str) {
                     // 光标锁定随状态/暂停翻转，需在各状态下都跑（自身判态，无 run_if）。
                     // Esc「无 UI 时释放鼠标」先行置位软开关，再交由 cursor_lock_system 一并翻转。
                     crate::menu::cursor_release_toggle.run_if(in_state(AppState::InGame)),
-                    crate::menu::cursor_lock_system,
+                    // OOM 诊断（默认关闭，`COD_FX_TRACE=1` 启用）与光标锁封装一层：`.chain()` 只对
+                    // ≤20 元组提供实现，外层元组已满员，降维保持既有顺序不变。
+                    (crate::menu::cursor_lock_system, crate::diag::report).chain(),
                 )
                     .chain(),
                 // 模态仲裁：生产者（hud/menu）对照源状态发差量事件 → flow 落账进唯一 ModalState。

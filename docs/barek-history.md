@@ -24,6 +24,33 @@
 
 ---
 
+## [0.14.3] · 2026-10-07 · 调试模式（`0.14.x` 系热修复）
+
+- **变更类型**：Fix（**诊断工具 / 文档收口**；新增客户端 `.rs` 但不触碰线格式 / 配置语义 / 公共 Trait）
+- **影响模块**：HostCode —— 新增 `diag.rs`（OOM 诊断系统）、`main.rs`（`mod diag` 注册）、
+  `launcher/mod.rs`（`diag::report` 挂 Update 链尾，与 `cursor_lock_system` 封层降维保 `.chain()` ≤20 元组）；
+  仓库门面 —— `README.md`（〈八〉渲染内存条目改写 + 版本表 `0.14.3` 行）、
+  `.agents/skills/compliant-delivery/SKILL.md`（新增「热修复版本（hotfix）规约」：`z` 段顺延 +1、`y` 段不动、
+  轻量流程与 zip 复用判据）、三端 `Cargo.toml` / `Cargo.lock` / 契约 YAML（版本 `0.14.2` → `0.14.3`）。
+- **兼容性**：**兼容**（`z+1`，`0.14.x` 系热修复）—— 诊断器默认关闭（`COD_FX_TRACE` 未设时首帧即短路返回），
+  正常游玩零开销；`wire_version` 仍为 **14**，双端 `0.14.3` 与 `0.14.x` 互通。
+- **迁移指南**：不适用（非协议不兼容）。
+- **内容**：
+  - **① OOM 诊断器落地**：`diag::report` 每 5s 打印 `时间s | 实体 | Mesh | StdMat | Image | Font`，
+    某列单调上涨即为泄漏源方向；delta 取 `Time::delta` 真实帧时长（开发中修正过两处计时 bug：
+    delta 写死 `Duration::ZERO` 致计时器永不走满、Repeating 计时器 finished 帧回绕致时间列恒 0，
+    后者改独立累加 `total`）。
+  - **② 渲染内存挂账收口**：`COD_FX_TRACE=1` 实机挂机 **38 分钟（468 条样本）**，实体 `2376` 恒定、
+    `Mesh 18 / StdMat 47 / Image 32 / Font 2` 全程零增长（偏离基线仅启动/进图瞬时 2 条），
+    README〈八〉改判「已复验通过」并附**保修边界警告**：结论仅覆盖当前训练场场景，
+    未来拓展大世界 / 长时地图 / 高频特效玩法必须用 `diag.rs` 重测，**当前结果不构成保修承诺**。
+  - **③ 交付技能热修复规约**：`0.14.2` / `0.14.3` 定性为 `0.14.1` 系热修复版本，规约写入本项目
+    SKILL.md 并同步 RustJ 仓库（`Desktop/RustJ`）。
+- **验证**：`cargo check -p cute_of_duty_host` 退出码 `0`；`cargo metadata --no-deps` 版本自洽
+  （三端 + `Cargo.lock` 全 `0.14.3`，零编译验证）；双端 `cargo build --workspace --release` 重建；
+  38 分钟挂机数据见上。诊断器修复后经实机确认输出正常（时间列走真实秒数）。
+- **关联**：[README〈八〉已知问题](../../README.md)、README 版本表 `0.14.3` 行。
+
 ## [0.14.2] · 2026-10-06 · 傻瓜上手（仓库首个正式版）
 
 - **变更类型**：Fix（**发布治理 / 文档 / 工具**，无 `.rs` 代码更改；不触碰线格式）
