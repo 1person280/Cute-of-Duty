@@ -185,8 +185,18 @@ pub enum InventoryAction {
 pub enum EventKind {
     /// 击杀了目标（击杀播报 + 连击计数）
     Kill { killer_id: u64, victim_id: u64 },
-    /// 被击中（受击反馈，扣血红圈 + 爆头判定）
-    Hit { source_id: u64, target_id: u64, is_headshot: bool },
+    /// 被击中（受击反馈，扣血红圈 + 爆头判定）。
+    ///
+    /// `damage` 与 `reaction` 由服务端权威结算后随事件下发（0.15.0 新增）：
+    /// 客户端无权也不应推算伤害数值，只做展示——这是"命中反馈飘字"的数据来源。
+    /// `reaction` 携带元素反应枚举名（无反应为 `None`）。
+    Hit {
+        source_id: u64,
+        target_id: u64,
+        is_headshot: bool,
+        damage: f32,
+        reaction: Option<String>,
+    },
     /// 拾取物品
     Pickup { item_name: String },
     /// 区域/战局通告（撤离可用、抽水到账等文本）

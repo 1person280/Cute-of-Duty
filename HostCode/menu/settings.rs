@@ -199,9 +199,14 @@ pub fn settings_apply_fov(
 }
 
 /// 把设置的环境亮度写入世界 `AmbientLight`（仅当值变化时）。
+///
+/// 量纲映射（Why）：设置面板存储的逻辑亮度 0.10–1.20 沿用 bevy 0.15 的倍率习惯；
+/// bevy 0.16 起 `brightness` 与光照强度同量纲（lux），故统一 ×4000 映射到物理值
+/// （默认 0.55 → 2200 lux，对齐 8000 lux 主光的露天观感）。基准线 `spawn_scene_baseline`
+/// 的首帧兜底值 = 默认逻辑值 × 同一系数，两处需同步修改。
 pub fn settings_apply_ambient(settings: Res<GameSettings>, mut ambient: ResMut<AmbientLight>) {
     if !settings.is_changed() {
         return;
     }
-    ambient.brightness = settings.ambient_brightness;
+    ambient.brightness = settings.ambient_brightness * 4_000.0;
 }

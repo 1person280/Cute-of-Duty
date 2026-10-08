@@ -35,8 +35,8 @@ pub const MAIN_PAYLOAD_BYTES: usize = PACKET_BYTES - HEADER_BYTES;
 pub const RES_PAYLOAD_BYTES: usize = RES_PACKET_BYTES - HEADER_BYTES;
 /// 帧魔数 "COD1"（小端读出 = 0x434F4431）。
 pub const MAGIC: u32 = 0x434F_4431;
-/// 线格式版本（与协议 y 位对齐；0.14 = 小定长包 + 指令优先世代 + 服务端预设/世界目录）。
-pub const WIRE_VERSION: u16 = 14;
+/// 线格式版本（与协议 y 位对齐；0.15 = 事件 `Hit` 扩伤害/反应字段 + 命中反馈世代）。
+pub const WIRE_VERSION: u16 = 15;
 
 /// 连接角色：由首条绑定包决定，之后固定该连接的包长。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

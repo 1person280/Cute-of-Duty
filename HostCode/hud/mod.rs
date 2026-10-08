@@ -11,6 +11,7 @@ pub(crate) mod backpack;
 pub(crate) mod bigmap;
 pub(crate) mod button;
 pub(crate) mod crosshair;
+pub(crate) mod feedback;
 pub(crate) mod grenade;
 pub(crate) mod interact;
 pub(crate) mod item;
@@ -35,6 +36,7 @@ pub(crate) use button::panel::{
     sync_button_panel, ButtonPanelState,
 };
 pub(crate) use crosshair::update_crosshair;
+pub(crate) use feedback::update_hit_feedback;
 pub(crate) use grenade::hint::{reset_held_grenade, sync_held_grenade, HeldGrenadeState};
 pub(crate) use interact::panel::{sync_interact_menu, sync_interact_panel};
 pub(crate) use interact::{

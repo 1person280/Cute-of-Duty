@@ -6,12 +6,14 @@
 //! 命名约定：单词语义概念直接作文件名；两词概念单开子目录（如 `voxel/model.rs`），
 //! 不再用下划线拼接文件名。
 
+pub(crate) mod aiming;
 pub(crate) mod camera;
 pub(crate) mod grenade;
 pub(crate) mod model;
 pub(crate) mod scene;
 pub(crate) mod voxel;
 
+pub(crate) use aiming::{draw_aim_line, Tracer};
 pub(crate) use camera::{follow_system, mouse_look_system, spawn_camera, sync_grenade_aim};
 pub(crate) use grenade::preview::draw_grenade_preview;
 pub(crate) use scene::{spawn_scene_baseline, spawn_world_when_ready};

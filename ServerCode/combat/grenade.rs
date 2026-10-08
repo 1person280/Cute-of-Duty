@@ -188,7 +188,7 @@ pub fn apply_explosion(
         let falloff = (1.0 - dist / radius).max(0.3);
         let Some(target) = world.get_entity_mut(tid) else { continue };
         let packet = DamagePacket::new(element, base_damage * falloff, source).with_source_pos(pos);
-        resolver.resolve(target, &packet, env);
+        let outcome = resolver.resolve(target, &packet, env);
 
         // 机制：点燃 DoT 挂到目标
         if effect.burn_secs > 0.0 && effect.burn_dps > 0.0 {
@@ -207,7 +207,7 @@ pub fn apply_explosion(
             events.push(CombatEvent::Kill { killer: source.as_u64(), victim: tid.as_u64() });
         } else {
             // 载具伤害事件仅统计命中（爆炸没有“弱点头”概念）
-            events.push(CombatEvent::Hit { source: source.as_u64(), target: tid.as_u64(), is_headshot: false });
+            events.push(CombatEvent::Hit { source: source.as_u64(), target: tid.as_u64(), is_headshot: false, damage: outcome.damage, reaction: outcome.reaction });
         }
     }
 }

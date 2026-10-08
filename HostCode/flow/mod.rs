@@ -14,10 +14,11 @@ pub(crate) mod state;
 pub(crate) use state as flow_state;
 
 pub(crate) use state::{
-    route_control_messages, setup_global, AppState, CjkFont, LoadoutPresets, LocalPlayer,
-    ModelCatalog, WorldCatalog,
+    route_control_messages, setup_global, AimRig, AppState, CjkFont, HitFeedback, LoadoutPresets,
+    LocalPlayer, ModelCatalog, WorldCatalog,
 };
 pub(crate) use settings::{apply_setting_step, setting_label, setting_step, GameSettings, SettingKind};
+pub(crate) use state::{style, text};
 pub(crate) use loading::{loading_tick, spawn_loading};
 pub(crate) use modal::{
     apply_modal_changes, ModalChange, ModalKind, ModalState, PauseOpenRequest,

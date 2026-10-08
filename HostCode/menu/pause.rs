@@ -302,11 +302,11 @@ pub fn cursor_lock_system(
 ) {
     let lock = *state.get() == AppState::InGame && !modal.releases_cursor();
     for mut window in &mut windows {
-        let grab = if lock { CursorGrabMode::Locked } else { CursorGrabMode::None };
-        if window.cursor_options.grab_mode != grab {
-            window.cursor_options.grab_mode = grab;
-            window.cursor_options.visible = !lock;
-        }
+        // 无条件重写（不做 `!=` 短路）：Windows 上窗口失焦（Alt-Tab / 切任务管理器）会
+        // 就地释放光标禁锢，而 bevy 侧 grab_mode 仍记录 Locked——短路会让我们永远不再
+        // 恢复，切回游戏后鼠标逃逸出准星。同值重复写入是 winit 层轻量调用，开销可忽略。
+        window.cursor_options.grab_mode = if lock { CursorGrabMode::Locked } else { CursorGrabMode::None };
+        window.cursor_options.visible = !lock;
     }
 }
 

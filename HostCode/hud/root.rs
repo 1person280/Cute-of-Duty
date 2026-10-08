@@ -53,6 +53,7 @@ pub fn spawn_hud(
             super::skills::spawn_skills(p, &fonts);
             super::minimap::spawn_minimap(p, &fonts, &layout);
             super::crosshair::spawn_crosshair(p);
+            super::feedback::spawn_hit_feedback(p, &fonts);
             super::kill::counter::spawn_kill_counter(p, &fonts, &kills);
             spawn_extract_label(p, &fonts);
             // 持雷提示（按本人快照 `held_grenade` 派生显隐，默认隐藏）。

@@ -38,7 +38,7 @@ mod tests {
 
         let damage = DamagePacket::new(ElementType::Fire, 50.0, EntityId(2));
 
-        let final_damage = resolver.resolve(&mut target, &damage, &EntityElementState::Normal);
+        let final_damage = resolver.resolve(&mut target, &damage, &EntityElementState::Normal).damage;
 
         // 基础50伤害，无元素反应倍率1.0，防御减伤 100/(100+50) = 0.667
         // 期望伤害约 50 * 0.667 = 33.3
@@ -59,9 +59,9 @@ mod tests {
         // 潮湿目标受到火攻击 = 蒸发 (1.5倍)
         let damage = DamagePacket::new(ElementType::Fire, 100.0, EntityId(2));
         let final_damage = resolver.resolve(&mut target, &damage, &EntityElementState::Normal);
-
-        // 期望: 100 * 1.5 (蒸发倍率) * 1.0 (无防御) = 150
-        assert!((final_damage - 150.0).abs() < 1.0);
+        // 期望: 100 * 1.5 (蒸发倍率) * 1.0 (无防御) = 150；且应触发蒸发反应
+        assert!((final_damage.damage - 150.0).abs() < 1.0);
+        assert_eq!(final_damage.reaction.as_deref(), Some("Vaporize"));
     }
 
     #[test]

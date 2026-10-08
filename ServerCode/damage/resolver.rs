@@ -10,6 +10,19 @@ use crate::element::{ElementSystem, ElementType, EntityElementState, ReactionRes
 use crate::entity::Entity;
 use super::*;
 
+/// 一次伤害结算的结果（0.15.0 新增）。
+///
+/// 设计动机（Why）：命中反馈飘字需要"真实伤害 + 触发的反应名"二者都由服务端权威给出，
+/// 过去 `resolve` 只返回伤害数值、反应在内部消化，客户端拿不到反应信息。本结构仅是
+/// 服务端内部签名——线格式归属仍在 `EventKind::Hit`（由 shooter/grenade 构造事件时填充）。
+#[derive(Debug, Clone, PartialEq)]
+pub struct ResolveOutcome {
+    /// 最终伤害数值（已应用所有修正）
+    pub damage: f32,
+    /// 本次结算触发的元素反应枚举名（未触发为 `None`）
+    pub reaction: Option<String>,
+}
+
 /// 伤害结算器
 ///
 /// 内部持有Arc<ElementSystem>，克隆开销极小，
@@ -32,8 +45,8 @@ impl DamageResolver {
     /// - `environment`: 当前环境状态
     ///
     /// # 返回
-    /// 最终伤害数值（已应用所有修正）
-    pub fn resolve(&self, target: &mut Entity, damage: &DamagePacket, environment: &EntityElementState) -> f32 {
+    /// 结算结果（最终伤害数值 + 触发的反应名）
+    pub fn resolve(&self, target: &mut Entity, damage: &DamagePacket, environment: &EntityElementState) -> ResolveOutcome {
         // Step 1: 元素修正
         let element_multiplier = self.element_system.calculate_damage_multiplier(
             &target.element_state,
@@ -65,8 +78,10 @@ impl DamageResolver {
             * crit_multiplier
             * side_effect_multiplier;
 
-        // Step 7: 副作用附加（根据元素反应结果）
+        // Step 7: 副作用附加（根据元素反应结果；反应名随结算结果带出，供命中反馈展示）
+        let mut reaction_name = None;
         if let Some(reaction) = self.element_system.query_reaction(&target.element_state, &damage.element) {
+            reaction_name = Some(format!("{:?}", reaction.result));
             for effect in &reaction.attach_effects {
                 self.apply_reaction_effect(target, effect);
             }
@@ -86,7 +101,7 @@ impl DamageResolver {
             target.hp = 0.0;
         }
 
-        final_damage
+        ResolveOutcome { damage: final_damage, reaction: reaction_name }
     }
 
     /// 计算距离衰减

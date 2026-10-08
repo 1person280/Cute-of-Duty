@@ -73,6 +73,8 @@ pub fn run(addr: &str) {
         .init_resource::<crate::hud::BackpackPanelState>()
         // 持雷派生资源常驻（默认未持雷；相机越肩/上行左键语义/Esc 门控共读）。
         .init_resource::<crate::hud::HeldGrenadeState>()
+        // 曳光瞬时状态常驻（默认无曳光；开火瞬间由 draw_aim_line 写入并自行熄灭）。
+        .init_resource::<crate::world::Tracer>()
         // 可点击操作按钮组门控资源常驻（默认关；`gameplay_input_active` 与光标锁定读其 open）。
         .init_resource::<crate::hud::ButtonPanelState>()
         // 「无 UI 时释放鼠标」软开关（Esc 主动交还光标；默认锁定）。
@@ -124,6 +126,13 @@ pub fn run(addr: &str) {
                     crate::world::sync_grenade_aim,
                     // 投掷轨迹预览：读同一份持雷态与朝向，用与服务器同源的弹道常数画预测抛物线。
                     crate::world::draw_grenade_preview,
+                    // 激光瞄准线 + 曳光（仅本人本地可见；持雷时让位给抛物线预览）。
+                    crate::world::draw_aim_line,
+                )
+                    .chain(),
+                // 相机跟随及后续 UI/诊断：`.chain()` 只对 ≤20 元组提供实现，
+                // 0.15 加入瞄准线后常驻链超员，拆成第二个子链保持总顺序不变。
+                (
                     crate::world::follow_system.run_if(crate::menu::pause_closed),
                     crate::shared::refresh_ui_ready,
                     crate::net::caps_toggle,
@@ -134,8 +143,7 @@ pub fn run(addr: &str) {
                     // 光标锁定随状态/暂停翻转，需在各状态下都跑（自身判态，无 run_if）。
                     // Esc「无 UI 时释放鼠标」先行置位软开关，再交由 cursor_lock_system 一并翻转。
                     crate::menu::cursor_release_toggle.run_if(in_state(AppState::InGame)),
-                    // OOM 诊断（默认关闭，`COD_FX_TRACE=1` 启用）与光标锁封装一层：`.chain()` 只对
-                    // ≤20 元组提供实现，外层元组已满员，降维保持既有顺序不变。
+                    // OOM 诊断（默认关闭，`COD_FX_TRACE=1` 启用）与光标锁封装一层。
                     (crate::menu::cursor_lock_system, crate::diag::report).chain(),
                 )
                     .chain(),
@@ -240,6 +248,8 @@ pub fn run(addr: &str) {
                     crate::hud::update_vitals_bars,
                     crate::hud::update_vitals_text,
                     crate::hud::update_crosshair,
+                    // 准星左侧命中反馈飘字（读 flow 侧 HitFeedback 资源，0.8s 淡出）。
+                    crate::hud::update_hit_feedback,
                     crate::hud::update_minimap,
                     crate::hud::update_skills,
                     crate::hud::update_feed,

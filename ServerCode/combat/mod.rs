@@ -47,8 +47,9 @@ pub const ZONE_TICK_SECS: f32 = 0.5;
 pub enum CombatEvent {
     /// 击杀：`killer` 击杀 `victim`
     Kill { killer: u64, victim: u64 },
-    /// 被命中：`source` 击中 `target`（`is_headshot` 供 HUD 爆头判定）
-    Hit { source: u64, target: u64, is_headshot: bool },
+    /// 被命中：`source` 击中 `target`（`is_headshot` 供 HUD 爆头判定；
+    /// `damage`/`reaction` 为服务端权威结算结果，0.15.0 新增，供命中反馈飘字展示）
+    Hit { source: u64, target: u64, is_headshot: bool, damage: f32, reaction: Option<String> },
 }
 
 /// 单 Tick 的战斗意图（由 `net::protocol::PlayerInput` 在 `main.rs` 映射而来）。

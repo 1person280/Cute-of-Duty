@@ -17,28 +17,24 @@
 # =============================================================================
 
 contract: protocol
-version: 0.14.3
+version: 0.15.1
 status: draft
 owner_module: ContractCode/net
 authoritative_impl: ContractCode/net/protocol.rs
 compat:
-  previous: 0.13.0
+  previous: 0.14.3
   breaking: true
   migration_guide: |
-    新增下行变体 `ServerMessage::WorldCatalog`（服务端权威的干员名册 + 活动地图布局），**线格式不兼容**：
-    `WIRE_VERSION` 13 → 14，老客户端连新服务端将在首条绑定包因版本号不符而断开。
+    `EventKind::Hit` 扩字段 `damage: f32` + `reaction: Option<String>`（0.15.1，服务端权威的命中
+    反馈数据），**线格式不兼容**：旧 JSON 反序列化将因缺字段失败。
+    `WIRE_VERSION` 14 → 15，双端必须同步升级到 0.15.1，无渐进兼容路径。
+    客户端消费：`flow::state` 路由 `source_id == 本人` 的命中 → `HitFeedback` 资源 →
+    `hud::feedback` 准星左侧飘字（爆头黄字、反应两行、0.8s 淡出）。
+    曳光/激光瞄准线仅本人本地可见；跨玩家曳光待 `Shot` 事件（未实现）。
     迁移步骤：
-      1. 服务端：`ContractCode/net/packet.rs` 的 `WIRE_VERSION` 置 14；`codec::encode_server` 把
-         `WorldCatalog` 编为控制类数据流（`DataKind::Control` + JSON），与既有变长控制消息同路；
-         连接建立后一次性下发该消息（静态冷数据，不进每帧快照通道）。
-      2. 客户端：升级 `WIRE_VERSION` 至 14；新增 `ServerMessage::WorldCatalog` 分支，把名册与地图
-         布局存入本地资源（`flow::WorldCatalog`），场景/HUD 改读该资源而不再直读契约静态表
-         （`operator::roster()` / `map::lawn::layout()`）；未识别的老客户端无法解析该 JSON 变体，故必须同步升级。
-      3. 浏览器骨架页（`ServerCode/net/web/portal.html`）的绑定包版本号同步置 14。
-    契约类型同步：`OperatorDef`/`SkillDef`/`SkillKind`/`SkillEffect` 与 `MapLayout`/`Prop`/`GlowSpec`/
-    `TargetSpec`/`StationSpec`/`PickupSpec`/`Motion` 新增 `Serialize/Deserialize`，其中标签/名称字段由
-    `&'static str` 改为 owned `String`（`ROSTER` 由 `const` 改为 `LazyLock`）。
-    老端处置：老客户端需同步升级到 0.14.0 才能与新服务端互通。
+      1. 双端同步升级到 0.15.1（`ContractCode/net/packet.rs` `WIRE_VERSION` 置 15）。
+      2. 客户端：`flow::state` 命中事件分支读取新字段；老客户端 JSON 反序列化因缺字段失败，无兼容路径。
+      3. 浏览器骨架页（`ServerCode/net/web/portal.html`）的绑定包版本号同步置 15。
 
 # -----------------------------------------------------------------------------
 # 传输层：小定长包 + 指令优先组包 + 双通道（0.12.0 起取代统一 64KB 槽帧）
@@ -187,6 +183,9 @@ downlink:
       - name: Handshake
       - name: Snapshot
       - name: Event
+        doc: 玩法事件（Kill / Hit / …）。0.15.1 起 Hit 载荷扩字段：
+             { source_id: u64, target_id: u64, is_headshot: bool, damage: f32, reaction: Option<String> }——
+             damage 与 reaction 为服务端权威结算结果，客户端只展示不推算（命中反馈飘字数据源）
       - name: Pong
       - name: PresetCatalog           # 0.13.0 新增
         added_in: 0.13.0

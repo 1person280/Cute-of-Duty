@@ -501,14 +501,14 @@ pub fn forward_combat_events(
                     rt.send_to(conn_id, ServerMessage::Event { kind: EventKind::Kill { killer_id: *killer, victim_id: *victim } });
                 }
             }
-            crate::combat::CombatEvent::Hit { source, target, is_headshot } => {
+            crate::combat::CombatEvent::Hit { source, target, is_headshot, damage, reaction } => {
                 // 命中反馈同时给射手（为自己命中出彩、训练靶计分 HUD）
                 // 与受击者（被击中掉血警示）。各查一次连接，未上线的一侧自动忽略。
                 if let Some(&conn_id) = eid_to_conn.get(&EntityId::new(*source)) {
-                    rt.send_to(conn_id, ServerMessage::Event { kind: EventKind::Hit { source_id: *source, target_id: *target, is_headshot: *is_headshot } });
+                    rt.send_to(conn_id, ServerMessage::Event { kind: EventKind::Hit { source_id: *source, target_id: *target, is_headshot: *is_headshot, damage: *damage, reaction: reaction.clone() } });
                 }
                 if let Some(&conn_id) = eid_to_conn.get(&EntityId::new(*target)) {
-                    rt.send_to(conn_id, ServerMessage::Event { kind: EventKind::Hit { source_id: *source, target_id: *target, is_headshot: *is_headshot } });
+                    rt.send_to(conn_id, ServerMessage::Event { kind: EventKind::Hit { source_id: *source, target_id: *target, is_headshot: *is_headshot, damage: *damage, reaction: reaction.clone() } });
                 }
             }
         }

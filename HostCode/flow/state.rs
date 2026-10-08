@@ -128,6 +128,39 @@ pub struct Announcements(pub Vec<String>);
 #[derive(Resource, Default)]
 pub struct KillCount(pub u32);
 
+/// 准星左侧命中反馈（0.15.0 新增）：最新一次**本人命中**的权威数值。
+///
+/// 设计动机（Why）：伤害数值与反应名由服务端结算、随 `EventKind::Hit` 下发；
+/// 本资源只承载「最新一条」的展示状态（新命中覆盖旧条目，0.8s 淡出由 HUD 侧推进），
+/// 客户端不做任何伤害推算。仅统计 `source_id == 本人` 的命中——受击警示是另一条 UI 线。
+#[derive(Resource, Default)]
+pub struct HitFeedback {
+    /// 服务端权威伤害数值。
+    pub damage: f32,
+    /// 元素反应枚举名（无反应为 `None`）。
+    pub reaction: Option<String>,
+    /// 是否爆头（爆头数字变黄）。
+    pub is_headshot: bool,
+    /// 淡出剩余秒数；≤0 表示无活跃条目。
+    pub remaining: f32,
+}
+
+impl HitFeedback {
+    /// 记录一次新命中（覆盖旧条目并重置淡出计时）。
+    pub fn record(&mut self, damage: f32, reaction: Option<String>, is_headshot: bool) {
+        self.damage = damage;
+        self.reaction = reaction;
+        self.is_headshot = is_headshot;
+        self.remaining = 0.8;
+    }
+
+    /// 推进淡出计时，返回推进后的剩余秒数。
+    pub fn tick(&mut self, dt: f32) -> f32 {
+        self.remaining = (self.remaining - dt).max(0.0);
+        self.remaining
+    }
+}
+
 /// 上行序号（Input/Ping 公用单调递增，服务端可据此去重回放）。
 #[derive(Resource, Default)]
 pub struct SeqCounter(pub u64);
@@ -142,6 +175,7 @@ pub fn setup_global(mut commands: Commands, mut fonts: ResMut<Assets<Font>>) {
     commands.insert_resource(LiveLatency::default());
     commands.insert_resource(Announcements::default());
     commands.insert_resource(KillCount(0));
+    commands.insert_resource(HitFeedback::default());
     commands.insert_resource(SeqCounter(0));
     commands.insert_resource(AimRig::default());
     commands.insert_resource(crate::net::latency::LatencyShow(false));
@@ -202,6 +236,7 @@ pub fn route_control_messages(
     mut live: ResMut<LiveLatency>,
     mut announces: ResMut<Announcements>,
     mut kills: ResMut<KillCount>,
+    mut feedback: ResMut<HitFeedback>,
     mut loadout_presets: ResMut<LoadoutPresets>,
     mut world_catalog: ResMut<WorldCatalog>,
     mut load_timer: Local<f32>,
@@ -232,6 +267,14 @@ pub fn route_control_messages(
                     // 只累计本人击杀（Kill 事件权威由服务端广播；victim 忽略）。
                     if killer_id == player.entity_id {
                         kills.0 += 1;
+                    }
+                }
+                ClientInbound::Server(ServerMessage::Event {
+                    kind: EventKind::Hit { source_id, damage, reaction, is_headshot, .. },
+                }) => {
+                    // 准星左侧反馈只关心本人命中的（受击警示走 vitals 红圈线）。
+                    if source_id == player.entity_id {
+                        feedback.record(damage, reaction, is_headshot);
                     }
                 }
                 ClientInbound::Server(ServerMessage::ReturnToMenu) => {

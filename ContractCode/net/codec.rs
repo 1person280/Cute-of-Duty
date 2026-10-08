@@ -450,6 +450,20 @@ mod tests {
         let WireMessage::Data(kind, bytes) = encode_server(&snap).unwrap() else { panic!("快照应为数据流") };
         assert_eq!(kind, DataKind::Snapshot);
         assert_eq!(decode_server_data(kind, &bytes).unwrap(), snap);
+
+        // Hit 事件（0.15 扩 damage/reaction 字段）走事件数据流且 JSON 往返无损。
+        let hit = ServerMessage::Event {
+            kind: crate::net::protocol::EventKind::Hit {
+                source_id: 1,
+                target_id: 2,
+                is_headshot: true,
+                damage: 37.5,
+                reaction: Some("蒸发".into()),
+            },
+        };
+        let WireMessage::Data(kind, bytes) = encode_server(&hit).unwrap() else { panic!("事件应为数据流") };
+        assert_eq!(kind, DataKind::Event);
+        assert_eq!(decode_server_data(kind, &bytes).unwrap(), hit);
     }
 
     /// 预设目录含字符串，走控制类数据流且 JSON 往返无损。

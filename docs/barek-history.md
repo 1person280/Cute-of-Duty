@@ -24,6 +24,46 @@
 
 ---
 
+## [0.15.1] · 2026-10-08 · 射击表现与命中反馈
+
+- **变更类型**：Breaking（**协议不兼容** `y+1`）+ Additive（客户端表现层两新文件）
+- **影响模块**：ContractCode —— `net/protocol.rs`（`EventKind::Hit` 扩 `damage: f32` + `reaction: Option<String>`）、
+  `net/packet.rs`（`WIRE_VERSION` 14 → 15）、`net/codec.rs`（`Hit` 事件 JSON 往返测试断言）；
+  ServerCode —— `damage/resolver.rs`（`resolve` 返回 `ResolveOutcome { damage, reaction }`，反应名随结算带出）、
+  `combat/mod.rs`（`CombatEvent::Hit` 扩同名字段）、`combat/shooter.rs`（事件携带权威数值 + 模块头协议留待点注释）、
+  `combat/grenade.rs`（手雷命中事件同步）、`net/stages.rs`（转投适配）、`combat/tests.rs`（载荷断言）；
+  HostCode —— 新增 `world/aiming.rs`（激光瞄准线 DDA 步进掩体截断 + 目标球面交点取近者 + 开火曳光）、
+  新增 `hud/feedback.rs`（准星左侧飘字：0.8s 淡出、新命中覆盖、反应两行、爆头黄字）、
+  `flow/state.rs`（`HitFeedback` 资源 + `Hit` 事件消费路由）、`flow/mod.rs`、`hud/mod.rs`、`hud/root.rs`、
+  `world/mod.rs`、`launcher/mod.rs`（装配 + 常驻链拆双子链保 `.chain()` ≤20 元组）；
+  **实机回归追加修复**：`world/aiming.rs`（曳光 0.12s→0.3s + 按住连发持续点亮）、
+  `menu/pause.rs`（光标锁定去 `!=` 短路——Windows 失焦释放禁锢后 bevy 永不恢复的根因）、
+  `world/scene.rs` + `menu/settings.rs`（**环境光量纲修复**：bevy 0.16 起 `AmbientLight.brightness`
+  与光照同量纲（lux），0.15 时代 0.55 ≈ 全黑，是 0.14.1 起「往南走背光面全黑」的根因；
+  逻辑亮度 ×4000 映射，默认 0.55 → 2200 lux）；
+  仓库门面 —— `README.md`（新开〈十、不稳定警告〉章节并迁移全部既有警告 + 新增「曳光仅本人可见」）、
+  `docs/contracts/protocol.yaml`（`0.15.1` + Event/Hit 载荷同步 + 迁移指南）、
+  三端 `Cargo.toml` / `Cargo.lock`（`0.14.3` → `0.15.1`）、`ServerCode/net/web/portal.html`（绑定包版本 15）。
+- **兼容性**：**不兼容**（`y+1`）—— `EventKind::Hit` 加必填字段，老客户端 JSON 反序列化因缺字段失败；
+  `WIRE_VERSION` 14 → 15，双端必须同步升级。
+- **迁移指南**：见 [protocol.yaml](contracts/protocol.yaml) `compat.migration_guide`。
+  要点：①双端同步升级 0.15.1；②客户端 `flow::state` 消费 `Hit` 新字段（原分支被吞）；③浏览器骨架页绑定包版本置 15；
+  ④老版本客户端连 0.15.1 服务端将在首条绑定包被 wire_version 拒绝（预期行为）。
+- **验证**：`cargo check --workspace` 退出码 `0`（本机无 `cargo-wrap`，按 0.12.4 / 0.14.1 先例经 owner 确认以裸 `cargo` 替代）；
+  `cargo test -p cute_of_duty_contract` **51 passed**；`cargo test -p cute_of_duty_server` **128 passed**；
+  `cargo metadata --no-deps` 版本自洽（三端 + `Cargo.lock` 全 `0.15.1`）。
+  实机验证清单（owner）：①激光线随准星、被掩体截断、指向敌人时止于表面；②开火曳光枪口→命中点；
+  ③命中显示伤害数字、爆头变黄；④元素反应时第二行显示反应名；⑤连发覆盖、停火 0.8s 淡出；⑥老版本客户端被拒。
+- **临时问题（正式版发布前必须修复，本轮已知未修）**：
+  ①**曳光触发为本地近似**——客户端用「左键按下沿 / 按住连发」本地近似服务端射速节拍，未消费服务端权威开火事件，射速受限武器下曳光节拍会与实际弹道脱节；
+  ②**旋转掩体按轴对齐盒近似**——激光线遮挡截断把带 `Motion`（旋转）的掩体按当前帧轴对齐盒近似，旋转掩体边缘处截断位置存在误差；
+  ③**靶机显形辨识待定夺**——环境光修复后南侧训练靶（靶面红 + 靶心白方块）成片显形，是否缩小 / 提高红色占比以增强辨识，待 owner 实机定夺；
+  ④**环境光量纲映射系数为首版估算**——逻辑亮度 ×4000（默认 0.55 → 2200 lux）为人工标定，观感偏亮 / 偏暗需 owner 实机微调后固化；
+  ⑤**Bevy 0.16 弃用 API 存量**——`get_single*` 等约 50 条弃用告警按纪律未迁（自 0.14.1 结转）；
+  ⑥**实机验证清单部分未复测**——本轮追加三修复（曳光加长 / 光标锁定去短路 / 环境光量纲）后，清单③~⑦（伤害数字 / 爆头黄 / 反应两行 / 覆盖淡出 / 老客户端被拒）未逐项复测，owner 实机确认后方可转正式。
+- **未做**（按来源版本结转，见 README 版本表同源清单）。
+- **关联**：[计划 0007](plans/0007-射击表现与命中反馈.md)、[protocol.yaml](contracts/protocol.yaml)、README〈十、不稳定警告〉。
+
 ## [0.14.3] · 2026-10-07 · 调试模式（`0.14.x` 系热修复）
 
 - **变更类型**：Fix（**诊断工具 / 文档收口**；新增客户端 `.rs` 但不触碰线格式 / 配置语义 / 公共 Trait）
@@ -135,7 +175,7 @@
     **WGSL 单源并入 Bevy/wgpu**，**DX11 显式剔除**（wgpu 不支持）。
   - 计划全文落 [`docs/plans/0001`](plans/0001-区域光照着色器套件.md)（整体架构 → 核心数据结构 → 着色器接口 → 各模块实现）；
     架构决策落 [`ADR 0008`](adr/0008-triangle-region-radiance.md)。
-  - 目标版本 **`0.15.0`（`y+1`，协议不兼容）**：新增成对消息 `ClientMessage::RequestSceneUnits` / `ServerMessage::SceneUnits`，
+  - 目标版本 **`0.15.1`（`y+1`，协议不兼容）**：新增成对消息 `ClientMessage::RequestSceneUnits` / `ServerMessage::SceneUnits`，
     `WIRE_VERSION` **14 → 15** —— **属未来实现阶段落地，本轮不动版本号**。
   - **README 新增「六、已采纳未来形态」**为全仓唯一权威路线图：把此前散落在各版 Release note / 版本表格中**重复的多目标清单**收敛于此；
     原「六 文档」→「七」、「七 开发环境」→「八」。

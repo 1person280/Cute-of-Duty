@@ -27,9 +27,13 @@ pub fn spawn_scene_baseline(mut commands: Commands, mut meshes: ResMut<Assets<Me
         handle: meshes.add(Cuboid::new(1.0, 1.0, 1.0)),
     });
     // 全局环境光：供「设置浮层 · 环境亮度」调节写入（世界仅配了 DirectionalLight）。
+    // bevy 0.16 起 `AmbientLight.brightness` 与光照强度同量纲（lux，典型值数百到数千），
+    // 0.15 时代的 0.55 倍率在新量纲下≈全黑（背光面纯黑、盒子底面纯黑，即 0.14.1 起的
+    // 「往南走渲染错乱」根因）。此处取逻辑默认 0.55 × 4000 = 2200 lux 作首帧兜底，
+    // 正式值由 `settings_apply_ambient` 在启动帧覆盖（见 flow/settings.rs 的量纲映射）。
     commands.insert_resource(AmbientLight {
         color: Color::WHITE,
-        brightness: 0.55,
+        brightness: 2_200.0,
         // 0.16 新增字段：本世界无光照贴图网格，取默认 true 保持既有全局环境光语义。
         affects_lightmapped_meshes: true,
     });

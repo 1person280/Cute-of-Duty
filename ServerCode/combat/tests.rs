@@ -72,7 +72,20 @@ fn fire_hits_and_consumes_ammo() {
     assert!(ai_hp < 80.0, "命中应使 AI 掉血，实际 {ai_hp}");
 
     let events = h.system.drain_events();
-    assert!(events.iter().any(|e| matches!(e, CombatEvent::Hit { .. })), "应有命中事件");
+    // 0.15.0：命中事件须携带服务端权威的伤害数值与反应结果（本枪无元素附着，反应应为 None）。
+    let hit = events
+        .iter()
+        .find_map(|e| match e {
+            CombatEvent::Hit { source, target, is_headshot, damage, reaction }
+                if *source == pid.as_u64() && *target == aid.as_u64() => {
+                Some((*is_headshot, *damage, reaction.clone()))
+            }
+            _ => None,
+        })
+        .expect("应有以玩家为 source、AI 为 target 的命中事件");
+    assert!(hit.1 > 0.0, "命中事件应携带正的伤害数值，实际 {}", hit.1);
+    assert!(hit.2.is_none(), "对普通 AI 的直射不应触发反应，实际 {:?}", hit.2);
+    assert!(!hit.0, "躯干命中不应判定爆头");
 }
 
 /// 训练靶：开火命中靶机 → 消耗弹药、出命中事件、计分 +1，且靶机不致死。

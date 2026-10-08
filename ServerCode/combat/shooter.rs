@@ -2,6 +2,9 @@
 //!
 //! 权威半边：不再生成曳光/枪口火花/弹孔网格（那是 launcher 表现层的活），
 //! 只决定“这一枪是否命中、打掉多少血、是否致死”，并据此产出 [`CombatEvent`]。
+//!
+//! 协议留待点：客户端曳光/激光瞄准线**仅本人本地可见**；跨玩家曳光需协议新增
+//! `Shot` 事件（服务端广播开火点/命中点），当前未实现，留待下版本。
 
 use crate::combat::{Combatant, CombatEvent, RAY_MAX_RANGE, RELOAD_TIME_SECS, WEAKPOINT_CORE_R, WEAKPOINT_MULT};
 use crate::combat::range::TARGET_HIT_RADIUS;
@@ -200,17 +203,17 @@ pub fn try_fire(
     if is_target {
         crate::combat::range::record_hit(world, target_id);
         // 命中靶仍要回传射手（source），事件由 main.rs 转投给射手连接
-        events.push(CombatEvent::Hit { source: eid.as_u64(), target: target_id.as_u64(), is_headshot });
+        events.push(CombatEvent::Hit { source: eid.as_u64(), target: target_id.as_u64(), is_headshot, damage, reaction: None });
         return;
     }
     let Some(target_entity) = world.get_entity_mut(target_id) else {
         return;
     };
     let packet = DamagePacket::new(element, damage, eid).with_source_pos(origin_hit);
-    resolver.resolve(target_entity, &packet, env);
+    let outcome = resolver.resolve(target_entity, &packet, env);
 
     let victim_dead = target_entity.hp <= 0.0;
-    events.push(CombatEvent::Hit { source: eid.as_u64(), target: target_id.as_u64(), is_headshot });
+    events.push(CombatEvent::Hit { source: eid.as_u64(), target: target_id.as_u64(), is_headshot, damage: outcome.damage, reaction: outcome.reaction });
     if victim_dead {
         target_entity.is_alive = false;
         events.push(CombatEvent::Kill { killer: eid.as_u64(), victim: target_id.as_u64() });
