@@ -165,7 +165,7 @@ pub fn update_skills(
     mut texts: Query<(&RightText, &mut Text, &mut TextColor)>,
 ) {
     let snapshot = snap.current.iter().find(|e| e.entity_id == player.entity_id);
-    let (ammo, ammo_max, ammo_reserve, reload, weapons, active_slot, elem_state) = match snapshot {
+    let (ammo, ammo_max, ammo_reserve, reload, weapons, active_slot) = match snapshot {
         Some(e) => (
             e.ammo,
             e.ammo_max,
@@ -173,9 +173,8 @@ pub fn update_skills(
             e.reload_remaining,
             e.weapon_elements,
             e.active_slot,
-            Some(e.element_state.clone()),
         ),
-        None => (-1, -1, -1, 0.0, None, 0, None),
+        None => (-1, -1, -1, 0.0, None, 0),
     };
     // 闪烁相位：3Hz 方波（亮 1/6s、暗 1/6s 交替）。
     let blink_on = ((time.elapsed_secs() * BLINK_HZ * 2.0) as u32) % 2 == 0;
@@ -229,7 +228,15 @@ pub fn update_skills(
                 tc.0 = theme::ACCENT_AMBER;
             }
             RightText::Element => {
-                let (value, color) = element_readout(elem_state.as_ref());
+                // 读当前手持武器元素（Why：0.15.3 起枪击挂的是目标状态，自身 element_state
+                // 恒 Normal；右下角读者关心的是"我手里这把枪是什么元素"，与 1/2 槽名互证）。
+                let (value, color) = match weapons.and_then(|w| w.get(active_slot as usize).copied())
+                {
+                    Some(element) => {
+                        (format!("武器 · {}", element_name(element)), weapon_color(element))
+                    }
+                    None => ("武器 · —".to_string(), theme::TEXT_DIM),
+                };
                 text.0 = value;
                 tc.0 = color;
             }
@@ -249,17 +256,15 @@ fn weapon_color(e: ElementType) -> Color {
     }
 }
 
-/// 元素附着读数：`Normal`（或无快照）显示"无"，其余显示状态名并配元素色。
-fn element_readout(state: Option<&cute_of_duty_contract::element::EntityElementState>) -> (String, Color) {
-    use cute_of_duty_contract::element::EntityElementState as S;
-    match state {
-        Some(S::Burning) => ("元素 · 燃烧".to_string(), Color::srgb(1.0, 0.45, 0.2)),
-        Some(S::Frozen) => ("元素 · 冰冻".to_string(), Color::srgb(0.5, 0.85, 1.0)),
-        Some(S::Electrified) => ("元素 · 感电".to_string(), Color::srgb(0.75, 0.6, 1.0)),
-        Some(S::Poisoned) => ("元素 · 中毒".to_string(), Color::srgb(0.6, 0.95, 0.4)),
-        Some(S::Wet) => ("元素 · 潮湿".to_string(), Color::srgb(0.5, 0.7, 1.0)),
-        Some(other) => (format!("元素 · {other:?}"), theme::TEXT_DIM),
-        None => ("元素 · 无".to_string(), theme::TEXT_DIM),
+/// 元素中文名（表现层冷映射，与背包面板口径一致）。
+fn element_name(e: ElementType) -> &'static str {
+    match e {
+        ElementType::Fire => "火",
+        ElementType::Ice => "冰",
+        ElementType::Electric => "电",
+        ElementType::Poison => "毒",
+        ElementType::Physical => "物",
+        ElementType::Water => "水",
     }
 }
 

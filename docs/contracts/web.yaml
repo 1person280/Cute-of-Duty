@@ -13,7 +13,7 @@
 # =============================================================================
 
 contract: web
-version: 0.15.3
+version: 0.15.4
 status: draft
 owner_module: ServerCode/net
 authoritative_impl: ServerCode/net/web

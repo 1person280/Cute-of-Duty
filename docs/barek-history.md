@@ -24,6 +24,25 @@
 
 ---
 
+## [0.15.4] · 2026-10-13 · 读数纠偏（HUD 右下角改显武器元素）
+
+- **变更类型**：Fix（**细节版 `z+1`**，不触碰线格式）
+- **背景**：0.15.3 实机复测确认反应链路已通（冰枪冻靶→火枪融冰），但 owner 发现右下角
+  「元素 · Normal」读数纹丝不动——该读数读的是**自身实体** `element_state`，而 0.15.3 挂的是
+  **目标**状态，自身恒 Normal，此读数已无信息量；武器元素虽有 1/2 槽名与配色承载，
+  但右下角一行未体现当前手持武器。
+- **影响模块**：HostCode —— `hud/skills.rs`（`RightText::Element` 分支改读快照
+  `weapon_elements[active_slot]`，显示「武器 · 火/冰/电/毒/物/水」并配 `weapon_color` 元素色，
+  切枪随 `active_slot` 联动；删 `element_readout`（自身附着读数），新增私有 `element_name`
+  冷映射（与 `backpack/panel.rs` 口径一致）；解构元组去 `elem_state`）；文档 —— `Host.hud.md` 随碰随补。
+- **兼容性**：兼容（`z+1`）—— 纯客户端表现层读数改源，快照字段与 `WIRE_VERSION 15` 均不变；
+  双端 `0.15.4` 与 `0.15.3` 互通。**语义取舍（明示）**：自身被敌方挂状态的显示不再出现
+  （owner 拍板「只显武器元素」）。
+- **验证**：`cargo check -p cute_of_duty_host` 退出码 `0`（56 条警告均为既有 Bevy 0.16 弃用项）；
+  `cargo metadata --no-deps` 版本自洽（三端 + `Cargo.lock` 全 `0.15.4`）；
+  客户端 `--release` 重建（服务端零 diff 复用 0.15.3 产物）。**实机验证（owner）**：反应两行飘字正常。
+- **关联**：README 版本表 0.15.4 行、[BarekHistory 0.15.3](barek-history.md)（其冻结项⑥由 owner 实机确认收窄了结）。
+
 ## [0.15.3] · 2026-10-12 · 元素实感（枪击挂元素状态）
 
 - **变更类型**：Feature（**细节版 `z+1`**，不触碰线格式）

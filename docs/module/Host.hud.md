@@ -5,7 +5,7 @@
 ## 边界
 
 **本模块负责**：
-- **常驻 HUD 面板族**：`vitals`（血条/文本）、`crosshair`（准星）、`minimap`、`bigmap`（战术大地图 + 撤离）、`skills`（技能/击杀播报）、`kill`（击杀计数）、`alert`（告警）、`root`（HUD 根 + 撤离交互）。
+- **常驻 HUD 面板族**：`vitals`（血条/文本）、`crosshair`（准星）、`minimap`、`bigmap`（战术大地图 + 撤离）、`skills`（技能/击杀播报，右下角元素读数自 0.15.4 起显示**当前手持武器元素**——0.15.3 起枪击挂的是目标状态，自身 `element_state` 恒 Normal，读自身已无信息量）、`kill`（击杀计数）、`alert`（告警）、`root`（HUD 根 + 撤离交互）。
 - **模态面板族**：`interact`（F 交互二级面板）、`loot`（物资箱 4×3 格位 + 拖拽）、`item/wheel`（3/4 径向轮盘）、`backpack`（Tab 背包总览）、`button/panel`（B 可点击操作按钮组）、`grenade/hint`（持雷提示）。
 - **模态发布**：`modal::publish_modal_changes`——每帧对照七个 HUD 侧模态源资源与 `flow::ModalState`，有差异才发 `ModalChange`（唯一发布点，杜绝多路径漏发）。
 - **输入门控**：`bigmap::gameplay_input_active`（统一取自 `flow::ModalState::blocks_gameplay_input`）。
