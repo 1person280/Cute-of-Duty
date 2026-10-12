@@ -24,6 +24,25 @@
 
 ---
 
+## [0.15.2] · 2026-10-12 · 动画拆分
+
+- **变更类型**：Refactor（不含语义变化，**细节版 `z+1`**）
+- **影响模块**：ServerCode —— `model/loader.rs`（`FIREFOX_MODEL` / `FIREFOX_ANIMATION` 双 `include_str!`，
+  `RawModelFile` 只保留几何段、新增 `RawAnimationFile` 承载动画段，Why 注释改写为「Bedrock 标准双文件」）、
+  `model/mod.rs`（模块文档同步）、`model/FireFox.json`（移除顶层 `animations` 段，只留 `minecraft:geometry`）、
+  新增 `model/FireFox.animation.json`（`format_version "1.8.0"`，三段 clip idle/walk/hold_gun 原样迁出）；
+  仓库门面 —— `README.md`（路线图 #1 标注对战链路继续冻结：缺少真实玩家反馈；〈十、不稳定警告〉
+  非标模型条目划掉作废并声明 Bedrock 1.12.0 标准与动画拆分落定）+ 三端 `Cargo.toml` / `Cargo.lock`。
+- **变更动机（Why）**：Blockbench 打开几何文件时会**忽略其中内嵌的 `animations` 段**（动画时间线为空，
+  无法编辑动画）；Bedrock 标准本就要求几何与动画分文件存储。拆分后第三方编辑器工作流完整可用。
+- **兼容性**：兼容——模型/动画是服务端编译期嵌入的资源内容，经既有 `VoxelModelSpec` /
+  `VoxelAnimationSpec` 线格式下发，结构与 `WIRE_VERSION 15` 均不变；双端 `0.15.2` 与 `0.15.1` **互通**。
+- **迁移指南**：不适用（无契约变更）。改造型时：几何改 `FireFox.json`、动画改 `FireFox.animation.json`。
+- **验证**：`cargo test -p cute_of_duty_server` **128 passed / 0 failed**（含几何 12 骨 43 盒断言与
+  三段动画 clip/表达式断言）；`cargo metadata --no-deps` 版本自洽（三端 + `Cargo.lock` 全 `0.15.2`）；
+  双端 `--release` 重建。**实机验证（owner，2026-10-12）**：客户端模型渲染无误、更新有效。
+- **关联**：README〈十、不稳定警告〉、[BarekHistory 0.15.1](barek-history.md)（其冻结项⑦本版了结）。
+
 ## [0.15.1] · 2026-10-08 · 射击表现与命中反馈
 
 - **变更类型**：Breaking（**协议不兼容** `y+1`）+ Additive（客户端表现层两新文件）

@@ -17,7 +17,7 @@
 # =============================================================================
 
 contract: protocol
-version: 0.15.1
+version: 0.15.2
 status: draft
 owner_module: ContractCode/net
 authoritative_impl: ContractCode/net/protocol.rs
@@ -65,7 +65,7 @@ transport:
   header:
     bytes: 32
     magic: 0x434F4431            # "COD1"
-    wire_version: 14             # 与协议 y 位对齐（0.14 = 小定长包世代 + 服务端预设/世界目录）
+    wire_version: 15             # 与协议 y 位对齐（0.15 = 射击表现世代：Hit 事件带权威伤害/元素反应）
     header_layout:               # (offset, width, little-endian)
       - { offset: 0,  width: 4, name: magic }
       - { offset: 4,  width: 2, name: version }

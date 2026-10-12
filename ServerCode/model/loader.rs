@@ -1,14 +1,18 @@
 //! 体素模型规格加载器（YSM「是，史蒂夫模型」线格式 → 可下行的稳定结构）
 //!
 //! 设计动机（对齐全局约束「易变内容放服务端、客户端只画」）：模型几何是**会随造型迭代
-//! 而变**的易变内容，故其源文件（单份 `FireFox.json`）与解析都落在服务端 `model` 模块；
+//! 而变**的易变内容，故其源文件（`FireFox.json` / `FireFox.animation.json`）与解析都落在
+//! 服务端 `model` 模块；
 //! 客户端不持有几何，只消费服务端经协议下发的 [`VoxelModelSpec`] / [`VoxelAnimationSpec`]
 //! 内存副本。
 //!
-//! 单一事实来源：几何与动画**合并为同一份** `FireFox.json`——几何在顶层
-//! `minecraft:geometry`、动画在顶层 `animations`，两段同源同版本，避免造型与动作分居两文件
-//! 后各自漂移。以编译期 `include_str!` 嵌入（与 `config` 模块同一约定），改造型只改 JSON、
-//! 重新编译即生效，不会与代码里的硬编码漂移。
+//! 单一事实来源：遵循 Bedrock 标准双文件结构——几何在 `FireFox.json`（顶层
+//! `minecraft:geometry`）、动画在 `FireFox.animation.json`（顶层 `animations`）。分文件的
+//! Why：Blockbench 打开几何文件时会**忽略其中内嵌的 `animations` 段**（动画时间线为空，
+//! 无法编辑动画），Bedrock 标准本就要求几何与动画分文件存储；两文件同目录同仓库提交、
+//! 同版本发布，漂移风险由 loader 的编译期嵌入 + 解析测试兜底。以编译期 `include_str!`
+//! 嵌入（与 `config` 模块同一约定），改造型只改 JSON、重新编译即生效，不会与代码里的
+//! 硬编码漂移。
 //!
 //! ## 命名免责声明
 //! 本模块与源文件 `FireFox.json` 中的 "FireFox" 指本作我方火系干员「焰狐」（Flame Fox）；
@@ -31,16 +35,24 @@ use cute_of_duty_contract::model::{
 
 use super::ModelPreset;
 
-/// 编译期嵌入的焰狐模型源文件（几何 + 动画合并，权威默认，随二进制分发；无源码环境亦一致）。
+/// 编译期嵌入的焰狐几何源文件（Bedrock 标准几何，权威默认，随二进制分发；无源码环境亦一致）。
 pub const FIREFOX_MODEL: &str = include_str!("FireFox.json");
 
+/// 编译期嵌入的焰狐动画源文件（Bedrock 标准动画，与几何分文件——Blockbench 依赖分文件
+/// 才能编辑动画时间线；权威默认，随二进制分发）。
+pub const FIREFOX_ANIMATION: &str = include_str!("FireFox.animation.json");
+
 // —— 原始线格式（仅解析用，不外泄）——
-// 几何与动画同处一份 JSON，故用单一 `RawModelFile` 承载两段，各自再投影为下行结构。
+// 几何与动画分属两份 JSON，各用独立的 Raw 结构承载，各自再投影为下行结构。
 
 #[derive(Deserialize)]
 struct RawModelFile {
     #[serde(rename = "minecraft:geometry")]
     geometries: Vec<RawGeometryEntry>,
+}
+
+#[derive(Deserialize)]
+struct RawAnimationFile {
     animations: HashMap<String, RawClip>,
 }
 
@@ -94,13 +106,18 @@ pub fn catalog() -> Vec<VoxelModelSpec> {
 pub fn animations() -> Vec<VoxelAnimationSpec> {
     static CACHE: OnceLock<Vec<VoxelAnimationSpec>> = OnceLock::new();
     CACHE
-        .get_or_init(|| build_animations(load_raw().animations))
+        .get_or_init(|| build_animations(load_animations_raw().animations))
         .clone()
 }
 
-/// 解析编译期嵌入的模型源文件（几何 + 动画同一份 JSON）。
+/// 解析编译期嵌入的几何源文件（Bedrock 标准几何）。
 fn load_raw() -> RawModelFile {
     serde_json::from_str(FIREFOX_MODEL).expect("嵌入的 FireFox.json 应可解析")
+}
+
+/// 解析编译期嵌入的动画源文件（Bedrock 标准动画）。
+fn load_animations_raw() -> RawAnimationFile {
+    serde_json::from_str(FIREFOX_ANIMATION).expect("嵌入的 FireFox.animation.json 应可解析")
 }
 
 fn build_catalog(geometries: Vec<RawGeometryEntry>) -> Vec<VoxelModelSpec> {
