@@ -557,3 +557,44 @@ fn apply_loadout_drops_overflow() {
     assert_eq!(bp.slots.iter().filter(|s| s.is_some()).count(), 12);
 }
 
+/// 枪击挂状态全链路（0.15.3）：冰枪打训练靶挂 `Frozen` → 换火枪再打触发 `Melt` 反应。
+///
+/// 切枪自带 0.25s 硬直且冷却衰减在 `Combatant::tick`（harness 不跑主循环），
+/// 故按本文件 L133 先例在每次切枪后手动碾平冷却再开火。
+#[test]
+fn gun_attaches_state_and_triggers_reaction() {
+    let mut h = CombatHarness::new();
+    let pid = spawn_player(&mut h.world, Vec3::default(), 0);
+    let tid = super::range::spawn_target(&mut h.world, Vec3::new(0.0, 1.5, 8.0), "近距靶", None);
+    let mut fire = |h: &mut CombatHarness| {
+        h.system.apply_input(&mut h.world, &h.resolver, pid, 0.016, &h.env,
+            CombatIntent { shoot: true, ..CombatIntent::default() });
+        h.system.drain_events()
+    };
+    let reset_cd = |h: &mut CombatHarness| {
+        h.world.get_entity_mut(pid).unwrap().get_component_mut::<Combatant>().unwrap().shoot_cooldown = 0.0;
+    };
+    // 槽 1 为冰枪：命中后靶应被冻结（无反应）
+    switch_weapon(&mut h.world, pid, 1);
+    reset_cd(&mut h);
+    let events = fire(&mut h);
+    assert_eq!(h.world.get_entity(tid).unwrap().element_state, EntityElementState::Frozen, "冰枪应挂 Frozen");
+    assert!(events.iter().any(|e| matches!(e, CombatEvent::Hit { reaction: None, .. })), "冻结枪击不应带反应");
+    // 槽 0 为火枪：打冻结靶应触发 Melt，反应名随命中事件回传
+    switch_weapon(&mut h.world, pid, 0);
+    reset_cd(&mut h);
+    let events = fire(&mut h);
+    assert!(events.iter().any(|e| matches!(e, CombatEvent::Hit { reaction: Some(r), .. } if r == "Melt")), "火枪打冻结靶应触发 Melt，事件 {events:?}");
+}
+/// 挂接守卫：`Physical` 不挂状态；已有状态不被无反应枪击覆盖（转换只走反应表）。
+#[test]
+fn attach_state_guards() {
+    let mut h = CombatHarness::new();
+    let mut e = Entity::new_ai(0, Vec3::default());
+    assert!(h.resolver.attach_element_state(&mut e, &ElementType::Physical).is_none(), "Physical 不应挂状态");
+    assert_eq!(e.element_state, EntityElementState::Normal);
+    e.element_state = EntityElementState::Burning;
+    h.resolver.attach_element_state(&mut e, &ElementType::Fire);
+    assert_eq!(e.element_state, EntityElementState::Burning, "已有 Burning 不应被同元素覆盖");
+}
+

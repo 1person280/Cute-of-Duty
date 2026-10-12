@@ -195,15 +195,20 @@ pub fn try_fire(
     let damage = base_damage * if is_headshot { WEAKPOINT_MULT } else { 1.0 };
 
     // 阶段3：结算（沿用权威伤害管线）
-    // 训练靶：只计分、不致死。先判型再计分，避免对 `world` 的双重可变借用。
+    // 训练靶：只计分、不致死，但**参与元素挂接**（0.15.3）——冰枪冻靶、火枪融冰，
+    // 反应名随命中事件回传，训练场即可自测"反应两行"飘字（原 0.15.1 清单⑤）。
+    // 先判型再计分，避免对 `world` 的双重可变借用。
     let is_target = world
         .get_entity(target_id)
         .map(|e| e.entity_type == EntityType::Target)
         .unwrap_or(false);
     if is_target {
+        let reaction = world
+            .get_entity_mut(target_id)
+            .and_then(|e| resolver.attach_element_state(e, &element));
         crate::combat::range::record_hit(world, target_id);
         // 命中靶仍要回传射手（source），事件由 main.rs 转投给射手连接
-        events.push(CombatEvent::Hit { source: eid.as_u64(), target: target_id.as_u64(), is_headshot, damage, reaction: None });
+        events.push(CombatEvent::Hit { source: eid.as_u64(), target: target_id.as_u64(), is_headshot, damage, reaction });
         return;
     }
     let Some(target_entity) = world.get_entity_mut(target_id) else {
@@ -211,11 +216,19 @@ pub fn try_fire(
     };
     let packet = DamagePacket::new(element, damage, eid).with_source_pos(origin_hit);
     let outcome = resolver.resolve(target_entity, &packet, env);
-
     let victim_dead = target_entity.hp <= 0.0;
-    events.push(CombatEvent::Hit { source: eid.as_u64(), target: target_id.as_u64(), is_headshot, damage: outcome.damage, reaction: outcome.reaction });
     if victim_dead {
         target_entity.is_alive = false;
+    }
+    // 挂接纪律（Why 见 `attach_element_state`）：命中即反应的路径已由 `resolve` Step 7
+    // 消化，此处仅补"无反应"枪击的状态写入；`attach` 内部保证不覆盖既有状态。
+    if outcome.reaction.is_none() {
+        if let Some(e) = world.get_entity_mut(target_id) {
+            resolver.attach_element_state(e, &element);
+        }
+    }
+    events.push(CombatEvent::Hit { source: eid.as_u64(), target: target_id.as_u64(), is_headshot, damage: outcome.damage, reaction: outcome.reaction });
+    if victim_dead {
         events.push(CombatEvent::Kill { killer: eid.as_u64(), victim: target_id.as_u64() });
     }
 }

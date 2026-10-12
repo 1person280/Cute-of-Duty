@@ -7,7 +7,7 @@
 **本模块负责**：
 - **战斗结算**：`CombatSystem::apply_input`（开火 / 换弹 / 技能 Q/E / 切枪 / 速用，分派给 `shooter`/`skill`）与 `tick_world`（手雷飞行引爆 / 毒区周期结算 / 换弹推进）。
 - **战斗组件**：`Combatant`（`operator_idx` + `weapons` + `active_slot` + 弹夹 + 冷却）、`HeldGrenade`（持雷中间态）。
-- **弹道与数值**：`shooter`（`try_fire` / `try_reload`，含弱点 ×1.8）、`grenade`（弹道常数 + 投掷/取消，**公开**供客户端预览同源复用）、`skill`（Grenade/Burst/Dash）、`zone`（周期掉血）。
+- **弹道与数值**：`shooter`（`try_fire` / `try_reload`，含弱点 ×1.8；命中后经 `resolver.attach_element_state` **把武器元素挂到目标 `element_state`**——仅从 `Normal` 挂接、不覆盖既有状态，训练靶也参与挂接）、`grenade`（弹道常数 + 投掷/取消，**公开**供客户端预览同源复用）、`skill`（Grenade/Burst/Dash）、`zone`（周期掉血）。
 - **实体与装配**：`spawn_player`、`apply_loadout`（选装清单重播种背包，未知名忽略）、`switch_weapon` / `switch_operator` / `equip_weapon` / `push_item` / `use_item_at`。
 - **事件出队**：`CombatEvent::{Kill, Hit}` 经 `drain_events()` 出队，供网络层转 `ServerMessage::Event`。
 
@@ -42,7 +42,7 @@
 | 事件名 | 方向 | 载荷契约 | 订阅者 |
 |---|---|---|---|
 | `CombatEvent::Kill { killer, victim }` | `combat` → 主循环 | 击杀事实 | `GameLoop::drain_combat_events` → `ServerMessage::Event` |
-| `CombatEvent::Hit { source, target, is_headshot }` | `combat` → 主循环 | 命中事实 | 同上 |
+| `CombatEvent::Hit { source, target, is_headshot, damage, reaction }` | `combat` → 主循环 | 命中事实 + 权威伤害数值 + 反应名（0.15.1 起；0.15.3 起枪击挂状态产生的反应亦经此回传） | 同上 |
 
 ## 成熟度
 

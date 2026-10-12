@@ -196,6 +196,36 @@ impl DamageResolver {
         }
     }
 
+    /// 武器命中后的元素状态挂接（0.15.3 新增）。
+    ///
+    /// 设计动机（Why）：元素枪此前"能改倍率却挂不上状态"——全游戏只有技能与毒区会写
+    /// `element_state`，枪击从不写，导致元素武器与制式武器实战表现完全相同（owner 实机
+    /// 反馈"看不到元素效果"）。本方法是枪击挂状态的**唯一入口**：优先查反应表（已冻结
+    /// 目标被火枪打即在此触发 `Melt`，反应名供飘字第二行），无反应且目标为 `Normal` 时
+    /// 才写入映射状态——不覆盖既有状态，状态转换只走反应表，避免链式自改写。
+    ///
+    /// 调用纪律：`resolve` 已在 Step 7 内消化"命中即反应"的路径；调用方必须在
+    /// `outcome.reaction.is_none()` 时才调用本方法（AI 分支），训练靶分支（不走
+    /// `resolve`）则可直接调用以获得反应名。
+    ///
+    /// 返回触发的反应枚举名（未触发为 `None`），供 `CombatEvent::Hit` 填充。
+    pub fn attach_element_state(&self, target: &mut Entity, element: &ElementType) -> Option<String> {
+        // 先查反应：目标已有状态 + 入射元素命中反应表 → 触发反应（效果 + 状态转换）。
+        if let Some(reaction) = self.element_system.query_reaction(&target.element_state, element) {
+            let name = format!("{:?}", reaction.result);
+            for effect in &reaction.attach_effects {
+                self.apply_reaction_effect(target, effect);
+            }
+            self.update_element_state(target, &reaction.result);
+            return Some(name);
+        }
+        // 无反应：仅从 `Normal` 挂接映射状态（`Physical` 不挂，既有状态不覆盖）。
+        if target.element_state == EntityElementState::Normal {
+            target.element_state = weapon_attach_state(element)?;
+        }
+        None
+    }
+
     /// 处理爆炸指令（预爆炸缓存推送）
     pub fn process_explosion(&self, explosion: &ExplosionCmd, targets: &mut [Entity]) {
         for target in targets.iter_mut() {
@@ -228,5 +258,21 @@ impl DamageResolver {
     fn check_line_of_sight(&self, _from: &Vec3, _to: &Vec3) -> bool {
         // 实际实现应使用射线检测
         false
+    }
+}
+
+/// 武器元素 → 挂接状态映射（0.15.3）。
+///
+/// Why：与反应表的 `target_state` 词汇保持同一套状态枚举；`Physical` 无元素附着语义，
+/// 返回 `None` 表示"此枪不挂状态"。映射刻意保持"一元素一状态"的直译关系，复杂转换
+/// 一律交由反应表（`element_reactions.yaml`）裁决，本映射不做任何特判。
+fn weapon_attach_state(element: &ElementType) -> Option<EntityElementState> {
+    match element {
+        ElementType::Fire => Some(EntityElementState::Burning),
+        ElementType::Ice => Some(EntityElementState::Frozen),
+        ElementType::Water => Some(EntityElementState::Wet),
+        ElementType::Electric => Some(EntityElementState::Electrified),
+        ElementType::Poison => Some(EntityElementState::Poisoned),
+        ElementType::Physical => None,
     }
 }
