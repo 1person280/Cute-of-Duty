@@ -1,4 +1,4 @@
-﻿//! 仓库选装浮层的**交互与拖拽**：拖拽会话状态机 + Shift 快捷移动 + 确认/返回。
+//! 仓库选装浮层的**交互与拖拽**：拖拽会话状态机 + Shift 快捷移动 + 确认/返回。
 //!
 //! 设计动机（Why）：把「谁被拖起、松手落在哪个容器、有没有按 Shift」全部收敛在此——
 //! 共享状态定义在 `state`、绘制在 `refresh`，本模块只做输入判定与清单增删，且只上行
@@ -22,16 +22,16 @@ fn set_ghost(
     source: &ArsenalDragSource,
     window: &mut Query<&mut Window, With<PrimaryWindow>>,
 ) {
-    if let Ok((mut gv, mut gs)) = ghost.get_single_mut() {
+    if let Ok((mut gv, mut gs)) = ghost.single_mut() {
         *gv = Visibility::Visible;
-        if let Ok(w) = window.get_single_mut() {
+        if let Ok(w) = window.single_mut() {
             if let Some(cursor) = w.cursor_position() {
                 gs.left = Val::Px(cursor.x - 70.0);
                 gs.top = Val::Px(cursor.y - 20.0);
             }
         }
     }
-    if let Ok((mut text, mut text_color)) = ghost_text.get_single_mut() {
+    if let Ok((mut text, mut text_color)) = ghost_text.single_mut() {
         let (name, color) = match source {
             ArsenalDragSource::Warehouse(i) => (MVP_ITEMS[*i].to_string(), ITEM_COLORS[*i]),
             ArsenalDragSource::Carried(i) => match sel.0.get(*i) {
@@ -67,12 +67,12 @@ pub fn arsenal_drag_system(
         (Without<ArsenalRow>, Without<BackpackRow>),
     >,
 ) {
-    let Ok(vis) = panel_vis.get_single() else {
+    let Ok(vis) = panel_vis.single() else {
         return;
     };
     if *vis != Visibility::Visible {
         if drag.source.take().is_some() {
-            if let Ok((mut gv, _)) = ghost.get_single_mut() {
+            if let Ok((mut gv, _)) = ghost.single_mut() {
                 *gv = Visibility::Hidden;
             }
         }
@@ -134,8 +134,8 @@ pub fn arsenal_drag_system(
 
     // ——— 拖拽中：幽灵跟随光标；松手按落区移动 ———
     if let Some(source) = drag.source {
-        if let Ok((_, mut style)) = ghost.get_single_mut() {
-            if let Ok(w) = window.get_single_mut() {
+        if let Ok((_, mut style)) = ghost.single_mut() {
+            if let Ok(w) = window.single_mut() {
                 if let Some(cursor) = w.cursor_position() {
                     style.left = Val::Px(cursor.x - 70.0);
                     style.top = Val::Px(cursor.y - 20.0);
@@ -157,7 +157,7 @@ pub fn arsenal_drag_system(
                 _ => {}
             }
             drag.source = None;
-            if let Ok((mut gv, _)) = ghost.get_single_mut() {
+            if let Ok((mut gv, _)) = ghost.single_mut() {
                 *gv = Visibility::Hidden;
             }
         }
@@ -209,7 +209,7 @@ pub fn arsenal_interaction(
     back: Query<&Interaction, (With<BackButton>, Changed<Interaction>)>,
     preset_btns: Query<(&PresetButton, &Interaction), Changed<Interaction>>,
 ) {
-    if let Ok(mut visibility) = root_q.get_single_mut() {
+    if let Ok(mut visibility) = root_q.single_mut() {
         *visibility = if vis.0 {
             Visibility::Visible
         } else {

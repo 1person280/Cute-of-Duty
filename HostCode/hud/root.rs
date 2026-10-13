@@ -131,7 +131,7 @@ pub fn update_extract(
     let dist = (dx * dx + dz * dz).sqrt();
     let in_zone = dist <= EXTRACTION_RANGE;
 
-    if let Ok(mut text) = extract.get_single_mut() {
+    if let Ok(mut text) = extract.single_mut() {
         text.0 = if in_zone {
             "已到撤离区 · 按 Enter 撤离".to_string()
         } else {
@@ -140,7 +140,7 @@ pub fn update_extract(
     }
 
     // 居中大字：仅入区时显示，并按 0.5s 节拍闪烁以强化提示。
-    if let Ok(mut vis) = prompt.get_single_mut() {
+    if let Ok(mut vis) = prompt.single_mut() {
         let blink = (time.elapsed_secs() * 2.0) as u32 % 2 == 0;
         *vis = if in_zone && blink {
             Visibility::Visible

@@ -43,7 +43,7 @@ pub(super) fn write_loadout_texts(sel: &ArsenalSelection, wh: &mut WhTextQ, bp: 
             }
         }
     }
-    if let Ok(mut cap) = cap.get_single_mut() {
+    if let Ok(mut cap) = cap.single_mut() {
         cap.0 = format!("{} / {}", sel.0.len(), LOADOUT_CAPACITY);
     }
 }

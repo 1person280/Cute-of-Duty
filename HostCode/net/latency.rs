@@ -73,7 +73,7 @@ pub fn panel_update(
     mut text_q: Query<&mut Text, With<LatencyText>>,
 ) {
     // 1) 显隐跟随 CapsLock
-    if let Ok(mut visibility) = panelq.get_single_mut() {
+    if let Ok(mut visibility) = panelq.single_mut() {
         *visibility = if show.0 {
             Visibility::Visible
         } else {
@@ -82,7 +82,7 @@ pub fn panel_update(
     }
 
     // 2) 刷新文本内容（连接含握手 + 常态 RTT）
-    if let Ok(mut text) = text_q.get_single_mut() {
+    if let Ok(mut text) = text_q.single_mut() {
         text.0 = format!(
             "test   连接(含握手) {:.1} ms    RTT {:.1} ms",
             connect.ms, live.rtt_ms

@@ -377,7 +377,7 @@ pub fn publish_modal_changes(
     ];
     for (kind, open) in pairs {
         if modal.get(kind) != open {
-            out.send(ModalChange { kind, open });
+            out.write(ModalChange { kind, open });
         }
     }
 }

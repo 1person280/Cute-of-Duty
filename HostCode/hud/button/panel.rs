@@ -1,4 +1,4 @@
-﻿//! HUD 可点击操作按钮组（按 B 打开的模态面板）：把 demo 操作映射为一组可点击按钮。
+//! HUD 可点击操作按钮组（按 B 打开的模态面板）：把 demo 操作映射为一组可点击按钮。
 //!
 //! 设计动机（Why）：legacy demo 的操作方式全是键鼠（WASD / 左键 / R / Q / E / 3 / 4…），
 //! 缺少"屏幕上点一下就触发"的等价入口（台账 B#1「按钮」缺口）。本面板把每一类 demo 操作
@@ -206,7 +206,7 @@ pub fn button_panel_toggle(
     }
     state.open = !state.open;
     state.reset_flags();
-    if let Ok(mut vis) = root.get_single_mut() {
+    if let Ok(mut vis) = root.single_mut() {
         *vis = if state.open {
             Visibility::Visible
         } else {
@@ -270,21 +270,21 @@ pub fn button_panel_click(
             ButtonKind::OpenBackpack => {
                 close_self(&mut state, &mut root);
                 backpack.open = true;
-                if let Ok(mut vis) = backpack_root.get_single_mut() {
+                if let Ok(mut vis) = backpack_root.single_mut() {
                     *vis = Visibility::Visible;
                 }
             }
             ButtonKind::OpenBigMap => {
                 close_self(&mut state, &mut root);
                 bigmap.0 = true;
-                if let Ok(mut vis) = bigmap_root.get_single_mut() {
+                if let Ok(mut vis) = bigmap_root.single_mut() {
                     *vis = Visibility::Visible;
                 }
             }
             ButtonKind::OpenPause => {
                 close_self(&mut state, &mut root);
                 // 请求 `menu` 装配暂停 UI（字体未就绪与否由 `menu` 自行判定，与本模块解耦）。
-                pause_req.send(crate::flow::PauseOpenRequest);
+                pause_req.write(crate::flow::PauseOpenRequest);
             }
             ButtonKind::Close => close_self(&mut state, &mut root),
         }
@@ -363,7 +363,7 @@ pub fn sync_button_panel(
     mut root: Query<&mut Visibility, With<ButtonPanelRoot>>,
     mut buttons: Query<(&ButtonKind, &Interaction, &mut BackgroundColor, &mut BorderColor)>,
 ) {
-    if let Ok(mut vis) = root.get_single_mut() {
+    if let Ok(mut vis) = root.single_mut() {
         *vis = if state.open {
             Visibility::Visible
         } else {
@@ -413,7 +413,7 @@ fn is_active(kind: &ButtonKind, state: &ButtonPanelState) -> bool {
 fn close_self(state: &mut ButtonPanelState, root: &mut Query<&mut Visibility, With<ButtonPanelRoot>>) {
     state.open = false;
     state.reset_flags();
-    if let Ok(mut vis) = root.get_single_mut() {
+    if let Ok(mut vis) = root.single_mut() {
         *vis = Visibility::Hidden;
     }
 }

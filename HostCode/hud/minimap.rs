@@ -378,7 +378,7 @@ pub fn update_minimap(
         style.left = Val::Px(MAP_SIZE * 0.5 + rel - 7.0);
         style.display = if rel.abs() <= 95.0 { Display::Flex } else { Display::None };
     }
-    if let Ok(mut text) = heading_text.get_single_mut() {
+    if let Ok(mut text) = heading_text.single_mut() {
         const DIR_NAMES: [&str; 8] =
             ["正北", "东北", "正东", "东南", "正南", "西南", "正西", "西北"];
         let dir = DIR_NAMES[((heading_deg + 22.5) / 45.0) as usize % 8];
@@ -393,12 +393,12 @@ pub fn update_minimap(
 
     // ---- 玩家朝向菱形：恒居中，仅按相机朝向旋转 ----
     // UI 屏幕 y 向下，rotation.z 正值在屏上表现为顺时针，恰与罗盘方位一致。
-    if let Ok(mut transform) = player_arrow.get_single_mut() {
+    if let Ok(mut transform) = player_arrow.single_mut() {
         transform.rotation = Quat::from_rotation_z(heading + std::f32::consts::FRAC_PI_4);
     }
 
     // ---- 动态实体点重建（以玩家为原点局部投影，越界剔除） ----
-    let Ok(container) = layer.get_single() else {
+    let Ok(container) = layer.single() else {
         return;
     };
     commands.entity(container).despawn_related::<Children>();

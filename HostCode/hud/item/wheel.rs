@@ -416,7 +416,7 @@ pub fn update_item_wheel(
         (With<ItemWheelKeyText>, Without<ItemWheelSectorText>, Without<ItemWheelCenterText>),
     >,
 ) {
-    if let Ok(mut v) = root.get_single_mut() {
+    if let Ok(mut v) = root.single_mut() {
         *v = if state.open {
             Visibility::Visible
         } else {
@@ -463,7 +463,7 @@ pub fn update_item_wheel(
         };
     }
 
-    if let Ok(mut t) = center.get_single_mut() {
+    if let Ok(mut t) = center.single_mut() {
         t.0 = if state.cancel {
             "松开取消".to_string()
         } else {
@@ -471,7 +471,7 @@ pub fn update_item_wheel(
         };
     }
 
-    if let Ok(mut t) = key_text.get_single_mut() {
+    if let Ok(mut t) = key_text.single_mut() {
         let cat = if state.held_key == Some(3) {
             "3 恢复类"
         } else {

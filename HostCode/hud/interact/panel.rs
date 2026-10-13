@@ -35,7 +35,7 @@ pub fn sync_interact_panel(
     let n = state.entries.len();
     // 就近列表常显：附近有目标且未进入二级面板即可见（无需先按 F）。
     let show = n > 0 && !state.panel_open;
-    if let Ok(mut v) = root.get_single_mut() {
+    if let Ok(mut v) = root.single_mut() {
         *v = if show { Visibility::Visible } else { Visibility::Hidden };
     }
     if !show {
@@ -68,7 +68,7 @@ pub fn sync_interact_panel(
         }
     }
 
-    if let Ok(mut style) = thumb.get_single_mut() {
+    if let Ok(mut style) = thumb.single_mut() {
         let track_h = track_height();
         let total = n as f32;
         let visible = INTERACT_VISIBLE_ROWS.min(n) as f32;
@@ -82,7 +82,7 @@ pub fn sync_interact_panel(
         style.top = Val::Px(top);
     }
 
-    if let Ok(mut text) = hint.get_single_mut() {
+    if let Ok(mut text) = hint.single_mut() {
         let pages = n.div_ceil(INTERACT_VISIBLE_ROWS);
         text.0 = if pages > 1 {
             let page = state.scroll_start / INTERACT_VISIBLE_ROWS + 1;
@@ -103,7 +103,7 @@ pub fn sync_interact_menu(
     list: Query<Entity, With<InteractMenuList>>,
     mut title: Query<&mut Text, With<InteractMenuTitle>>,
 ) {
-    if let Ok(mut v) = root.get_single_mut() {
+    if let Ok(mut v) = root.single_mut() {
         *v = if state.panel_open { Visibility::Visible } else { Visibility::Hidden };
     }
 
@@ -116,11 +116,11 @@ pub fn sync_interact_menu(
         return;
     }
 
-    if let Ok(mut t) = title.get_single_mut() {
+    if let Ok(mut t) = title.single_mut() {
         t.0 = state.title.clone();
     }
 
-    let Ok(list_entity) = list.get_single() else {
+    let Ok(list_entity) = list.single() else {
         return;
     };
     commands.entity(list_entity).despawn_related::<Children>();

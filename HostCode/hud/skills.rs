@@ -273,7 +273,7 @@ pub fn update_feed(
     announces: Res<Announcements>,
     mut feed: Query<&mut Text, (With<FeedText>, Without<RightText>)>,
 ) {
-    let Ok(mut text) = feed.get_single_mut() else {
+    let Ok(mut text) = feed.single_mut() else {
         return;
     };
     let msg = announces

@@ -347,7 +347,7 @@ pub fn bigmap_toggle(
         return;
     }
     open.0 = !open.0;
-    if let Ok(mut vis) = root.get_single_mut() {
+    if let Ok(mut vis) = root.single_mut() {
         *vis = if open.0 {
             Visibility::Visible
         } else {
@@ -377,11 +377,11 @@ pub fn update_bigmap(
     };
     let px = world_to_px(m.x, half);
     let py = world_to_px(m.z, half);
-    if let Ok(mut style) = dot.get_single_mut() {
+    if let Ok(mut style) = dot.single_mut() {
         style.left = Val::Px(px - 2.0);
         style.top = Val::Px(py - 2.0);
     }
-    if let Ok((mut style, mut transform)) = arrow.get_single_mut() {
+    if let Ok((mut style, mut transform)) = arrow.single_mut() {
         style.left = Val::Px(px - 5.5);
         style.top = Val::Px(py - 5.5);
         transform.rotation = Quat::from_rotation_z(heading_rad(rig.yaw) + std::f32::consts::FRAC_PI_4);

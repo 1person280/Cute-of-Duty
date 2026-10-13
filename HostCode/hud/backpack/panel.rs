@@ -193,7 +193,7 @@ pub fn backpack_toggle(
     if !state.open {
         state.hovered = None;
     }
-    if let Ok(mut vis) = root.get_single_mut() {
+    if let Ok(mut vis) = root.single_mut() {
         *vis = if state.open {
             Visibility::Visible
         } else {
@@ -263,7 +263,7 @@ pub fn sync_backpack_panel(
         Query<&mut Text, With<BpHintText>>,
     )>,
 ) {
-    if let Ok(mut vis) = root.get_single_mut() {
+    if let Ok(mut vis) = root.single_mut() {
         *vis = if state.open {
             Visibility::Visible
         } else {
@@ -313,7 +313,7 @@ pub fn sync_backpack_panel(
     }
 
     // 双武器槽概览：手持槽以 `▸` 标注，弹夹数（服务端只下发挥当前手持槽）仅随手持槽显示。
-    if let Ok(mut t) = texts.p1().get_single_mut() {
+    if let Ok(mut t) = texts.p1().single_mut() {
         t.0 = match me {
             Some(e) => match e.weapon_elements {
                 Some([a, b]) => {
@@ -335,7 +335,7 @@ pub fn sync_backpack_panel(
     }
 
     // 备用弹药总量（弹池 + 背包弹药合计，服务端权威合计）。
-    if let Ok(mut t) = texts.p2().get_single_mut() {
+    if let Ok(mut t) = texts.p2().single_mut() {
         let reserve = me.map(|e| e.ammo_reserve).unwrap_or(-1);
         t.0 = if reserve < 0 {
             "—".to_string()
@@ -344,7 +344,7 @@ pub fn sync_backpack_panel(
         };
     }
 
-    if let Ok(mut t) = texts.p3().get_single_mut() {
+    if let Ok(mut t) = texts.p3().single_mut() {
         t.0 =
             "鼠标悬停物品 · 按 R 使用 · Tab / Esc 关闭".to_string();
     }

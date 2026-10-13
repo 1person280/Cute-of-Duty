@@ -73,9 +73,7 @@ pub fn tick_grace(time: Res<Time>, mut grace: ResMut<MenuGrace>) {
 
 /// 主菜单按钮/输入分发：设置开关、模式切换、进场、退出与设置步进。
 pub fn main_menu_interaction(
-    mut next_state: ResMut<NextState<AppState>>,
     mut app_exit: EventWriter<AppExit>,
-    out: Res<NetOut>,
     grace: Res<MenuGrace>,
     keys: Res<ButtonInput<KeyCode>>,
     mut settings: ResMut<GameSettings>,
@@ -85,7 +83,6 @@ pub fn main_menu_interaction(
     ui: Res<MainMenuUi>,
     mut visibility: Query<&mut Visibility>,
     mut value_texts: Query<(&SettingValueText, &mut Text), Without<StatusText>>,
-    mut status_texts: Query<&mut Text, (With<StatusText>, Without<SettingValueText>)>,
     buttons: MenuButtons,
     adjust_buttons: Query<(&SettingAdjust, &Interaction), Changed<Interaction>>,
     select_buttons: Query<(&Interaction, Option<&CategoryButton>, Option<&ModeRow>), Changed<Interaction>>,
@@ -142,7 +139,7 @@ pub fn main_menu_interaction(
                 *vis = Visibility::Visible;
             }
         } else if quit.is_some() {
-            app_exit.send(AppExit::Success);
+            app_exit.write(AppExit::Success);
             return;
         }
     }
@@ -279,8 +276,8 @@ pub fn main_menu_style(
         }
     }
 
-    if let Ok(interaction) = gear_hover.get_single() {
-        if let Ok(mut image) = gear_icon.get_single_mut() {
+    if let Ok(interaction) = gear_hover.single() {
+        if let Ok(mut image) = gear_icon.single_mut() {
             image.color = if *interaction == Interaction::Hovered {
                 menu_accent()
             } else {

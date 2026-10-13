@@ -285,7 +285,7 @@ pub fn loot_panel_drag(
 ) {
     if !state.open {
         state.drag = None;
-        if let Ok((mut vis, _)) = ghost.get_single_mut() {
+        if let Ok((mut vis, _)) = ghost.single_mut() {
             *vis = Visibility::Hidden;
         }
         return;
@@ -326,21 +326,21 @@ pub fn loot_panel_drag(
                 .find(|(c, _)| c.side == side && c.index == index)
                 .map(|(_, t)| t.0.clone())
                 .unwrap_or_default();
-            if let Ok((mut vis, mut style)) = ghost.get_single_mut() {
+            if let Ok((mut vis, mut style)) = ghost.single_mut() {
                 *vis = Visibility::Visible;
-                if let Ok(w) = window.get_single() {
+                if let Ok(w) = window.single() {
                     if let Some(cur) = w.cursor_position() {
                         style.left = Val::Px(cur.x - 60.0);
                         style.top = Val::Px(cur.y - 18.0);
                     }
                 }
             }
-            if let Ok(mut t) = ghost_text.get_single_mut() {
+            if let Ok(mut t) = ghost_text.single_mut() {
                 t.0 = label;
             }
         }
         None => {
-            if let Ok((mut vis, _)) = ghost.get_single_mut() {
+            if let Ok((mut vis, _)) = ghost.single_mut() {
                 *vis = Visibility::Hidden;
             }
         }
@@ -431,7 +431,7 @@ pub fn sync_loot_panel(
         Query<(&LootSideTitle, &mut Text)>,
     )>,
 ) {
-    if let Ok(mut v) = root.get_single_mut() {
+    if let Ok(mut v) = root.single_mut() {
         *v = if state.open {
             Visibility::Visible
         } else {
@@ -501,7 +501,7 @@ pub fn sync_loot_panel(
         }
     }
 
-    if let Ok(mut t) = texts.p2().get_single_mut() {
+    if let Ok(mut t) = texts.p2().single_mut() {
         t.0 = match state.mode {
             LootMode::Crate => "物资箱",
             LootMode::Supply => "补给台 · 领取补给",
@@ -517,7 +517,7 @@ pub fn sync_loot_panel(
         text.0 = name.to_string();
     }
 
-    if let Ok(mut t) = texts.p1().get_single_mut() {
+    if let Ok(mut t) = texts.p1().single_mut() {
         let verb = match state.mode {
             LootMode::Crate => {
                 let side = if state.side == 0 { "容器" } else { "背包" };

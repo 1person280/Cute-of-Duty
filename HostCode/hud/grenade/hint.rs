@@ -80,7 +80,7 @@ pub fn sync_held_grenade(
         .find(|e| e.entity_id == player.entity_id)
         .and_then(|e| e.held_grenade);
     state.element = held;
-    if let Ok(mut vis) = root.get_single_mut() {
+    if let Ok(mut vis) = root.single_mut() {
         *vis = if held.is_some() {
             Visibility::Visible
         } else {

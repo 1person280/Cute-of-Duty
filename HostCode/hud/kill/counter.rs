@@ -34,7 +34,7 @@ pub fn spawn_kill_counter(p: &mut ChildSpawnerCommands<'_>, fonts: &CjkFont, cou
 
 /// 每帧刷新击杀数文本（仅本人计数）。
 pub fn update_kill(mut counter: Query<&mut Text, With<KillCounterText>>, count: Res<KillCount>) {
-    let Ok(mut text) = counter.get_single_mut() else {
+    let Ok(mut text) = counter.single_mut() else {
         return;
     };
     text.0 = format!("击杀 {}", count.0);
