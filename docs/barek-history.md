@@ -24,6 +24,30 @@
 
 ---
 
+## [0.15.6] · 2026-10-13 · 精截斜墙（OBB 截断 + 弃用 API 清零）
+
+- **变更类型**：Fix ×2（**细节版 `z+1`**，不触碰线格式）
+- **背景**：owner 实测 0.15.5 后拍板清冻结清单——①「旋转掩体按轴对齐盒近似截断」与
+  ③「Bevy 0.16 弃用 API 存量」同版双修；②「靶机反馈缺失」继续冻结待 owner 定夺，
+  清完后冻结清单仅剩一项。
+- **影响模块**：HostCode —— `world/aiming.rs`（`hits_prop` 忽略 `Prop.rot` 的视觉近似改
+  **OBB 精确判定**：采样点按轴角逆旋转（Rodrigues）还原局部坐标再做轴对齐判定；渲染层
+  `scene.rs` 摆正转、此处逆变换即还原局部盒；圆柱绕 y 旋转对称天然成立。拆纯函数
+  `point_in_prop` 供单测，45° 斜墙命中/排除断言 `obb_local_inverse_restores_hit`）；
+  17 文件 **56 条弃用 API 机械改名**（`get_single_mut`→`single_mut` ×47、`get_single`→
+  `single` ×5、`EventWriter::send`→`write` ×4，纯换名零语义变化）+ `menu/behaviour.rs`
+  死参清理（0.15.5 拆分遗留的 `next_state`/`out`/`status_texts`）。**盘点修正**：此前
+  口径「约 50/58 条」实为 56 条（`cargo check --message-format json` 全量盘点）。
+- **兼容性**：兼容（`z+1`）—— 双端 `0.15.6` 与 `0.15.x` 互通；当前地图无旋转掩体
+  （`with_rot` 零调用），OBB 改动纯防御性，为未来地图作者启用 `rot` 即得正确截断。
+  相机 SpringArm 与 minimap/bigmap 的 AABB 近似**本轮不动**（俯视投影本就合理；相机
+  待旋转掩体实际入图再议）。
+- **验证**：`cargo check --workspace` **弃用警告归零**（61→5→0，另 5 条为死参警告一并
+  清除）；`cargo test -p cute_of_duty_host` 12 passed；`cargo test -p cute_of_duty_server`
+  130 passed；`cargo metadata --no-deps` 三端 + `Cargo.lock` 全 `0.15.6`；双端 `--release`
+  重建。实机待 owner 复核（激光线观感应无回归）。
+- **关联**：README 版本表 0.15.6 行。
+
 ## [0.15.5] · 2026-10-13 · 进场统一（预设带物资修复）
 
 - **变更类型**：Fix（**细节版 `z+1`**，不触碰线格式）
