@@ -24,6 +24,27 @@
 
 ---
 
+## [0.15.5] · 2026-10-13 · 进场统一（预设带物资修复）
+
+- **变更类型**：Fix（**细节版 `z+1`**，不触碰线格式）
+- **背景**：owner 实机反馈「选择仓库预设后点右下角开始游戏不带物资，只能走仓库浮层自带
+  的开始游戏」——根因：浮层确认按钮先发 `Loadout { carried }` 再发 `StartTraining`
+  （[arsenal/interaction.rs]），右下角按钮只发 `StartTraining`（[menu/behaviour.rs]）；
+  服务端 `StartTraining` 按 `conn_loadout` **完全替换**进图背包，无记录即空背包 →
+  选了预设也空手进图。预设按钮只填本地 `ArsenalSelection`，从不上报，放大了这一缺口。
+- **影响模块**：HostCode —— `menu/arsenal/interaction.rs`（新增公开 `enter_training` 统一进场入口：
+  上报 `Loadout` → 请求进图 → 关浮层 → 切 InGame，Why 注释写明单点收口动机；浮层确认按钮改调它）、
+  `menu/behaviour.rs`（`main_menu_interaction` 的进场分支拆出为独立系统 `start_game_interaction`
+  ——主交互系统参数已达 bevy 单系统 16 个上限，Why 注释写明；门控与「敬请期待」状态行保持原语义）、
+  `menu/mod.rs`（导出）、`launcher/mod.rs`（链条挂入 `start_game_interaction`，紧跟主交互之后）；
+  文档 —— `Host.menu.md` 随碰随补。
+- **兼容性**：兼容（`z+1`）—— 纯客户端进场路径改线，`ClientMessage` 集与 `WIRE_VERSION 15` 均不变；
+  双端 `0.15.5` 与 `0.15.4` 互通。**语义取舍（明示）**：从未打开过仓库的玩家走右下角进场
+  上报空清单 → 空手进图（与既有「无记录即空背包」语义一致，非回归）。
+- **验证**：`cargo check -p cute_of_duty_host` 退出码 `0`；`cargo metadata --no-deps`
+  版本自洽（三端 + `Cargo.lock` 全 `0.15.5`）；实机验证待 owner 复核（选预设 → 右下角开始 → 进图带物资）。
+- **关联**：README 版本表 0.15.5 行、[BarekHistory 0.15.4](barek-history.md)（其冻结项⑥的换装路径由本版修复）。
+
 ## [0.15.4] · 2026-10-13 · 读数纠偏（HUD 右下角改显武器元素）
 
 - **变更类型**：Fix（**细节版 `z+1`**，不触碰线格式）

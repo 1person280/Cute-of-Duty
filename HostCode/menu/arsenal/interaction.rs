@@ -178,6 +178,24 @@ pub fn arsenal_drag_system(
     }
 }
 
+/// 统一进场入口：上报当前携带清单 → 请求进图 → 关浮层 → 切 InGame。
+///
+/// Why 单点收口：此前只有仓库浮层的确认按钮会先发 `Loadout`，主菜单右下角
+/// 「开始游戏」只发 `StartTraining`——服务端 `conn_loadout` 为空即按空清单
+/// **完全替换**进图，导致"选了预设点右下角开始"空手进图。两入口从此共享同一段
+/// 进场语义（浮层本就关闭时 `vis.0 = false` 为无害幂等），新增进场入口不再漂移。
+pub fn enter_training(
+    out: &NetOut,
+    next_state: &mut NextState<AppState>,
+    vis: &mut ArsenalVisible,
+    selection: &ArsenalSelection,
+) {
+    let _ = out.0.send(ClientMessage::Loadout { carried: selection.0.clone() });
+    let _ = out.0.send(ClientMessage::StartTraining);
+    vis.0 = false;
+    next_state.set(AppState::InGame);
+}
+
 /// 浮层交互：显隐跟随、预设一键填充、返回、确认进场（上报选装 + 请求进场）。
 /// 拖拽由 `arsenal_drag_system` 负责。
 pub fn arsenal_interaction(
@@ -214,12 +232,7 @@ pub fn arsenal_interaction(
     }
     for interaction in &confirm {
         if *interaction == Interaction::Pressed {
-            let _ = out.0.send(ClientMessage::Loadout {
-                carried: selection.0.clone(),
-            });
-            let _ = out.0.send(ClientMessage::StartTraining);
-            vis.0 = false;
-            next_state.set(AppState::InGame);
+            enter_training(&out, &mut next_state, &mut vis, &selection);
         }
     }
 }

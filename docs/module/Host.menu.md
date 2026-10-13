@@ -6,9 +6,9 @@
 
 **本模块负责**：
 - **主菜单**（`mod.rs`）：整屏 UI 树（标题区 / 模式面板 / 状态行 / 退出），根节点挂 `StateScoped(MainMenu)`。
-- **交互与样式**：`behaviour`（`main_menu_interaction` / `main_menu_style` / `main_menu_loadout` / `tick_grace` 输入保护期）。
+- **交互与样式**：`behaviour`（`main_menu_interaction` / `main_menu_style` / `main_menu_loadout` / `tick_grace` 输入保护期；`start_game_interaction` 进场分发）。
 - **模式选择**：`mode/panel`（分类 + 模式清单 + `SelectedMode` / `SelectedCategory`）。
-- **仓库选装浮层**：`arsenal`（复用双清单浮层 + 拖拽/选中 `ArsenalDrag` / `ArsenalSelection` / `ArsenalVisible` + `refresh`）。
+- **仓库选装浮层**：`arsenal`（复用双清单浮层 + 拖拽/选中 `ArsenalDrag` / `ArsenalSelection` / `ArsenalVisible` + `refresh`；`enter_training` **统一进场入口**——0.15.5 起右下角「开始游戏」与浮层确认按钮共享同一段进场语义：上报 `Loadout` → 请求进图 → 关浮层 → 切 InGame，杜绝"选预设走右下角空手进图"）。
 - **设置浮层**：`settings`（面板构建 + `settings_apply_fov` / `settings_apply_ambient` 应用系统；数据规则在 `flow::GameSettings`）。
 - **暂停菜单与光标**：`pause`（`pause_toggle` / `pause_menu_interaction` / `teardown_pause` / `pause_closed` 运行条件；`cursor_lock_system` / `cursor_release_toggle` 光标锁定；`open_pause_on_request` 消费暂停请求）。
 

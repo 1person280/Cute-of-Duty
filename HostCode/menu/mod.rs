@@ -18,7 +18,7 @@ pub(crate) use arsenal::{
     ArsenalVisible,
 };
 pub(crate) use behaviour::{
-    main_menu_interaction, main_menu_loadout, main_menu_style, tick_grace,
+    main_menu_interaction, main_menu_loadout, main_menu_style, start_game_interaction, tick_grace,
 };
 pub(crate) use mode::panel::{SelectedCategory, SelectedMode};
 pub(crate) use pause::{

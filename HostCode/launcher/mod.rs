@@ -170,6 +170,7 @@ pub fn run(addr: &str) {
             (
                 crate::menu::tick_grace,
                 crate::menu::main_menu_interaction,
+                crate::menu::start_game_interaction,
                 crate::menu::main_menu_style,
                 crate::menu::main_menu_loadout,
                 crate::menu::ensure_overlay,

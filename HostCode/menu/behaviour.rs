@@ -6,7 +6,6 @@
 //! 显隐（`ArsenalVisible`）开关驱动，其自身交互仍在 `arsenal`。
 
 use bevy::prelude::*;
-use cute_of_duty_contract::net::protocol::ClientMessage;
 
 use super::arsenal::ArsenalVisible;
 use crate::flow::flow_state::AppState;
@@ -29,7 +28,6 @@ type MenuButtons<'w, 's> = Query<
     (
         &'static Interaction,
         Option<&'static SwitchModeButton>,
-        Option<&'static StartGameButton>,
         Option<&'static GearButton>,
         Option<&'static SettingsCloseButton>,
         Option<&'static QuitButton>,
@@ -114,7 +112,7 @@ pub fn main_menu_interaction(
     let loadout_open = arsenal_vis.0;
 
     // 按钮动作分发（任一浮层打开时，除各自「返回」外全部拦截）
-    for (interaction, switch, start, gear, close, quit) in &buttons {
+    for (interaction, switch, gear, close, quit) in &buttons {
         if *interaction != Interaction::Pressed {
             continue;
         }
@@ -135,16 +133,6 @@ pub fn main_menu_interaction(
             if let Ok(mut vis) = visibility.get_mut(ui.mode_panel) {
                 let open = matches!(*vis, Visibility::Visible);
                 *vis = if open { Visibility::Hidden } else { Visibility::Visible };
-            }
-        } else if start.is_some() {
-            let spec = game_mode_spec(selected.0);
-            if spec.available {
-                let _ = out.0.send(ClientMessage::StartTraining);
-                next_state.set(AppState::InGame);
-                return;
-            }
-            if let Ok(mut text) = status_texts.get_mut(ui.status_text) {
-                text.0 = format!("「{}」尚未开放，敬请期待", spec.name);
             }
         } else if gear.is_some() {
             if let Ok(mut vis) = visibility.get_mut(ui.settings_overlay) {
@@ -185,6 +173,51 @@ pub fn main_menu_interaction(
     if adjusted {
         for (value, mut text) in value_texts.iter_mut() {
             text.0 = setting_label(&settings, value.0);
+        }
+    }
+}
+
+/// 「开始游戏」进场分发（独立系统）。
+///
+/// Why 独立拆出：主菜单交互系统的参数已达 bevy 单系统 16 个上限，无处再挂
+/// 进场所需的仓库选择态；且进场语义已收敛到 [`super::arsenal::enter_training`]
+/// 单点（先上报携带清单再请求进图），本系统只做门控与模式可用性检查。
+pub fn start_game_interaction(
+    mut next_state: ResMut<NextState<AppState>>,
+    out: Res<NetOut>,
+    grace: Res<MenuGrace>,
+    selected: Res<SelectedMode>,
+    mut arsenal_vis: ResMut<ArsenalVisible>,
+    arsenal_selection: Res<super::arsenal::ArsenalSelection>,
+    ui: Res<MainMenuUi>,
+    visibility: Query<&Visibility>,
+    start: Query<&Interaction, (With<StartGameButton>, Changed<Interaction>)>,
+    mut status_texts: Query<&mut Text, (With<StatusText>, Without<SettingValueText>)>,
+) {
+    if !grace.0.finished() {
+        return;
+    }
+    // 仓库浮层打开时由其自身确认按钮进场，此处不重复分发。
+    if arsenal_vis.0 {
+        return;
+    }
+    let settings_open = visibility
+        .get(ui.settings_overlay)
+        .map_or(false, |vis| matches!(*vis, Visibility::Visible));
+    if settings_open {
+        return;
+    }
+    for interaction in &start {
+        if *interaction != Interaction::Pressed {
+            continue;
+        }
+        let spec = game_mode_spec(selected.0);
+        if spec.available {
+            super::arsenal::enter_training(&out, &mut next_state, &mut arsenal_vis, &arsenal_selection);
+            return;
+        }
+        if let Ok(mut text) = status_texts.get_mut(ui.status_text) {
+            text.0 = format!("「{}」尚未开放，敬请期待", spec.name);
         }
     }
 }
