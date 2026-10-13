@@ -9,6 +9,7 @@
 //! 留待下版本（见 ServerCode `combat/shooter.rs` 模块头）。
 
 use bevy::prelude::*;
+use cute_of_duty_contract::map::{Prop, Shape};
 use cute_of_duty_contract::model::ModelPreset;
 
 use crate::flow::{AimRig, LocalPlayer, WorldCatalog};
@@ -149,21 +150,59 @@ fn ray_sphere(origin: Vec3, dir: Vec3, center: Vec3, radius: f32) -> Option<f32>
     }
 }
 
-/// 点是否落入任一静态掩体的包围盒内（Box 按轴对齐盒；圆柱取外接盒近似，视觉可接受）。
+/// 点是否落入任一静态掩体的包围盒内（Box 精确到旋转 OBB；圆柱取外接盒近似，视觉可接受）。
 fn hits_prop(p: Vec3, catalog: &WorldCatalog) -> bool {
     let Some(layout) = catalog.layout.as_ref() else {
         return false;
     };
-    layout.props.iter().any(|prop| {
-        let (hx, hy, hz) = match prop.shape {
-            cute_of_duty_contract::map::Shape::Box => (prop.half[0], prop.half[1], prop.half[2]),
-            cute_of_duty_contract::map::Shape::Cylinder { radius, height } => {
-                (radius, height / 2.0, radius)
-            }
-        };
-        // 旋转掩体忽略（视觉近似）；轴对齐判定足够让线"看起来止于表面"。
-        (p.x - prop.pos[0]).abs() <= hx
-            && (p.y - prop.pos[1]).abs() <= hy
-            && (p.z - prop.pos[2]).abs() <= hz
-    })
+    layout.props.iter().any(|prop| point_in_prop(p, prop))
+}
+
+/// 单个 prop 的命中判定（Why 拆纯函数：可脱离 `WorldCatalog` 单测旋转 OBB）。
+///
+/// 0.15.6 起不再忽略 `rot`：把采样点先按**逆旋转**（绕 prop 原点转 -angle）变到物体
+/// 局部坐标再做轴对齐判定——渲染层（`scene.rs`）按轴角摆的是正转，此处逆变换即还原
+/// 局部盒。圆柱绕 y 旋转本就对称，逆变换后外接盒判定依然成立，无需特判。
+fn point_in_prop(p: Vec3, prop: &Prop) -> bool {
+    let (hx, hy, hz) = match prop.shape {
+        Shape::Box => (prop.half[0], prop.half[1], prop.half[2]),
+        Shape::Cylinder { radius, height } => (radius, height / 2.0, radius),
+    };
+    let p = match prop.rot {
+        Some((axis, angle)) => inverse_rotate(p - Vec3::from(prop.pos), axis, angle),
+        None => p - Vec3::from(prop.pos),
+    };
+    p.x.abs() <= hx && p.y.abs() <= hy && p.z.abs() <= hz
+}
+
+/// Rodrigues 逆旋转：向量绕轴转 -angle（渲染层正转的还原）。
+fn inverse_rotate(v: Vec3, axis: [f32; 3], angle: f32) -> Vec3 {
+    let k = Vec3::from(axis).normalize_or_zero();
+    let c = (-angle).cos();
+    let s = (-angle).sin();
+    v * c + k.cross(v) * s + k * (k.dot(v) * (1.0 - c))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use cute_of_duty_contract::map::MaterialKind;
+
+    /// 纯盒构造的旋转判定：局部坐标还原正确（斜向点应命中，AABB 会误判/漏判处应排除）。
+    #[test]
+    fn obb_local_inverse_restores_hit() {
+        let wall = Prop::solid([0.0, 0.0, 0.0], [4.0, 0.1, 0.1], MaterialKind::Concrete)
+            .with_rot([0.0, 0.0, 1.0], std::f32::consts::FRAC_PI_4);
+        // 世界坐标 (2.83, 2.83, 0)：绕 z 正转 45° 后的墙长轴端点附近——OBB 应命中。
+        let on_wall = Vec3::new(2.0, 2.0, 0.0);
+        assert!(point_in_prop(on_wall, &wall), "斜墙长轴上的点应命中 OBB");
+        // (4.0, 0.0, 0.0) 在 AABB 长轴延伸处但已超出旋转后的墙身——OBB 应判不中。
+        let outside = Vec3::new(4.0, 0.0, 0.0);
+        assert!(!point_in_prop(outside, &wall), "AABB 会误判的点，OBB 应正确排除");
+
+        // 无旋转 prop 行为不变：AABB 直判。
+        let plain = Prop::solid([0.0, 0.0, 0.0], [4.0, 0.1, 0.1], MaterialKind::Concrete);
+        assert!(point_in_prop(Vec3::new(3.9, 0.0, 0.0), &plain));
+        assert!(!point_in_prop(Vec3::new(4.1, 0.0, 0.0), &plain));
+    }
 }
