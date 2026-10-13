@@ -323,6 +323,7 @@ pub(crate) fn hall_mover() -> Vec<TargetSpec> {
             pos: [-2.5, 1.5, -4.0],
             label: "移动靶".into(),
             motion: Some(Motion { speed: 2.0, range: 2.0, start_dir: 1.0 }),
+            destructible: false,
         },
     ]
 }
@@ -390,18 +391,18 @@ pub(crate) fn lane_markers() -> Vec<Prop> {
 pub(crate) fn static_targets() -> Vec<TargetSpec> {
     vec![
         // 近线：内侧双靶（大厅拱门内侧可直射）
-        TargetSpec { pos: [-3.0, 1.5, -8.0], label: "近距靶".into(), motion: None },
-        TargetSpec { pos: [3.0, 1.5, -8.0], label: "近距靶".into(), motion: None },
+        TargetSpec { pos: [-3.0, 1.5, -8.0], label: "近距靶".into(), motion: None, destructible: false },
+        TargetSpec { pos: [3.0, 1.5, -8.0], label: "近距靶".into(), motion: None, destructible: false },
         // 中线：外侧双靶
-        TargetSpec { pos: [-9.0, 1.8, -11.0], label: "中距靶".into(), motion: None },
-        TargetSpec { pos: [9.0, 1.8, -11.0], label: "中距靶".into(), motion: None },
+        TargetSpec { pos: [-9.0, 1.8, -11.0], label: "中距靶".into(), motion: None, destructible: false },
+        TargetSpec { pos: [9.0, 1.8, -11.0], label: "中距靶".into(), motion: None, destructible: false },
         // 远线：外侧双靶（贴后墙净空）
-        TargetSpec { pos: [-9.0, 2.2, -14.3], label: "远距靶".into(), motion: None },
-        TargetSpec { pos: [9.0, 2.2, -14.3], label: "远距靶".into(), motion: None },
+        TargetSpec { pos: [-9.0, 2.2, -14.3], label: "远距靶".into(), motion: None, destructible: false },
+        TargetSpec { pos: [9.0, 2.2, -14.3], label: "远距靶".into(), motion: None, destructible: false },
         // 指挥台顶靶：练垂直仰角射击
-        TargetSpec { pos: [0.0, 3.4, 0.0], label: "台顶靶".into(), motion: None },
+        TargetSpec { pos: [0.0, 3.4, 0.0], label: "台顶靶".into(), motion: None, destructible: false },
         // 回廊靶：东侧二层回廊上层位
-        TargetSpec { pos: [13.0, 3.4, -2.0], label: "回廊靶".into(), motion: None },
+        TargetSpec { pos: [13.0, 3.4, -2.0], label: "回廊靶".into(), motion: None, destructible: false },
     ]
 }
 
@@ -413,12 +414,14 @@ pub(crate) fn range_movers() -> Vec<TargetSpec> {
             pos: [6.5, 1.8, -9.5],
             label: "移动靶".into(),
             motion: Some(Motion { speed: 3.0, range: 3.0, start_dir: -1.0 }),
+            destructible: false,
         },
         // 射击馆远端中速巡逻
         TargetSpec {
             pos: [-9.0, 1.5, -13.0],
             label: "移动靶".into(),
             motion: Some(Motion { speed: 2.5, range: 2.5, start_dir: 1.0 }),
+            destructible: false,
         },
     ]
 }

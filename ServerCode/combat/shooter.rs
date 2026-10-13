@@ -203,11 +203,43 @@ pub fn try_fire(
         .map(|e| e.entity_type == EntityType::Target)
         .unwrap_or(false);
     if is_target {
+        // 可击毁靶（0.15.7）：真实扣血走权威伤害管线（元素倍率/反应照常生效），
+        // 血空即灭但不播 Kill、不清理实体——重生由 `range::tick_respawns` 推进。
+        // 计分靶维持只计分、绝不致死。
+        let destructible = world
+            .get_entity(target_id)
+            .and_then(|e| e.get_component::<crate::combat::range::RangeTarget>())
+            .map(|rt| rt.destructible)
+            .unwrap_or(false);
+        if destructible {
+            let outcome = world.get_entity_mut(target_id).map(|e| {
+                resolver.resolve(e, &DamagePacket::new(element, damage, eid).with_source_pos(origin_hit), env)
+            });
+            let destroyed = world
+                .get_entity(target_id)
+                .map(|e| e.hp <= 0.0)
+                .unwrap_or(false);
+            if destroyed {
+                if let Some(e) = world.get_entity_mut(target_id) {
+                    e.is_alive = false;
+                    if let Some(rt) = e.get_component_mut::<crate::combat::range::RangeTarget>() {
+                        rt.respawn_in = crate::combat::range::TARGET_RESPAWN_SECS;
+                    }
+                }
+            }
+            crate::combat::range::record_hit(world, target_id);
+            // 命中靶仍要回传射手（source），事件由 main.rs 转投给射手连接
+            if let Some(outcome) = outcome {
+                events.push(CombatEvent::Hit { source: eid.as_u64(), target: target_id.as_u64(), is_headshot, damage: outcome.damage, reaction: outcome.reaction });
+            }
+            return;
+        }
+        // 计分靶：参与元素挂接（0.15.3）——冰枪冻靶、火枪融冰，反应名随命中事件
+        // 回传，训练场即可自测"反应两行"飘字。先判型再计分，避免双重可变借用。
         let reaction = world
             .get_entity_mut(target_id)
             .and_then(|e| resolver.attach_element_state(e, &element));
         crate::combat::range::record_hit(world, target_id);
-        // 命中靶仍要回传射手（source），事件由 main.rs 转投给射手连接
         events.push(CombatEvent::Hit { source: eid.as_u64(), target: target_id.as_u64(), is_headshot, damage, reaction });
         return;
     }

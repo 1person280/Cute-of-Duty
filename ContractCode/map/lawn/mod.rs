@@ -169,16 +169,16 @@ pub(crate) fn pad_glow() -> Vec<GlowSpec> {
 /// 搜索目标：两列纵向散布，间距错开避免排成直线
 pub(crate) fn search_targets() -> Vec<TargetSpec> {
     vec![
-        TargetSpec { pos: [-360.0, 1.5, 400.0], label: "搜索目标".into(), motion: None },
-        TargetSpec { pos: [360.0, 1.5, 400.0], label: "搜索目标".into(), motion: None },
-        TargetSpec { pos: [-240.0, 1.5, 360.0], label: "搜索目标".into(), motion: None },
-        TargetSpec { pos: [240.0, 1.5, 360.0], label: "搜索目标".into(), motion: None },
-        TargetSpec { pos: [-120.0, 1.5, 320.0], label: "搜索目标".into(), motion: None },
-        TargetSpec { pos: [120.0, 1.5, 320.0], label: "搜索目标".into(), motion: None },
-        TargetSpec { pos: [-300.0, 1.5, 280.0], label: "搜索目标".into(), motion: None },
-        TargetSpec { pos: [300.0, 1.5, 280.0], label: "搜索目标".into(), motion: None },
-        TargetSpec { pos: [-60.0, 1.5, 240.0], label: "搜索目标".into(), motion: None },
-        TargetSpec { pos: [60.0, 1.5, 240.0], label: "搜索目标".into(), motion: None },
+        TargetSpec { pos: [-360.0, 1.5, 400.0], label: "搜索目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [360.0, 1.5, 400.0], label: "搜索目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [-240.0, 1.5, 360.0], label: "搜索目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [240.0, 1.5, 360.0], label: "搜索目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [-120.0, 1.5, 320.0], label: "搜索目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [120.0, 1.5, 320.0], label: "搜索目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [-300.0, 1.5, 280.0], label: "搜索目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [300.0, 1.5, 280.0], label: "搜索目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [-60.0, 1.5, 240.0], label: "搜索目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [60.0, 1.5, 240.0], label: "搜索目标".into(), motion: None, destructible: true },
     ]
 }
 
@@ -236,15 +236,15 @@ pub(crate) fn zone_markers() -> Vec<Prop> {
 /// 三排射击道静态靶：近（100m）/ 中（200m）/ 远（300m），逐级抬高
 pub(crate) fn engage_targets() -> Vec<TargetSpec> {
     vec![
-        TargetSpec { pos: [-200.0, 1.5, 100.0], label: "射击目标".into(), motion: None },
-        TargetSpec { pos: [0.0, 1.5, 100.0], label: "射击目标".into(), motion: None },
-        TargetSpec { pos: [200.0, 1.5, 100.0], label: "射击目标".into(), motion: None },
-        TargetSpec { pos: [-200.0, 1.8, 0.0], label: "射击目标".into(), motion: None },
-        TargetSpec { pos: [0.0, 1.8, 0.0], label: "射击目标".into(), motion: None },
-        TargetSpec { pos: [200.0, 1.8, 0.0], label: "射击目标".into(), motion: None },
-        TargetSpec { pos: [-200.0, 2.2, -100.0], label: "射击目标".into(), motion: None },
-        TargetSpec { pos: [0.0, 2.2, -100.0], label: "射击目标".into(), motion: None },
-        TargetSpec { pos: [200.0, 2.2, -100.0], label: "射击目标".into(), motion: None },
+        TargetSpec { pos: [-200.0, 1.5, 100.0], label: "射击目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [0.0, 1.5, 100.0], label: "射击目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [200.0, 1.5, 100.0], label: "射击目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [-200.0, 1.8, 0.0], label: "射击目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [0.0, 1.8, 0.0], label: "射击目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [200.0, 1.8, 0.0], label: "射击目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [-200.0, 2.2, -100.0], label: "射击目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [0.0, 2.2, -100.0], label: "射击目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [200.0, 2.2, -100.0], label: "射击目标".into(), motion: None, destructible: true },
     ]
 }
 
@@ -255,11 +255,13 @@ pub(crate) fn engage_movers() -> Vec<TargetSpec> {
             pos: [0.0, 1.8, 50.0],
             label: "移动目标".into(),
             motion: Some(Motion { speed: 4.0, range: 40.0, start_dir: -1.0 }),
+            destructible: false,
         },
         TargetSpec {
             pos: [0.0, 1.8, -50.0],
             label: "移动目标".into(),
             motion: Some(Motion { speed: 3.0, range: 60.0, start_dir: 1.0 }),
+            destructible: false,
         },
     ]
 }
@@ -292,8 +294,8 @@ pub(crate) fn extract_glow() -> Vec<GlowSpec> {
 /// 撤离目标：撤离途中侧翼压制
 pub(crate) fn extract_targets() -> Vec<TargetSpec> {
     vec![
-        TargetSpec { pos: [-150.0, 1.5, -320.0], label: "撤离目标".into(), motion: None },
-        TargetSpec { pos: [150.0, 1.5, -320.0], label: "撤离目标".into(), motion: None },
+        TargetSpec { pos: [-150.0, 1.5, -320.0], label: "撤离目标".into(), motion: None, destructible: true },
+        TargetSpec { pos: [150.0, 1.5, -320.0], label: "撤离目标".into(), motion: None, destructible: true },
     ]
 }
 

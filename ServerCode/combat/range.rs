@@ -2,8 +2,11 @@
 //!
 //! 架构约定：靶位与运动参数来自 `crate::map::*::layout().targets`（纯数据），
 //! 本模块负责把 `TargetSpec` 实体化进权威世界、驱动移动靶运动，并累计命中计分。
-//! 靶机 `hp` 为最大值（见 `Entity::new_target`），命中只计分、绝不致死，因此
-//! 常规的死亡清理不会误删它——这是与 AI 敌人最本质的差别。
+//! 靶机分两种语义（0.15.7 起，由 `TargetSpec::destructible` 逐靶选择）：
+//! **计分靶** `hp` 为最大值（见 `Entity::new_target`），命中只计分、绝不致死；
+//! **可击毁靶** 血量为 [`TARGET_MAX_HP`]，命中真实扣血，血空即灭（快照隐藏），
+//! 满 [`TARGET_RESPAWN_SECS`] 经 [`tick_respawns`] 满血重生——与 AI 敌人的差别
+//! 在于可击毁靶击毁不播 `Kill` 事件、死亡不清理实体，只在原地等待重生。
 //!
 //! 命中判定（射线对靶面球体求交）由 `shooter::try_fire` 统一完成；这里只在一个
 //! 训练靶被射中时被回调 `record_hit` 累加次数。
@@ -23,6 +26,12 @@ pub struct TargetMotion {
 /// 训练靶抗打击半径（靶面 1.2×1.2 取外接球约 0.7，留一点命中宽容）
 pub const TARGET_HIT_RADIUS: f32 = 0.7;
 
+/// 可击毁靶血量：火枪 9 发 / 冰枪 7 发量级，够感受掉血又不至于拖沓
+pub const TARGET_MAX_HP: f32 = 100.0;
+
+/// 可击毁靶击毁后满血重生等待秒数
+pub const TARGET_RESPAWN_SECS: f32 = 5.0;
+
 /// 训练靶运行时：标签、累计命中数、可选往返运动
 ///
 /// 运动实现在 [`Component::on_tick`]，位置写回 `owner`——和 AI 巡逻同构，
@@ -35,6 +44,10 @@ pub struct RangeTarget {
     pub hits: u32,
     /// 往返运动；None = 静态靶
     pub motion: Option<TargetMotion>,
+    /// 可击毁语义（0.15.7）：命中真实扣血、血空即灭、定时重生
+    pub destructible: bool,
+    /// 击毁后剩余重生等待秒数（仅死亡期间有意义）
+    pub respawn_in: f32,
     /// 移动靶当前 x 相位中心/方向（内部分运动状态）
     pub base_x: f32,
     pub dir: f32,
@@ -47,6 +60,8 @@ impl RangeTarget {
             label: label.into(),
             hits: 0,
             motion: None,
+            destructible: false,
+            respawn_in: 0.0,
             base_x: 0.0,
             dir: 1.0,
             phase_x: 0.0,
@@ -58,10 +73,19 @@ impl RangeTarget {
             label: label.into(),
             hits: 0,
             motion: Some(motion),
+            destructible: false,
+            respawn_in: 0.0,
             base_x: 0.0,
             dir: motion.start_dir,
             phase_x: 0.0,
         }
+    }
+
+    /// 链式升级为可击毁靶（Why：`TargetSpec` 字面量众多，开关走 builder 可让
+    /// 计分靶构造点零改动，仅 `spawn_target` 按 `destructible` 标志调用）。
+    pub fn destructible(mut self) -> Self {
+        self.destructible = true;
+        self
     }
 }
 
@@ -96,11 +120,14 @@ impl Component for RangeTarget {
 /// 生成一个训练靶实体并塞入世界。
 ///
 /// `center_x` 同时写入实体初始位置与 `RangeTarget::base_x`，移动靶围绕它往返。
+/// `destructible = true` 时实体血量从 `f32::MAX` 收到 [`TARGET_MAX_HP`]，
+/// 走「命中扣血 → 击毁 → 重生」语义（见模块头注释）。
 pub fn spawn_target(
     world: &mut World,
     pos: Vec3,
     label: impl Into<String>,
     motion: Option<TargetMotion>,
+    destructible: bool,
 ) -> EntityId {
     let mut entity = Entity::new_target(0, pos);
     let mut rt = match motion {
@@ -108,6 +135,11 @@ pub fn spawn_target(
         None => RangeTarget::static_target(label),
     };
     rt.base_x = pos.x;
+    if destructible {
+        rt = rt.destructible();
+        entity.max_hp = TARGET_MAX_HP;
+        entity.hp = TARGET_MAX_HP;
+    }
     entity.add_component(Box::new(rt));
     world.spawn(entity)
 }
@@ -128,10 +160,38 @@ pub fn spawn_range_targets(world: &mut World, targets: &[crate::map::TargetSpec]
             Vec3::new(t.pos[0], t.pos[1], t.pos[2]),
             t.label.clone(),
             motion,
+            t.destructible,
         );
         ids.push(id);
     }
     ids
+}
+
+/// 可击毁靶重生推进：击毁满 [`TARGET_RESPAWN_SECS`] 原地满血复活。
+///
+/// 为何不放 `Component::on_tick`：`Entity::tick` 对死亡实体**提前返回**，
+/// 死亡期间组件拿不到心跳——重生倒计时必须由 [`crate::combat::CombatSystem::tick_world`]
+/// 在实体 tick 之外统一推进。
+pub fn tick_respawns(world: &mut World, dt: f32) {
+    for entity in world.get_all_entities_mut() {
+        if entity.entity_type != crate::entity::EntityType::Target || entity.is_alive {
+            continue;
+        }
+        let Some(rt) = entity.get_component_mut::<RangeTarget>() else {
+            continue;
+        };
+        if !rt.destructible {
+            continue;
+        }
+        rt.respawn_in -= dt;
+        // 先还借用再写实体字段（NLL：hp/is_alive 写入须在组件借用结束之后）
+        let ready = rt.respawn_in <= 0.0;
+        if ready {
+            rt.respawn_in = 0.0;
+            entity.hp = entity.max_hp;
+            entity.is_alive = true;
+        }
+    }
 }
 
 /// 训练靶“命中一次”：累加计分，返回新累计次数（供测试断言）。
@@ -155,7 +215,7 @@ mod tests {
     #[test]
     fn spawns_and_tags_target() {
         let mut world = World::new();
-        let id = spawn_target(&mut world, Vec3::new(0.0, 1.5, -8.0), "近距靶", None);
+        let id = spawn_target(&mut world, Vec3::new(0.0, 1.5, -8.0), "近距靶", None, false);
         let e = world.get_entity(id).unwrap();
         assert_eq!(e.entity_type, EntityType::Target);
         assert!(e.is_alive, "靶机必须恒存活");
@@ -165,7 +225,7 @@ mod tests {
     #[test]
     fn record_hit_increments_score() {
         let mut world = World::new();
-        let id = spawn_target(&mut world, Vec3::new(0.0, 1.5, -8.0), "近距靶", None);
+        let id = spawn_target(&mut world, Vec3::new(0.0, 1.5, -8.0), "近距靶", None, false);
         assert_eq!(record_hit(&mut world, id), 1);
         assert_eq!(record_hit(&mut world, id), 2);
     }
@@ -178,6 +238,7 @@ mod tests {
             Vec3::new(6.5, 1.8, -9.5),
             "移动靶",
             Some(TargetMotion { speed: 3.0, range: 3.0, start_dir: -1.0 }),
+            false,
         );
         let start_x = world.get_entity(id).unwrap().position.x;
         // 推进半秒：应朝 -X 移动，但不超过初值（range=3 内）
@@ -192,7 +253,7 @@ mod tests {
     #[test]
     fn static_target_does_not_migrate() {
         let mut world = World::new();
-        let id = spawn_target(&mut world, Vec3::new(9.0, 2.2, -14.3), "远距靶", None);
+        let id = spawn_target(&mut world, Vec3::new(9.0, 2.2, -14.3), "远距靶", None, false);
         for _ in 0..30 {
             world.tick_all_entities(1.0 / 60.0);
         }
@@ -218,5 +279,45 @@ mod tests {
             e.get_component::<RangeTarget>().unwrap().motion.is_none()
         }).count();
         assert!(movers >= 2 && statics >= 3, "移动靶 {movers}、静态靶 {statics} 分布异常");
+    }
+
+    #[test]
+    fn destructible_target_dies_and_respawns() {
+        let mut world = World::new();
+        let id = spawn_target(&mut world, Vec3::new(0.0, 1.5, 0.0), "大场靶", None, true);
+        let e = world.get_entity(id).unwrap();
+        assert_eq!(e.hp, TARGET_MAX_HP, "可击毁靶血量应为 {TARGET_MAX_HP}");
+        // 击毁：直接压血并标记死亡（模拟 shooter 结算后的状态）
+        {
+            let e = world.get_entity_mut(id).unwrap();
+            e.hp = 0.0;
+            e.is_alive = false;
+            e.get_component_mut::<RangeTarget>().unwrap().respawn_in = TARGET_RESPAWN_SECS;
+        }
+        // 4.9 秒：仍应死亡
+        tick_respawns(&mut world, 4.9);
+        assert!(!world.get_entity(id).unwrap().is_alive, "4.9s 不应重生");
+        // 再推 0.2s（越过 5s）：满血复活
+        tick_respawns(&mut world, 0.2);
+        let e = world.get_entity(id).unwrap();
+        assert!(e.is_alive, "5.1s 应已重生");
+        assert_eq!(e.hp, TARGET_MAX_HP, "重生应满血");
+        assert_eq!(e.get_component::<RangeTarget>().unwrap().respawn_in, 0.0);
+    }
+
+    #[test]
+    fn score_only_target_never_dies_via_respawn_tick() {
+        let mut world = World::new();
+        let id = spawn_target(&mut world, Vec3::new(0.0, 1.5, 0.0), "训练靶", None, false);
+        let e = world.get_entity(id).unwrap();
+        assert!(e.hp == f32::MAX, "计分靶血量应恒为最大值");
+        assert_eq!(e.max_hp, f32::MAX);
+        // 计分靶即使被标记死亡（防御性），tick_respawns 也不得复活它
+        {
+            let e = world.get_entity_mut(id).unwrap();
+            e.is_alive = false;
+        }
+        tick_respawns(&mut world, TARGET_RESPAWN_SECS + 1.0);
+        assert!(!world.get_entity(id).unwrap().is_alive, "计分靶不走重生语义");
     }
 }

@@ -24,6 +24,28 @@
 
 ---
 
+## [0.15.7] · 2026-10-13 · 靶有反馈（大场固定靶可击毁）
+
+- **变更类型**：Feature（**细节版 `z+1`**——`TargetSpec` 为地图布局数据，仅在场景装配时
+  本地消费、不进线格式，已核实 `net` 模块零引用；serde 默认 false，旧地图零改动）
+- **背景**：owner 实测 0.15.6 复核冻结清单时拍板方向——大场加可击毁固定靶；大场 lawn
+  其实已有三组固定靶（搜索/交战/撤离），根因是全靶「命中只计分、绝不致死」无血量反馈。
+- **影响模块**：ContractCode —— `map::TargetSpec` 加 `destructible: bool`（serde 默认
+  false + Why Rustdoc；lawn 三组静态靶标 true，移动靶与训练场保持 false）；ServerCode
+  —— `combat/range.rs`（`RangeTarget` 加 `destructible/respawn_in` + builder；常量
+  `TARGET_MAX_HP=100`、`TARGET_RESPAWN_SECS=5`；`spawn_target` 加 `destructible` 参数；
+  新增 `tick_respawns`——Why：`Entity::tick` 对死亡实体提前返回，重生倒计时必须在实体
+  tick 之外推进）；`combat/shooter.rs`（靶分支分叉：可击毁靶走权威伤害管线真实扣血、
+  血空即灭、不播 `Kill`、不清理实体；计分靶维持原语义）；`combat/mod.rs`（`tick_world`
+  挂 `tick_respawns`）。**文档**：`docs/module/Server.combat.md` 靶机双语义。
+- **兼容性**：兼容（`z+1`）——双端 `0.15.7` 与 `0.15.x` 互通；训练场靶机行为零变化。
+- **验证**：`cargo test -p cute_of_duty_server` **132 passed**（新增
+  `destructible_target_dies_and_respawns` / `score_only_target_never_dies_via_respawn_tick`
+  两测，落 `range.rs` 内嵌 tests——`combat/tests.rs` 600 行压线不再扩容）；
+  `cargo check -p cute_of_duty_contract` 通过；行数核验 range.rs 323 / tests.rs 600。
+  实机待 owner 复核（大场固定靶：掉血飘字 → 击毁消失 → 5s 重生）。
+- **关联**：README 版本表 0.15.7 行；0.15.6 冻结项①（本轮唯一冻结项，了结后清单清零）。
+
 ## [0.15.6] · 2026-10-13 · 精截斜墙（OBB 截断 + 弃用 API 清零）
 
 - **变更类型**：Fix ×2（**细节版 `z+1`**，不触碰线格式）

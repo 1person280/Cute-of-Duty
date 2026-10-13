@@ -143,6 +143,12 @@ pub struct TargetSpec {
     pub label: String,
     /// None = 静态靶
     pub motion: Option<Motion>,
+    /// 可击毁靶：命中真实扣血，血空即击毁（快照隐藏），满 `RESPAWN_SECS` 满血重生。
+    /// Why：0.15.7 起 owner 实测大场靶机「射击无反馈」，根因是全靶恒命不判死——
+    /// 该开关让地图作者逐靶选择计分靶（恒存）与可击毁靶（掉血重生）两种语义；
+    /// serde 默认 false，旧地图数据零改动即回退为只计分。
+    #[serde(default)]
+    pub destructible: bool,
 }
 
 /// 拾取物类型（数据层枚举，渲染层映射为具体道具与颜色）

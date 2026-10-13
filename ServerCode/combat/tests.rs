@@ -94,7 +94,7 @@ fn fire_hits_training_target() {
     let mut h = CombatHarness::new();
     let pid = spawn_player(&mut h.world, Vec3::default(), 0);
     // 玩家朝向 +Z（默认 yaw=0），靶放在正前方 8m
-    let tid = super::range::spawn_target(&mut h.world, Vec3::new(0.0, 1.5, 8.0), "近距靶", None);
+    let tid = super::range::spawn_target(&mut h.world, Vec3::new(0.0, 1.5, 8.0), "近距靶", None, false);
 
     let ammo_before = h.world.get_entity(pid).unwrap().get_component::<Combatant>().unwrap().active().ammo;
     h.system.apply_input(
@@ -565,8 +565,8 @@ fn apply_loadout_drops_overflow() {
 fn gun_attaches_state_and_triggers_reaction() {
     let mut h = CombatHarness::new();
     let pid = spawn_player(&mut h.world, Vec3::default(), 0);
-    let tid = super::range::spawn_target(&mut h.world, Vec3::new(0.0, 1.5, 8.0), "近距靶", None);
-    let mut fire = |h: &mut CombatHarness| {
+    let tid = super::range::spawn_target(&mut h.world, Vec3::new(0.0, 1.5, 8.0), "近距靶", None, false);
+    let fire = |h: &mut CombatHarness| {
         h.system.apply_input(&mut h.world, &h.resolver, pid, 0.016, &h.env,
             CombatIntent { shoot: true, ..CombatIntent::default() });
         h.system.drain_events()
@@ -589,7 +589,7 @@ fn gun_attaches_state_and_triggers_reaction() {
 /// 挂接守卫：`Physical` 不挂状态；已有状态不被无反应枪击覆盖（转换只走反应表）。
 #[test]
 fn attach_state_guards() {
-    let mut h = CombatHarness::new();
+    let h = CombatHarness::new();
     let mut e = Entity::new_ai(0, Vec3::default());
     assert!(h.resolver.attach_element_state(&mut e, &ElementType::Physical).is_none(), "Physical 不应挂状态");
     assert_eq!(e.element_state, EntityElementState::Normal);

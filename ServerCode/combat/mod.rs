@@ -160,6 +160,8 @@ impl CombatSystem {
     ) {
         grenade::tick_grenades(world, resolver, env, &mut self.events, dt);
         zone::tick_zones(world, resolver, env, dt);
+        // 可击毁靶重生推进（0.15.7）：死亡实体拿不到组件心跳，须在实体 tick 之外推进
+        range::tick_respawns(world, dt);
         // 换弹推进：计时耗尽后直接从背包抽弹补满弹夹（无中间弹池）。
         shooter::tick_reloads(world, dt);
     }
