@@ -597,4 +597,3 @@ fn attach_state_guards() {
     h.resolver.attach_element_state(&mut e, &ElementType::Fire);
     assert_eq!(e.element_state, EntityElementState::Burning, "已有 Burning 不应被同元素覆盖");
 }
-

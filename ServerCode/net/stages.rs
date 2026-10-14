@@ -474,6 +474,7 @@ pub fn apply_input(sim: &mut GameLoop, eid: EntityId, input: &PlayerInput, dt: f
         weapon_slot: input.weapon_slot,
         use_slot: input.use_slot,
         grenade_cancel: input.grenade_cancel,
+        aim_origin_offset: input.aim_origin_offset,
     });
 }
 

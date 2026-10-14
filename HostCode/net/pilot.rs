@@ -1,4 +1,4 @@
-﻿//! WASD 移动 + 鼠标视角 + 开火/换弹/技能输入系统：把本地意图折成 `PlayerInput` 上报服务端
+//! WASD 移动 + 鼠标视角 + 开火/换弹/技能输入系统：把本地意图折成 `PlayerInput` 上报服务端
 //!
 //! 设计动机（Why）：服务端权威架构下客户端绝不本地移动，只把按键/视角意图折成
 //! `PlayerInput` 上报，位移由服务端按 Tick 结算后经快照回显。移动轴系取自视角
@@ -16,9 +16,16 @@ use bevy::prelude::*;
 use cute_of_duty_contract::net::protocol::{ClientMessage, PlayerInput};
 
 use crate::flow::flow_state::{AimRig, SeqCounter};
-use crate::flow::ModalState;
+use crate::flow::{LocalPlayer, ModalState};
 use crate::hud::ItemWheelState;
+use crate::net::snapshot::SnapshotBuffer;
 use super::network::NetOut;
+
+/// 视线原点偏移（米）→ 厘米 i16：先夹到 i16 量程内再转整（合法相机偏移 ≈7.4m，
+/// 远在量程内；夹取仅为防御性——快照未就绪时原点错位也不产生越界值）。
+fn offset_to_centi(v: f32) -> i16 {
+    (v * 100.0).clamp(-32768.0, 32767.0) as i16
+}
 
 /// WASD 位移意图、鼠标视角、开火/换弹/技能的朝向上报。
 pub fn input_system(
@@ -30,6 +37,9 @@ pub fn input_system(
     modal: Res<ModalState>,
     mut wheel: ResMut<ItemWheelState>,
     held: Res<crate::hud::HeldGrenadeState>,
+    snap: Res<SnapshotBuffer>,
+    player: Res<LocalPlayer>,
+    cameras: Query<&GlobalTransform, With<Camera3d>>,
     mut last: Local<Option<PlayerInput>>,
 ) {
     // 径向轮盘打开期间冻结一切玩法意图（移动/开火/换弹/技能/切枪），但**保留视角朝向**——
@@ -79,6 +89,15 @@ pub fn input_system(
     // 视角即瞄准意图：服务端据此旋转权威实体、结算弹道，并作为移动轴系的基准。
     input.aim_yaw = rig.yaw;
     input.aim_pitch = rig.pitch;
+    // 视线原点偏移（0.15.8）：准星所在相机射线原点相对本人脚底的偏移，服务端校验
+    // 后用作弹道起点——消除第三人称相机与权威出手点（脚底+1.5m）约 1.2m 的平行错位。
+    // 本人快照缺失（AOI 对账间隙）或相机未就绪时保持零值 = 服务端旧语义回退。
+    if let Some(me) = snap.current.iter().find(|e| e.entity_id == player.entity_id) {
+        if let Ok(cam) = cameras.single() {
+            let off = cam.translation() - Vec3::new(me.x, me.y, me.z);
+            input.aim_origin_offset = [offset_to_centi(off.x), offset_to_centi(off.y), offset_to_centi(off.z)];
+        }
+    }
 
     if last.as_ref() == Some(&input) {
         return;

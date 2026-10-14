@@ -17,7 +17,7 @@
 # =============================================================================
 
 contract: protocol
-version: 0.15.7
+version: 0.15.8
 status: draft
 owner_module: ContractCode/net
 authoritative_impl: ContractCode/net/protocol.rs
@@ -137,6 +137,14 @@ uplink:
         added_in: 0.9.0
         serde_default: true
         doc: 持雷态下按 Esc 取消投掷并放回背包；未持雷时无副作用
+      - name: aim_origin_offset       # 0.15.8 新增（Additive，线打包占 u[22..28]）
+        type: "[i16; 3]"
+        added_in: 0.15.8
+        serde_default: true
+        doc: |
+          相机射线原点相对玩家脚底的偏移（厘米）。服务端 `脚底 + offset` 作弹道起点，
+          消除第三人称相机与权威出手点（脚底+1.5m）约 1.2m 的平行错位；模长超 8m
+          整体回退旧起点。全零（旧端未发）= 旧语义回退，Additive 兼容无迁移。
     removed_fields:                # 0.8.0 删除 —— 老客户端编译期即失败
       - { name: use_medkit,  removed_in: 0.8.0, replaced_by: use_slot }
       - { name: use_grenade, removed_in: 0.8.0, replaced_by: use_slot }

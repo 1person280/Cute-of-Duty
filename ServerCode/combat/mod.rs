@@ -72,6 +72,9 @@ pub struct CombatIntent {
     pub use_slot: Option<u8>,
     /// 取消持握中的手雷（边沿量）：原样放回背包、不消耗。
     pub grenade_cancel: bool,
+    /// 视线原点偏移（厘米，相对脚底，0.15.8 新增）：消除第三人称相机与权威出手点的
+    /// 平行错位。全零 = 旧端输入 → `shooter` 回退旧起点（脚底 +1.5m），Additive 兼容。
+    pub aim_origin_offset: [i16; 3],
 }
 
 /// 权威战斗系统：持有干员名册引用与事件出队队列。
@@ -134,6 +137,7 @@ impl CombatSystem {
                 yaw,
                 pitch,
                 weapon_element,
+                intent.aim_origin_offset,
             );
         }
         if intent.reload {
@@ -349,6 +353,9 @@ pub fn use_item_at(world: &mut World, eid: EntityId, index: usize) {
         _ => {}
     }
 }
+
+#[cfg(test)]
+mod aimorigin;
 
 #[cfg(test)]
 mod tests;

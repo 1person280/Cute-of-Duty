@@ -106,6 +106,7 @@ pub fn try_fire(
     yaw: f32,
     pitch: f32,
     element: ElementType,
+    aim_origin_offset: [i16; 3],
 ) {
     // 阶段0：只读背包弹药存量——打空自动换弹的可用性判定基准（备弹权威宿主是背包，无中间池）。
     let has_reserve = world
@@ -134,7 +135,7 @@ pub fn try_fire(
             let interval = cb.fire_interval();
             cb.active_mut().ammo -= 1;
             cb.shoot_cooldown = interval;
-            let o = Vec3::new(origin.x, origin.y + 1.5, origin.z);
+            let o = aim_origin(origin, aim_origin_offset);
             (true, o)
         }
     };
@@ -263,6 +264,30 @@ pub fn try_fire(
     if victim_dead {
         events.push(CombatEvent::Kill { killer: eid.as_u64(), victim: target_id.as_u64() });
     }
+}
+
+/// 视线原点偏移校验上界（米）：合法第三人称相机偏移 ≈ 枢轴 2.6 + 拉臂 6.5 + 肩偏 0.55
+/// 的三角和上限 ≈7.4m，8m 留足余量。超界**整体回退**旧起点——校验失败的表现即旧客户端
+/// 的表现，服务端无状态副作用，伪造大偏移得不到任何优势。
+pub const AIM_ORIGIN_MAX_OFFSET: f32 = 8.0;
+
+/// 由脚底坐标与上行偏移算弹道起点：`脚底 + offset`（厘米 → 米），模长超
+/// [`AIM_ORIGIN_MAX_OFFSET`] 或全零（旧端无此字段）时回退旧起点 `脚底 +1.5m`。
+///
+/// 方向始终由 `aim_yaw/aim_pitch` 权威裁决——客户端只报「从哪看」，不报「往哪打」。
+pub fn aim_origin(base: Vec3, offset_cm: [i16; 3]) -> Vec3 {
+    if offset_cm == [0, 0, 0] {
+        return Vec3::new(base.x, base.y + 1.5, base.z);
+    }
+    let off = Vec3::new(
+        offset_cm[0] as f32 / 100.0,
+        offset_cm[1] as f32 / 100.0,
+        offset_cm[2] as f32 / 100.0,
+    );
+    if off.x * off.x + off.y * off.y + off.z * off.z > AIM_ORIGIN_MAX_OFFSET * AIM_ORIGIN_MAX_OFFSET {
+        return Vec3::new(base.x, base.y + 1.5, base.z);
+    }
+    Vec3::new(base.x + off.x, base.y + off.y, base.z + off.z)
 }
 
 /// 射线与球面的最近正交点，返回 `t`（>0）；无交点返回 None。

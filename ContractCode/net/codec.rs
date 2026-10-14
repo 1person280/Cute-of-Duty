@@ -252,7 +252,11 @@ pub fn decode_server_data(_kind: DataKind, bytes: &[u8]) -> Result<ServerMessage
     serde_json::from_slice(bytes).map_err(|e| format!("解析服务端数据失败: {e}"))
 }
 
-/// 位打包 [`PlayerInput`]（opcode + seq8 + 掩码2 + 俯仰4 + 偏航4 + 轮盘1 + 两槽各1 = 22B ≤ 32）。
+/// 位打包 [`PlayerInput`]（opcode + seq8 + 掩码2 + 俯仰4 + 偏航4 + 轮盘1 + 两槽各1
+/// + 视线原点偏移6 = 28B ≤ 32）。
+///
+/// `aim_origin_offset` 占 u[22..28]（厘米 i16×3，0.15.8 Additive）：旧端只读前 22B
+/// 不受影响；全零解包 = 旧弹道语义回退，新旧双端互通不炸。
 fn pack_input(p: &PlayerInput) -> Unit {
     let mut u = [0u8; UNIT_BYTES];
     u[0] = C_INPUT;
@@ -274,6 +278,9 @@ fn pack_input(p: &PlayerInput) -> Unit {
     u[19] = p.wheel_pick as u8;
     u[20] = p.weapon_slot.unwrap_or(0xFF);
     u[21] = p.use_slot.unwrap_or(0xFF);
+    for (i, v) in p.aim_origin_offset.iter().enumerate() {
+        u[22 + i * 2..24 + i * 2].copy_from_slice(&v.to_le_bytes());
+    }
     u
 }
 
@@ -304,6 +311,11 @@ fn unpack_input(u: &Unit) -> PlayerInput {
         wheel_pick: u[19] as i8,
         weapon_slot: opt(u[20]),
         use_slot: opt(u[21]),
+        aim_origin_offset: [
+            i16::from_le_bytes([u[22], u[23]]),
+            i16::from_le_bytes([u[24], u[25]]),
+            i16::from_le_bytes([u[26], u[27]]),
+        ],
     }
 }
 
@@ -394,6 +406,7 @@ mod tests {
             aim_pitch: -0.25,
             aim_yaw: 1.75,
             grenade_cancel: false,
+            aim_origin_offset: [55, -120, 260],
         };
         let WireMessage::Command(units) = encode_client(&ClientMessage::Input { player: p }).unwrap() else {
             panic!("输入应为指令单元");
@@ -401,6 +414,15 @@ mod tests {
         assert_eq!(units.len(), 1, "输入应压进单单元");
         let back = decode_client_unit(&units[0]).unwrap();
         assert_eq!(back, ClientMessage::Input { player: p });
+    }
+
+    /// 旧端兼容：u[22..28] 全零解包 = `aim_origin_offset` 全零（服务端据此回退旧弹道起点），
+    /// 且负偏移（厘米 i16）经打包往返不丢符号。
+    #[test]
+    fn input_legacy_zero_bytes_decode_to_zero_offset() {
+        let legacy = [0u8; UNIT_BYTES];
+        let p = unpack_input(&legacy);
+        assert_eq!(p.aim_origin_offset, [0, 0, 0], "旧端字节应解出零偏移（旧语义回退）");
     }
 
     /// 交互/转移/切干员等定长指令往返一致。
