@@ -24,6 +24,61 @@
 
 ---
 
+## [0.15.9] · 2026-10-14 · 近靶火星（出生区近距靶组 + 静态命中特效）
+
+- **变更类型**：Fix（**细节版 `z+1`**；不触碰线格式）
+- **背景**：0.15.7 实机复核结转两条冻结项——①大场靶最近在 z=400（距出生 70m > AOI
+  60m），出生点附近快照永不含靶，可击毁/重生反馈无法就近体验；②打掩体/地面无任何
+  命中表现（0.15.8 已修准星错位，本条补表现层）。
+- **影响模块**：ContractCode —— `map/lawn`（新增 `spawn_targets()`：出生点正前
+  z=445 横排三具 `destructible: true` 近距靶，距出生 ≈25m 在 AOI 内，快照必含；
+  `layout().targets` 挂首位）；HostCode —— `world/aiming.rs`（`Tracer` 加 `impact`
+  落点：曳光触发时终点经 `hits_prop`/地面步进判落掩体或地面，出火花球 + 三向短刺，
+  与曳光同寿命 0.3s 熄灭——纯表现层，判定仍全在服务端）。
+- **兼容性**：兼容——`TargetSpec` 仅为地图布局数据（`net` 零引用，0.15.7 已核实），
+  新增靶走既有 `spawn_range_targets` 通道；命中特效为纯客户端 gizmo 表现。
+- **验证**：`cargo test -p cute_of_duty_server` 134 绿；`cargo check -p cute_of_duty_host`
+  零警告；`cargo metadata --no-deps` 三端 + Cargo.lock 全 0.15.9 自洽。
+  实机验证（owner，与 0.15.8 回执合并）：①出生点正前即见三具近距靶，连打 9 发击毁
+  → 5 秒复活；②打掩体/地面出火花，0.3s 消散；③准星指靶机出飘字；④旧版 exe 互通不炸。
+- **关联**：`docs/module/Server.combat.md`（靶组四组）、`docs/module/Host.world.md`
+  （aiming 命中特效）、README 版本表。
+- **实机回执（owner）**：**无法测试 + 有问题**——本轮冻结新增：**瞄准会让某些长方体
+  突发拉长**（模型在瞄准状态下突发沿某轴拉长，疑似瞄准位移/缩放插值或 AOI 插值跳变，
+  下版排查）；0.15.9 的五项实机验证清单顺延至下版执行。
+
+---
+
+## [0.15.8] · 2026-10-14 · 弹道对准（视线原点偏移修复准星错位）
+
+- **变更类型**：Additive + Fix（**细节版 `z+1`**；wire_version 不动——见兼容性）
+- **背景**：owner 实机回执 0.15.7 三项遗留时发现红靶机「几乎不响应」（完全无伤害飘字），
+  而打 AI 出数字正常。诊断：**客户端准星射线 ≠ 服务端弹道射线**——两者方向同源
+  （yaw/pitch），但起点平行错开 ≈1.2m（服务端 `脚底+1.5m` vs 相机枢轴 2.6 + 拉臂 6.5 +
+  肩偏 0.55）。AI 躯干球半径 1.5m 擦边仍能中，靶机命中球仅 0.7m 几乎永远脱靶。
+- **影响模块**：ContractCode —— `net/protocol.rs`（`PlayerInput` 加
+  `aim_origin_offset: [i16; 3]`，厘米相对脚底 + Why Rustdoc）、`net/codec.rs`
+  （位打包占 u[22..28]，22B→28B 仍 ≤ 32B 定长单元；往返测试 + 旧端零字节解包测试）；
+  HostCode —— `net/pilot.rs`（input_system 由快照脚底 + 相机 `GlobalTransform` 算偏移，
+  快照/相机未就绪保持零值回退）；ServerCode —— `combat/mod.rs`（`CombatIntent` 加字段 +
+  `net/stages.rs` 映射）、`combat/shooter.rs`（新 `aim_origin()`：全零/模长超 8m 整体回退
+  旧起点 `脚底+1.5m`；常量 `AIM_ORIGIN_MAX_OFFSET=8.0`，合法相机偏移上限 ≈7.4m）、
+  `combat/range.rs`（`TARGET_HIT_RADIUS` 0.7→**0.85**：0.9m 可视方块半对角 ≈0.78m，
+  0.7 球棱角漏判）；**测试**：`combat/aimorigin.rs`（新文件——tests.rs 逼近 600 行红线，
+  回归锚点单列：起点校验 / 高位靶旧 miss 新 hit / 超界回退）。
+- **兼容性**：兼容（Additive）——位打包尾部加字节：旧端只读前 22B 不受影响；新服务端对
+  旧客户端输入解出全零偏移 → 回退旧弹道起点。双端必须**同版发布**才能拿到修复收益
+  （旧客户端 + 新服务端可玩，弹道仍错位），无强升级需求，故 wire_version 14→15 不触发。
+- **明确不修**：服务端命中不做掩体遮挡（前伸相机可窥墙后目标）为既有独立议题，本版不扩。
+- **验证**：`cargo test -p cute_of_duty_contract` 52 绿、`cargo test -p cute_of_duty_server`
+  134 绿（含 2 条新回归锚点）、`cargo check -p cute_of_duty_host` 零警告；
+  `cargo metadata --no-deps` 三端 + Cargo.lock 全 0.15.8 自洽。
+  实机验证清单（owner）：①准星指靶机打，出伤害数字；②连打 9 发击毁 → 5 秒复活；
+  ③打 AI 命中率恢复正常手感；④旧版 exe 连新服互通不炸。
+- **关联**：`docs/contracts/protocol.yaml`（0.15.8 + PlayerInput 新字段）、README 版本表。
+
+---
+
 ## [0.15.7] · 2026-10-13 · 靶有反馈（大场固定靶可击毁）
 
 - **变更类型**：Feature（**细节版 `z+1`**——`TargetSpec` 为地图布局数据，仅在场景装配时

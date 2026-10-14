@@ -7,8 +7,8 @@
 **本模块负责**：
 - **战斗结算**：`CombatSystem::apply_input`（开火 / 换弹 / 技能 Q/E / 切枪 / 速用，分派给 `shooter`/`skill`）与 `tick_world`（手雷飞行引爆 / 毒区周期结算 / 可击毁靶重生 / 换弹推进）。
 - **战斗组件**：`Combatant`（`operator_idx` + `weapons` + `active_slot` + 弹夹 + 冷却）、`HeldGrenade`（持雷中间态）。
-- **弹道与数值**：`shooter`（`try_fire` / `try_reload`，含弱点 ×1.8；命中后经 `resolver.attach_element_state` **把武器元素挂到目标 `element_state`**——仅从 `Normal` 挂接、不覆盖既有状态，训练靶也参与挂接），`grenade`（弹道常数 + 投掷/取消，**公开**供客户端预览同源复用），`skill`（Grenade/Burst/Dash），`zone`（周期掉血）。
-- **训练靶**：`range` 双语义（0.15.7 起）——**计分靶**恒命只计分；**可击毁靶**（`TargetSpec::destructible`，大场 lawn 三组固定靶启用）命中真实扣血，血空即灭（快照隐藏、不播 `Kill`），`tick_world → range::tick_respawns` 满 5s 满血原地重生。
+- **弹道与数值**：`shooter`（`try_fire` / `try_reload`，含弱点 ×1.8；0.15.8 起弹道起点由上行 `aim_origin_offset` 校验后决定，超界/零值回退 `脚底+1.5m`——消除第三人称相机与权威出手点的平行错位；命中后经 `resolver.attach_element_state` **把武器元素挂到目标 `element_state`**——仅从 `Normal` 挂接、不覆盖既有状态，训练靶也参与挂接），`grenade`（弹道常数 + 投掷/取消，**公开**供客户端预览同源复用），`skill`（Grenade/Burst/Dash），`zone`（周期掉血）。
+- **训练靶**：`range` 双语义（0.15.7 起）——**计分靶**恒命只计分；**可击毁靶**（`TargetSpec::destructible`，大场 lawn 四组固定靶启用，0.15.9 增设出生区近距靶组）命中真实扣血，血空即灭（快照隐藏、不播 `Kill`），`tick_world → range::tick_respawns` 满 5s 满血原地重生。
 - **实体与装配**：`spawn_player`、`apply_loadout`（选装清单重播种背包，未知名忽略）、`switch_weapon` / `switch_operator` / `equip_weapon` / `push_item` / `use_item_at`。
 - **事件出队**：`CombatEvent::{Kill, Hit}` 经 `drain_events()` 出队，供网络层转 `ServerMessage::Event`。
 

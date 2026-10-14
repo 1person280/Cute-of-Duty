@@ -34,12 +34,18 @@ const TRACER_SECS: f32 = 0.3;
 const LINE_COLOR: Color = Color::srgba(1.0, 0.15, 0.15, 0.45);
 /// 曳光颜色（更亮更实）。
 const TRACER_COLOR: Color = Color::srgba(1.0, 0.55, 0.20, 0.85);
+/// 命中特效半径（米）：掩体/地面落点的火花小球量级。
+const IMPACT_R: f32 = 0.18;
+/// 命中特效颜色（暖橙火花）。
+const IMPACT_COLOR: Color = Color::srgba(1.0, 0.75, 0.25, 0.9);
 
 /// 曳光瞬时状态：开火瞬间记录命中终点并起计时，超时熄灭。
 #[derive(Resource, Default)]
 pub(crate) struct Tracer {
     /// 曳光终点（开火瞬间的截断点）；`None` = 当前无曳光。
     end: Option<Vec3>,
+    /// 命中特效落点（0.15.9）：曳光触发时若终点落在掩体/地面则记录，与曳光同寿命。
+    impact: Option<Vec3>,
     /// 剩余显示秒数。
     remaining: f32,
 }
@@ -76,6 +82,9 @@ pub fn draw_aim_line(
         // （本地左键近似服务端射速节拍；单击 edge 由 remaining>0 自然覆盖）。
         if mouse.pressed(MouseButton::Left) && tracer.remaining <= 0.0 {
             tracer.end = Some(end);
+            // 命中特效（0.15.9）：终点落在掩体（marching 命中即止于表面）或地面
+            // （p.y≤0 步进终点）时出火花；止于目标实体/满射程则无（命中反馈由服务端飘字负责）。
+            tracer.impact = (hits_prop(end, &catalog) || end.y <= 0.05).then_some(end);
             tracer.remaining = TRACER_SECS;
         }
     }
@@ -86,6 +95,13 @@ pub fn draw_aim_line(
         if let Some(end) = tracer.end {
             let muzzle = origin + dir * MUZZLE_FWD - Vec3::Y * 0.1;
             gizmos.line(muzzle, end, TRACER_COLOR);
+        }
+        // 命中特效（0.15.9）：落点火花球 + 三向短刺，与曳光同寿命熄灭。
+        if let Some(impact) = tracer.impact {
+            gizmos.sphere(impact, IMPACT_R, IMPACT_COLOR);
+            for spoke in [Vec3::X, Vec3::Y, Vec3::Z] {
+                gizmos.line(impact - spoke * IMPACT_R * 2.0, impact + spoke * IMPACT_R * 2.0, IMPACT_COLOR);
+            }
         }
     }
 }

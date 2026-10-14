@@ -10,6 +10,7 @@
 - **体素造型**：`voxel`——`model`（`VoxelMaterials` + `spawn_voxel_body`）、`idle`（`drive_idle` 按服务端动画表达式写枢轴旋转）、`facing`（`face_aim_direction` 对齐视线偏航）。
 - **干员配色预设**：`model`（`voxel_for` / `tint_code` / `tint_colors`）。
 - **手雷预览**：`grenade/preview`（`draw_grenade_preview`，与服务端同源弹道常数）。
+- **瞄准线与命中特效**：`aiming`——激光瞄准线/曳光（`draw_aim_line`，视线按掩体 OBB 截断）；0.15.9 起开火落点命中掩体/地面时出短寿命火花（与曳光同寿命，纯表现不参与判定）。
 
 **本模块不负责**（明确划出）：
 - **不做**位置/身份权威——坐标取自 `SnapshotBuffer`，模型身份取自快照 `model_preset`。

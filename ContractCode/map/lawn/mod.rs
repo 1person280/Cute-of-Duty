@@ -59,6 +59,7 @@ pub fn layout() -> MapLayout {
         ]
         .concat(),
         targets: [
+            spawn_targets(),
             search_targets(),
             engage_targets(),
             engage_movers(),
@@ -165,6 +166,17 @@ pub(crate) fn pad_glow() -> Vec<GlowSpec> {
 // 平坦草坪上散布搜索目标（静态靶）与拾取物（弹药/医疗/护甲/手雷），
 // 模拟侦察阶段逐一清除与收刮。本区无实心掩体，保证全向视野与直射。
 // ============================================================================
+
+/// 出生区近距可击毁靶组（0.15.9）：横排在出生点正前 z=445（距出生 ≈25m，AOI 60m 内
+/// 快照必含），Why：大场既有靶组最近也在 z=400（距出生 70m > AOI），出生点附近快照
+/// 永不含靶——可击毁/重生反馈无法在出生点就近体验。
+pub(crate) fn spawn_targets() -> Vec<TargetSpec> {
+    vec![
+        TargetSpec { pos: [-20.0, 1.5, 445.0], label: "近距靶".into(), motion: None, destructible: true },
+        TargetSpec { pos: [0.0, 1.5, 445.0], label: "近距靶".into(), motion: None, destructible: true },
+        TargetSpec { pos: [20.0, 1.5, 445.0], label: "近距靶".into(), motion: None, destructible: true },
+    ]
+}
 
 /// 搜索目标：两列纵向散布，间距错开避免排成直线
 pub(crate) fn search_targets() -> Vec<TargetSpec> {
